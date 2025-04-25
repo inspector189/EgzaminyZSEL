@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:io';
+import 'egzamin.dart';
+import 'package:flutter/foundation.dart';
+void main() async {
+   WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb) {
+    ByteData data = await rootBundle.load('assets/cert/interpage.cer');
+    SecurityContext.defaultContext.setTrustedCertificatesBytes(data.buffer.asUint8List());
+  }
 
-void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatefulWidget {
@@ -427,10 +436,9 @@ Widget _buildQuestionsBox(
                 title: 'Losuj 1 pytanie',
                 subtitle: 'Sprawdź swoją wiedzę',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Losowanie 1 pytania dla $qualification'),
-                    ),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const EgzaminView(tryb: TrybEgzaminu.jednoPytanie)),
                   );
                 },
               ),
@@ -439,10 +447,9 @@ Widget _buildQuestionsBox(
                 title: 'Test 40 losowych pytań',
                 subtitle: 'Pełny egzamin próbny',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Rozpoczęcie testu 40 pytań dla $qualification'),
-                    ),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const EgzaminView(tryb: TrybEgzaminu.czterdziesciPytan)),
                   );
                 },
               ),
@@ -451,10 +458,9 @@ Widget _buildQuestionsBox(
                 title: 'Baza wszystkich odpowiedzi',
                 subtitle: 'Przeglądaj wszystkie pytania',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Otwarcie bazy odpowiedzi dla $qualification'),
-                    ),
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const EgzaminView(tryb: TrybEgzaminu.wszystkie)),
                   );
                 },
               ),
