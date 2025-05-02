@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import 'egzamin.dart';
+import 'logowanie.dart';
 import 'package:flutter/foundation.dart';
 void main() async {
    WidgetsFlutterBinding.ensureInitialized();
@@ -198,21 +199,35 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
         backgroundColor: Theme.of(context).colorScheme.primary,
         actions: [
-          const Spacer(),
-          buildPopupMenu('Strona Główna'),
-          buildPopupMenu('Programista'),
-          buildPopupMenu('Informatyk'),
-          buildPopupMenu('Elektryk'),
-          buildPopupMenu('Elektronik'),
-          buildPopupMenu('Teleinformatyk'),
-          buildPopupMenu('Automatyk'),
-          const Spacer(),
-          IconButton(
-            icon: Icon(widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round),
-            tooltip: 'Przełącz motyw',
-            onPressed: widget.onToggleTheme,
-          ),
-        ],
+  const Spacer(),
+  buildPopupMenu('Strona Główna'),
+  buildPopupMenu('Programista'),
+  buildPopupMenu('Informatyk'),
+  buildPopupMenu('Elektryk'),
+  buildPopupMenu('Elektronik'),
+  buildPopupMenu('Teleinformatyk'),
+  buildPopupMenu('Automatyk'),
+  const Spacer(),
+
+  // 🔑 DODANY PRZYCISK LOGOWANIA
+  IconButton(
+    icon: Icon(Icons.login),
+    tooltip: 'Logowanie',
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => LogowaniePage()),
+      );
+    },
+  ),
+
+  IconButton(
+    icon: Icon(widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round),
+    tooltip: 'Przełącz motyw',
+    onPressed: widget.onToggleTheme,
+  ),
+],
+
       ),
       body: Navigator(
         key: _navigatorKey,
