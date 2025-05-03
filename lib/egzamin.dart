@@ -210,18 +210,16 @@ Html _html(String html) {
         tagsToExtend: {'img'},
         builder: (context) {
           final src = context.attributes['src'];
+          print("📷 src: $src");
           if (src != null) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 18), // Odstęp od tekstu
               child: Center(
                 child: Image.network(
                   src,
-                  width: MediaQuery.of(context.buildContext!).size.width * 0.5, // Maksymalna szerokość 80% ekranu
+                  fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
-                    return const Text(
-                      '❌ Nie udało się załadować obrazka',
-                      style: TextStyle(color: Colors.red),
-                    );
+                    return const Text('❌ Nie udało się załadować obrazka');
                   },
                 ),
               ),
@@ -271,12 +269,12 @@ Html _html(String html) {
           );
         }),
         const SizedBox(height: 10),
-        if (selectedAnswer != null)
-          Html(
-            data: selectedAnswer == q['poprawna']
-                ? "<b>✅ Odpowiedź $selectedAnswer jest poprawna.<br>${q['opisPoprawne']}</b>"
-                : "<b>❌ Odpowiedź $selectedAnswer jest niepoprawna.<br>${q['opisNiepoprawne']}<br><br><span style='color:green;'>✅ Odpowiedź poprawna to: ${q['poprawna']}</span></b>",
-          ),
+          if (selectedAnswer != null)
+            _html(
+              selectedAnswer == q['poprawna']
+                  ? "<b>✅ Odpowiedź $selectedAnswer jest poprawna.<br>${q['opisPoprawne']}</b>"
+                  : "<b>❌ Odpowiedź $selectedAnswer jest niepoprawna.<br>${q['opisNiepoprawne']}<br><br><span style='color:green;'>✅ Odpowiedź poprawna to: ${q['poprawna']}</span></b>",
+            ),
         const SizedBox(height: 20),
         Center(
           child: ElevatedButton.icon(
@@ -315,7 +313,7 @@ Widget _buildScrollableList() {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Html(data: "<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}"),
+             _html("<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}"),
               const SizedBox(height: 10),
               ...['A', 'B', 'C', 'D'].map((litera) {
                 final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
@@ -340,17 +338,17 @@ Widget _buildScrollableList() {
                         selectedAnswers[index] = litera;
                       });
                     },
-                    child: Html(data: odp ?? ""),
+                    child: _html(odp ?? "")
                   ),
                 );
               }).toList(),
               const SizedBox(height: 6),
               if (selected != null)
-                Html(
-                  data: selected == q['poprawna']
-                      ? "<b>✅ Odpowiedź $selected jest poprawna.<br>${q['opisPoprawne']}</b>"
-                      : "<b>❌ Odpowiedź $selected jest niepoprawna.<br>${q['opisNiepoprawne']}</b>",
-                ),
+              _html(
+                selected == q['poprawna']
+                    ? "<b>✅ Odpowiedź $selected jest poprawna.<br>${q['opisPoprawne']}</b>"
+                    : "<b>❌ Odpowiedź $selected jest niepoprawna.<br>${q['opisNiepoprawne']}</b>",
+              ),
             ],
           ),
         ),
