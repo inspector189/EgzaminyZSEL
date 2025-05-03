@@ -88,7 +88,7 @@ Future<void> sendResultToServer({
   required String dataCzas,
   required int czasTrwania,
 }) async {
-  final url = Uri.parse('http://localhost/zapisz_wynik.php');
+  final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
   final response = await http.post(
     url,
     body: {
