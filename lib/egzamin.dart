@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'wyniki.dart';
+
 enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
 
 class EgzaminView extends StatefulWidget {
-   final TrybEgzaminu tryb;
-  const EgzaminView({super.key, required this.tryb});
+  final TrybEgzaminu tryb;
+  final String kwalifikacja; 
+
+  const EgzaminView({
+    super.key,
+    required this.tryb,
+    required this.kwalifikacja, 
+  });
 
   @override
   State<EgzaminView> createState() => _EgzaminViewState();
@@ -19,24 +27,37 @@ class _EgzaminViewState extends State<EgzaminView> {
   bool isLoading = true;
   List<String?> selectedAnswers = [];
   List<String> pytania = [];
+  late DateTime startTime;
 
   @override
   void initState() {
     super.initState();
     fetchQuestions();
+    startTime = DateTime.now();
   }
-
+    int calculateCorrectAnswers() {
+      int correct = 0;
+      for (int i = 0; i < questions.length; i++) {
+        if (selectedAnswers[i] == questions[i]['poprawna']) {
+          correct++;
+        }
+      }
+      return correct;
+    }
   Future<void> fetchQuestions() async {
-      final url = Uri.parse('https://interpage.pl/egzaminy/test.php');
+final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
+final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
+  print("📌 Kwalifikacja: ${widget.kwalifikacja}");
+  print("🌐 URL: $url");
   try {
     final response = await http.get(url);
     print("✅ Status code: ${response.statusCode}");
-    print("✅ Body: ${response.body.substring(0, 100)}...");
     if (response.statusCode == 200) {
       final decoded = json.decode(response.body);
       if (decoded is List && decoded.isNotEmpty) {
         List<dynamic> allQuestions = decoded;
         List<dynamic> selected;
+
         switch (widget.tryb) {
           case TrybEgzaminu.jednoPytanie:
             selected = [allQuestions..shuffle()].first;
@@ -61,14 +82,35 @@ class _EgzaminViewState extends State<EgzaminView> {
     print("Błąd przy pobieraniu pytań: $e");
   }
 }
-  // Funkcja do zaznaczania odpowiedzi
+Future<void> sendResultToServer({
+  required String kwalifikacja,
+  required double wynik,
+  required String dataCzas,
+  required int czasTrwania,
+}) async {
+  final url = Uri.parse('http://localhost/zapisz_wynik.php');
+  final response = await http.post(
+    url,
+    body: {
+      'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
+      'wynik': wynik.toStringAsFixed(2),
+      'data_czas': dataCzas,
+      'czas_trwania': czasTrwania.toString(),
+    },
+  );
+
+  if (response.statusCode != 200) {
+    print('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
+  } else {
+    print('✅ Wynik zapisany');
+  }
+}
   void checkAnswer(String answer) {
     setState(() {
       selectedAnswer = answer;
     });
   }
 
-  // Funkcja do przejścia do kolejnego pytania
   void nextQuestion() {
     if (current < questions.length - 1) {
       setState(() {
@@ -78,7 +120,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     }
   }
 
-  // Funkcja do przejścia do poprzedniego pytania
   void prevQuestion() {
     if (current > 0) {
       setState(() {
@@ -88,7 +129,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     }
   }
 
-  // Funkcja do przejścia do wybranego pytania
   void jumpToQuestion(String value) {
     final number = int.tryParse(value);
     if (number != null && number >= 1 && number <= questions.length) {
@@ -115,12 +155,50 @@ Widget build(BuildContext context) {
     );
   }
 
-  return Scaffold(
-    appBar: AppBar(title: const Text("Egzamin")),
-    body: widget.tryb == TrybEgzaminu.jednoPytanie
-        ? _buildSingleQuestion(questions.first)
-        : _buildScrollableList(),
-  );
+return Scaffold(
+  appBar: AppBar(title: const Text("Egzamin")),
+  body: widget.tryb == TrybEgzaminu.jednoPytanie
+      ? _buildSingleQuestion(questions.first)
+      : _buildScrollableList(),
+  bottomNavigationBar: widget.tryb == TrybEgzaminu.czterdziesciPytan
+      ? Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: ElevatedButton(
+            onPressed: () async {
+              final correct = calculateCorrectAnswers();
+              final total = questions.length;
+              final percent = (correct / total) * 100;
+              final endTime = DateTime.now();
+              final duration = endTime.difference(startTime).inSeconds;
+
+              await sendResultToServer(
+                kwalifikacja: widget.kwalifikacja,
+                wynik: percent,
+                dataCzas: endTime.toIso8601String(),
+                czasTrwania: duration,
+              );
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EgzaminWynikView(
+                    correctAnswers: correct,
+                    totalQuestions: total,
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Zakończ egzamin"),
+          ),
+        )
+      : null,
+);
+
 }
 Html _html(String html) {
  html = html.replaceAll('<img', '<br><img');

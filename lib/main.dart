@@ -453,7 +453,12 @@ Widget _buildQuestionsBox(
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const EgzaminView(tryb: TrybEgzaminu.jednoPytanie)),
+                MaterialPageRoute(
+                  builder: (context) => EgzaminView(
+                        tryb: TrybEgzaminu.jednoPytanie,
+                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''), 
+                      ),
+                    )
                   );
                 },
               ),
@@ -464,7 +469,12 @@ Widget _buildQuestionsBox(
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const EgzaminView(tryb: TrybEgzaminu.czterdziesciPytan)),
+                    MaterialPageRoute(
+                      builder: (context) => EgzaminView(
+                        tryb: TrybEgzaminu.czterdziesciPytan,
+                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''), 
+                      ),
+                    )
                   );
                 },
               ),
@@ -475,7 +485,12 @@ Widget _buildQuestionsBox(
                 onTap: () {
                 Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const EgzaminView(tryb: TrybEgzaminu.wszystkie)),
+                    MaterialPageRoute(
+                      builder: (context) => EgzaminView(
+                        tryb: TrybEgzaminu.wszystkie,
+                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''), 
+                      ),
+                    )
                   );
                 },
               ),
