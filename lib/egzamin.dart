@@ -90,13 +90,17 @@ Future<void> sendResultToServer({
 }) async {
   final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
   final response = await http.post(
-    url,
-    body: {
-      'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
-      'wynik': wynik.toStringAsFixed(2),
-      'data_czas': dataCzas,
-      'czas_trwania': czasTrwania.toString(),
-    },
+  url,
+  headers: {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^', // TOKEN
+  },
+  body: {
+    'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
+    'wynik': wynik.toStringAsFixed(2),
+    'data_czas': dataCzas,
+    'czas_trwania': czasTrwania.toString(),
+  },
   );
 
   if (response.statusCode != 200) {
