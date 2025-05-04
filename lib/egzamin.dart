@@ -212,19 +212,28 @@ Html _html(String html) {
     extensions: [
       TagExtension(
         tagsToExtend: {'img'},
-        builder: (context) {
-          final src = context.attributes['src'];
-          print("📷 src: $src");
+        builder: (extensionContext) {
+          final src = extensionContext.attributes['src'];
           if (src != null) {
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 18), // Odstęp od tekstu
-              child: Center(
-                child: Image.network(
-                  src,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Text('❌ Nie udało się załadować obrazka');
-                  },
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Builder(
+                builder: (context) => Center(
+                  child: Tooltip(
+                    message: 'Kliknij, aby powiększyć',
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => _showImageDialog(context, src),
+                        child: Image.network(
+                          src,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Text('❌ Nie udało się załadować obrazka'),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             );
@@ -232,9 +241,84 @@ Html _html(String html) {
           return const Text('⚠️ Brak obrazka');
         },
       ),
+
     ],
   );
 }
+
+void _showImageDialog(BuildContext context, String imageUrl) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Zamknij',
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (context, anim1, anim2) {
+      final screenSize = MediaQuery.of(context).size;
+      bool isPressed = false;
+
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return GestureDetector(
+            // Zamykanie po kliknięciu w dowolne tło
+            onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+            child: Scaffold(
+              backgroundColor: Colors.black.withOpacity(0.9),
+              body: Stack(
+                children: [
+                  // interaktywne zdjęcie – blokuje tylko środek
+                  Center(
+                    child: GestureDetector(
+                      // Blokujemy kliknięcia na sam obrazek (żeby go nie zamykać)
+                      onTap: () {},
+                      child: Listener(
+                        onPointerDown: (_) => setState(() => isPressed = true),
+                        onPointerUp: (_) => setState(() => isPressed = false),
+                        child: MouseRegion(
+                          cursor: isPressed
+                              ? SystemMouseCursors.grabbing
+                              : SystemMouseCursors.grab,
+                          child: InteractiveViewer(
+                            panEnabled: true,
+                            minScale: 0.5,
+                            maxScale: 4,
+                            child: Image.network(
+                              imageUrl,
+                              width: screenSize.width * 0.8,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Text(
+                                '❌ Nie udało się załadować obrazka',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Przycisk X
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, size: 30, color: Colors.white),
+                      tooltip: 'Zamknij',
+                      onPressed: () =>
+                          Navigator.of(context, rootNavigator: true).pop(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+
 
   Widget _buildSingleQuestion(dynamic q) {
   return Padding(
@@ -303,10 +387,11 @@ void _losujNowePytanie() {
   });
 }
 Widget _buildScrollableList() {
-  return ListView.builder(
-    padding: const EdgeInsets.all(16),
-    itemCount: questions.length,
-    itemBuilder: (context, index) {
+return ListView.builder(
+  padding: const EdgeInsets.all(16),
+  itemCount: questions.length,
+  addAutomaticKeepAlives: false, 
+  itemBuilder: (context, index) {
       final q = questions[index];
       final selected = selectedAnswers[index];
 
@@ -360,6 +445,48 @@ Widget _buildScrollableList() {
     },
   );
 }
+
+
+}
+
+class _InteractiveImage extends StatefulWidget {
+  final String imageUrl;
+  const _InteractiveImage({required this.imageUrl});
+
+  @override
+  State<_InteractiveImage> createState() => _InteractiveImageState();
+}
+
+
+class _InteractiveImageState extends State<_InteractiveImage> {
+  bool _isPressed = false;
+
+ @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
+    return Listener(
+      onPointerDown: (_) => setState(() => _isPressed = true),
+      onPointerUp: (_) => setState(() => _isPressed = false),
+      child: MouseRegion(
+        cursor: _isPressed ? SystemMouseCursors.grabbing : SystemMouseCursors.grab,
+        child: InteractiveViewer(
+          panEnabled: true,
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.network(
+            widget.imageUrl,
+            fit: BoxFit.contain,
+            width: screenSize.width * 0.9,   // 🔥 WYMUSZAMY większy rozmiar
+            errorBuilder: (context, error, stackTrace) => const Text(
+              '❌ Nie udało się załadować obrazka',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
 
 }
