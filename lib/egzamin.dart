@@ -47,11 +47,8 @@ class _EgzaminViewState extends State<EgzaminView> {
   Future<void> fetchQuestions() async {
 final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
 final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
-  print("📌 Kwalifikacja: ${widget.kwalifikacja}");
-  print("🌐 URL: $url");
   try {
     final response = await http.get(url);
-    print("✅ Status code: ${response.statusCode}");
     if (response.statusCode == 200) {
       final decoded = json.decode(response.body);
       if (decoded is List && decoded.isNotEmpty) {

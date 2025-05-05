@@ -4,6 +4,8 @@ import 'dart:io';
 import 'egzamin.dart';
 import 'logowanie.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:math';
+import 'dart:ui';
 void main() async {
    WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
@@ -253,113 +255,168 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-// Widget for the home page content
 class HomeContent extends StatelessWidget {
+  final bool isDarkMode;
+  final Function(String) onQualificationTap;
+
   const HomeContent({
     super.key,
     required this.isDarkMode,
     required this.onQualificationTap,
   });
 
-  final bool isDarkMode;
-  final Function(String) onQualificationTap;
-
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+    final quotes = [
+      '„Nie uczysz się dla szkoły, lecz dla siebie.” – Seneka',
+      '„Nauka to potęgi klucz.” – Ignacy Krasicki',
+      '„Człowiek uczy się przez całe życie.”',
+      '„Wiedza to potęga.”',
+    ];
+    final random = Random();
+    final selectedQuote = quotes[random.nextInt(quotes.length)];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              'Witamy w aplikacji Egzaminy! 👋',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Przygotuj się do egzaminu zawodowego z najlepszą bazą pytań! Poniżej znajdziesz kwalifikacje, które możesz przeglądać:',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              '💬 $selectedQuote',
+              style: const TextStyle(
+                fontStyle: FontStyle.italic,
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        const SizedBox(height: 40),
+        _buildGrid(context, '👨‍💻 Technik Programista', [
+          _item(context, Icons.code, 'INF.03', 'programowanie i aplikacje'),
+          _item(context, Icons.router, 'INF.04', 'administrowanie siecią'),
+        ]),
+        _buildGrid(context, '💻 Technik Informatyk', [
+          _item(context, Icons.code, 'INF.03', 'programowanie i aplikacje'),
+          _item(context, Icons.memory, 'INF.02', 'sprzęt, systemy i sieci'),
+        ]),
+        _buildGrid(context, '🌐 Technik Teleinformatyk', [
+          _item(context, Icons.security, 'INF.08', 'usługi sieciowe i bezpieczeństwo'),
+          _item(context, Icons.network_check, 'INF.07', 'systemy i urządzenia sieciowe'),
+        ]),
+        _buildGrid(context, '🧑‍🔧 Technik Elektronik', [
+          Column(
+            children: [
+              _item(context, Icons.devices_other, 'E.06', 'montaż urządzeń elektronicznych'),
+              const SizedBox(height: 20),
+              _item(context, Icons.bolt, 'EE.22', 'eksploatacja instalacji elektrycznych'),
+            ],
+          ),
+          Column(
+            children: [
+              _item(context, Icons.analytics, 'ELM.02', 'instalacje i pomiary'),
+              const SizedBox(height: 20),
+              _item(context, Icons.build, 'ELM.05', 'serwis urządzeń elektronicznych'),
+            ],
+          ),
+        ]),
+        _buildGrid(context, '🧑‍🏭 Technik Elektryk', [
+          _item(context, Icons.precision_manufacturing, 'ELE.05', 'eksploatacja maszyn i urządzeń'),
+          _item(context, Icons.electrical_services, 'ELE.02', 'układy elektryczne'),
+          _item(context, Icons.cable, 'E.08', 'sieci lokalne i konfiguracja'),
+        ]),
+        _buildGrid(context, '🤖 Technik Automatyk', [
+          _item(context, Icons.build_circle, 'ELM.01', 'montaż automatyki przemysłowej'),
+          _item(context, Icons.settings_input_component, 'ELM.04', 'układy automatyki'),
+          _item(context, Icons.electrical_services, 'EE.18', '(opcjonalne)'),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildGrid(BuildContext context, String title, List<Widget> items) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
-            'Egzamin z teorii (test 40 pytań)',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontSize: 48,
-                ),
-            textAlign: TextAlign.center,
+            title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
-          Text(
-            'Oferujemy tutaj całkowicie darmowy dostęp do ogromnej bazy pytań z informatycznych egzaminów zawodowych. '
-            'Pytania pochodzą wprost z arkuszy z lat ubiegłych. Wybierz poniżej swoją kwalifikację i zacznij zdobywać wiedzę:',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          Center(
-            child: Wrap(
-              spacing: 20,
-              runSpacing: 20,
-              children: [
-                _buildQualificationBox(
-                  context,
-                  title: 'INF.02 (dawniej EE.08)',
-                  subtitle: 'sprzęt, systemy i sieci',
-                  onTap: () => onQualificationTap('INF.02'),
-                ),
-                _buildQualificationBox(
-                  context,
-                  title: 'INF.03 (dawniej EE.09/E14)',
-                  subtitle: 'programowanie',
-                  onTap: () => onQualificationTap('INF.03'),
-                ),
-              ],
-            ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 20,
+            runSpacing: 20,
+            children: items,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQualificationBox(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 300,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+  Widget _item(BuildContext context, IconData icon, String code, String label) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double itemWidth = screenWidth < 600 ? screenWidth - 40 : 300;
+
+    return InkWell(
+      onTap: () => onQualificationTap(code),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: itemWidth,
+        height: 180,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 36, color: const Color(0xFFFF7373)),
+            const SizedBox(height: 12),
+            Text(
+              code,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Icon(Icons.assignment, size: 50, color: const Color(0xFFFF7373)),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            )
+          ],
         ),
       ),
     );

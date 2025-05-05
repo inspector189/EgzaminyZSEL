@@ -18,7 +18,7 @@ class EgzaminWynikView extends StatelessWidget {
 
     final resultText = "$correctAnswers / $totalQuestions";
     final message = zdane
-        ? "Gratulacje!!! Zdajesz!"
+        ? "Gratulacje! Zdałeś egzamin!"
         : "Niestety, nie udało się zdać";
 
     final color = zdane ? Colors.green : Colors.red;
