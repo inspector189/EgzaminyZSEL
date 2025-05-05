@@ -318,17 +318,17 @@ void _showImageDialog(BuildContext context, String imageUrl) {
 
 
   Widget _buildSingleQuestion(dynamic q) {
-  return Padding(
+  return SingleChildScrollView(
     padding: const EdgeInsets.all(16),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
- _html("<h3>Pytanie:</h3>${q['pytanie']}"),
-          const SizedBox(height: 16),
-          ...['A', 'B', 'C', 'D'].map((litera) {
-            final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
-            final isCorrect = litera == q['poprawna'];
-            final isWrong = selectedAnswer == litera && !isCorrect;
+        _html("<h3>Pytanie:</h3>${q['pytanie']}"),
+        const SizedBox(height: 16),
+        ...['A', 'B', 'C', 'D'].map((litera) {
+          final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
+          final isCorrect = litera == q['poprawna'];
+          final isWrong = selectedAnswer == litera && !isCorrect;
 
           Color? buttonColor;
           if (selectedAnswer != null) {
@@ -341,25 +341,25 @@ void _showImageDialog(BuildContext context, String imageUrl) {
             }
           }
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: buttonColor,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => checkAnswer(litera),
-                child: _html(odp ?? ""),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: buttonColor,
+                foregroundColor: Colors.white,
               ),
+              onPressed: () => checkAnswer(litera),
+              child: _html(odp ?? ""),
+            ),
           );
         }),
         const SizedBox(height: 10),
-          if (selectedAnswer != null)
-            _html(
-              selectedAnswer == q['poprawna']
-                  ? "<b>✅ Odpowiedź $selectedAnswer jest poprawna.<br>${q['opisPoprawne']}</b>"
-                  : "<b>❌ Odpowiedź $selectedAnswer jest niepoprawna.<br>${q['opisNiepoprawne']}<br><br><span style='color:green;'>✅ Odpowiedź poprawna to: ${q['poprawna']}</span></b>",
-            ),
+        if (selectedAnswer != null)
+          _html(
+            selectedAnswer == q['poprawna']
+                ? "<b>✅ Odpowiedź $selectedAnswer jest poprawna.<br>${q['opisPoprawne']}</b>"
+                : "<b>❌ Odpowiedź $selectedAnswer jest niepoprawna.<br>${q['opisNiepoprawne']}<br><br><span style='color:green;'>✅ Odpowiedź poprawna to: ${q['poprawna']}</span></b>",
+          ),
         const SizedBox(height: 20),
         Center(
           child: ElevatedButton.icon(
@@ -377,6 +377,7 @@ void _showImageDialog(BuildContext context, String imageUrl) {
     ),
   );
 }
+
 void _losujNowePytanie() {
   setState(() {
     questions.shuffle();

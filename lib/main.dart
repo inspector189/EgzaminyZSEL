@@ -119,24 +119,28 @@ class _MyHomePageState extends State<MyHomePage> {
     if (title == 'Strona Główna') {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6.0),
-        child: GestureDetector(
-          onTap: () {
-            // Pop all pages until the home page is reached
-            _navigatorKey.currentState?.popUntil((route) => route.isFirst);
-          },
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 80),
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Center(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14.0,
-                  fontWeight: FontWeight.w500,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(4),
+            onTap: () {
+              _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+            },
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 80),
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                color: Colors.transparent,
+              ),
+              child: Center(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -144,6 +148,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       );
     }
+
 
     // Other categories use PopupMenuButton
     return Padding(
@@ -193,44 +198,217 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
+  Widget _drawerItem(BuildContext context, String title) {
+  return ListTile(
+    title: Text(title),
+    onTap: () {
+      Navigator.pop(context);
+      if (title == 'Strona Główna') {
+        _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+      } else {
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (context) => QualificationPage(
+              qualification: title,
+              isDarkMode: widget.isDarkMode,
+            ),
+          ),
+        );
+      }
+    },
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        actions: [
-  const Spacer(),
-  buildPopupMenu('Strona Główna'),
-  buildPopupMenu('Programista'),
-  buildPopupMenu('Informatyk'),
-  buildPopupMenu('Elektryk'),
-  buildPopupMenu('Elektronik'),
-  buildPopupMenu('Teleinformatyk'),
-  buildPopupMenu('Automatyk'),
-  const Spacer(),
+  drawer: MediaQuery.of(context).size.width <= 900
+      ? Drawer(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                child: Text(
+                  'Menu',
+                  style: TextStyle(color: Colors.white, fontSize: 24),
+                ),
+              ),
+              _drawerItem(context, 'Strona Główna'),
+              ExpansionTile(
+              title: const Text('Programista'),
+              children: getMenuItems('Programista').map((kwal) {
+                return ListTile(
+                  title: Text(kwal),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _navigatorKey.currentState?.push(
+                      MaterialPageRoute(
+                        builder: (context) => QualificationPage(
+                          qualification: kwal,
+                          isDarkMode: widget.isDarkMode,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              }).toList(),
+            ),
+              ExpansionTile(
+                title: const Text('Informatyk'),
+                children: getMenuItems('Informatyk').map((kwal) {
+                  return ListTile(
+                    title: Text(kwal),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigatorKey.currentState?.push(
+                        MaterialPageRoute(
+                          builder: (context) => QualificationPage(
+                            qualification: kwal,
+                            isDarkMode: widget.isDarkMode,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+              ExpansionTile(
+                title: const Text('Elektryk'),
+                children: getMenuItems('Elektryk').map((kwal) {
+                  return ListTile(
+                    title: Text(kwal),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigatorKey.currentState?.push(
+                        MaterialPageRoute(
+                          builder: (context) => QualificationPage(
+                            qualification: kwal,
+                            isDarkMode: widget.isDarkMode,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+              ExpansionTile(
+                title: const Text('Elektronik'),
+                children: getMenuItems('Elektronik').map((kwal) {
+                  return ListTile(
+                    title: Text(kwal),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigatorKey.currentState?.push(
+                        MaterialPageRoute(
+                          builder: (context) => QualificationPage(
+                            qualification: kwal,
+                            isDarkMode: widget.isDarkMode,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+              ExpansionTile(
+                title: const Text('Teleinformatyk'),
+                children: getMenuItems('Teleinformatyk').map((kwal) {
+                  return ListTile(
+                    title: Text(kwal),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigatorKey.currentState?.push(
+                        MaterialPageRoute(
+                          builder: (context) => QualificationPage(
+                            qualification: kwal,
+                            isDarkMode: widget.isDarkMode,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+              ExpansionTile(
+                title: const Text('Automatyk'),
+                children: getMenuItems('Automatyk').map((kwal) {
+                  return ListTile(
+                    title: Text(kwal),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigatorKey.currentState?.push(
+                        MaterialPageRoute(
+                          builder: (context) => QualificationPage(
+                            qualification: kwal,
+                            isDarkMode: widget.isDarkMode,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.login),
+                title: const Text('Logowanie'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LogowaniePage()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round),
+                title: const Text('Przełącz motyw'),
+                onTap: () {
+                  Navigator.pop(context);
+                  widget.onToggleTheme();
+                },
+              ),
+            ],
+          ),
+        )
+      : null,
 
-  // 🔑 DODANY PRZYCISK LOGOWANIA
-  IconButton(
-    icon: Icon(Icons.login),
-    tooltip: 'Logowanie',
-    onPressed: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => LogowaniePage()),
-      );
-    },
+  appBar: AppBar(
+    title: Text(widget.title),
+    backgroundColor: Theme.of(context).colorScheme.primary,
+    actions: MediaQuery.of(context).size.width > 900
+        ? [
+            const Spacer(),
+            buildPopupMenu('Strona Główna'),
+            buildPopupMenu('Programista'),
+            buildPopupMenu('Informatyk'),
+            buildPopupMenu('Elektryk'),
+            buildPopupMenu('Elektronik'),
+            buildPopupMenu('Teleinformatyk'),
+            buildPopupMenu('Automatyk'),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.login),
+              tooltip: 'Logowanie',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LogowaniePage()),
+                );
+              },
+            ),
+            IconButton(
+              icon: Icon(widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round),
+              tooltip: 'Przełącz motyw',
+              onPressed: widget.onToggleTheme,
+            ),
+          ]
+        : null,
   ),
-
-  IconButton(
-    icon: Icon(widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round),
-    tooltip: 'Przełącz motyw',
-    onPressed: widget.onToggleTheme,
-  ),
-],
-
-      ),
       body: Navigator(
         key: _navigatorKey,
         onGenerateRoute: (settings) {
@@ -268,11 +446,17 @@ class HomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final quotes = [
-      '„Nie uczysz się dla szkoły, lecz dla siebie.” – Seneka',
-      '„Nauka to potęgi klucz.” – Ignacy Krasicki',
-      '„Człowiek uczy się przez całe życie.”',
-      '„Wiedza to potęga.”',
-    ];
+  '„Nie uczysz się dla szkoły, lecz dla siebie.” – Seneka',
+  '„Nauka to potęgi klucz.” – Ignacy Krasicki',
+  '„Człowiek uczy się przez całe życie.”',
+  '„Wiedza to potęga.”',
+  '„Im więcej wiem, tym więcej wiem, że nic nie wiem.” – Sokrates',
+  '„Uczyć się to odkrywać to, co już wiesz. Działać to pokazywać, że to wiesz.” – Richard Bach',
+  '„Uczenie się jest jak wiosłowanie pod prąd – gdy przestajesz, cofasz się.” – Edward Benjamin Britten',
+  '„Kiedy uczymy innych, uczymy się podwójnie.” – Joseph Joubert',
+  '„Inwestycja w wiedzę zawsze przynosi największe zyski.” – Benjamin Franklin',
+  '„Nie ma większej siły niż wiedza i nie ma większej wolności niż edukacja.” – Malcolm X',
+];
     final random = Random();
     final selectedQuote = quotes[random.nextInt(quotes.length)];
 

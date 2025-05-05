@@ -104,55 +104,112 @@ class _LogowaniePageState extends State<LogowaniePage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(_isLoginMode ? 'Logowanie' : 'Rejestracja')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: ListView(
-          children: [
-            TextField(
-              controller: _loginController,
-              decoration: const InputDecoration(labelText: 'Login'),
+ @override
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
+  return Scaffold(
+    appBar: AppBar(title: Text(_isLoginMode ? 'Logowanie' : 'Rejestracja')),
+    body: Center(
+      child: Card(
+        elevation: 8,
+        margin: const EdgeInsets.all(24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _isLoginMode ? Icons.lock_open : Icons.person_add,
+                  size: 48,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _loginController,
+                  decoration: InputDecoration(
+                    labelText: 'Login',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _hasloController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Hasło',
+                    prefixIcon: const Icon(Icons.lock),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                if (!_isLoginMode) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _powtorzHasloController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Powtórz hasło',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: const Icon(Icons.email),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoginMode ? logowanie : rejestracja,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 2,
+                    ),
+                    child: Text(
+                      _isLoginMode ? 'Zaloguj się' : 'Zarejestruj się',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isLoginMode = !_isLoginMode),
+                      child: Text(
+                        _isLoginMode
+                            ? 'Nie masz konta? Zarejestruj się'
+                            : 'Masz już konto? Zaloguj się',
+                        style: TextStyle(
+                          color: theme.colorScheme.primary.withOpacity(0.9),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              ],
             ),
-            TextField(
-              controller: _hasloController,
-              decoration: const InputDecoration(labelText: 'Hasło'),
-              obscureText: true,
-            ),
-            if (!_isLoginMode)
-              TextField(
-                controller: _powtorzHasloController,
-                decoration: const InputDecoration(labelText: 'Powtórz hasło'),
-                obscureText: true,
-              ),
-            if (!_isLoginMode)
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isLoginMode ? logowanie : rejestracja,
-              child: Text(_isLoginMode ? 'Zaloguj' : 'Zarejestruj'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _isLoginMode = !_isLoginMode;
-                });
-              },
-              child: Text(
-                _isLoginMode
-                    ? 'Nie masz konta? Zarejestruj się'
-                    : 'Masz już konto? Zaloguj się',
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
