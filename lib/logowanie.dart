@@ -18,9 +18,9 @@ class _LogowaniePageState extends State<LogowaniePage> {
   bool _isLoginMode = true;
 
   void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   bool isEmailValid(String email) {
@@ -39,10 +39,7 @@ class _LogowaniePageState extends State<LogowaniePage> {
     try {
       final response = await http.post(
         url,
-        body: {
-          'login': _loginController.text,
-          'haslo': _hasloController.text,
-        },
+        body: {'login': _loginController.text, 'haslo': _hasloController.text},
       );
 
       final Map<String, dynamic> data = jsonDecode(response.body);
@@ -64,7 +61,10 @@ class _LogowaniePageState extends State<LogowaniePage> {
     final powtorzHaslo = _powtorzHasloController.text;
     final email = _emailController.text.trim();
 
-    if (login.isEmpty || haslo.isEmpty || powtorzHaslo.isEmpty || email.isEmpty) {
+    if (login.isEmpty ||
+        haslo.isEmpty ||
+        powtorzHaslo.isEmpty ||
+        email.isEmpty) {
       showMessage('Uzupełnij wszystkie pola');
       return;
     }
@@ -84,11 +84,7 @@ class _LogowaniePageState extends State<LogowaniePage> {
     try {
       final response = await http.post(
         url,
-        body: {
-          'login': login,
-          'haslo': haslo,
-          'email': email,
-        },
+        body: {'login': login, 'haslo': haslo, 'email': email},
       );
 
       final Map<String, dynamic> data = jsonDecode(response.body);
@@ -104,112 +100,127 @@ class _LogowaniePageState extends State<LogowaniePage> {
     }
   }
 
- @override
-Widget build(BuildContext context) {
-  final theme = Theme.of(context);
-  return Scaffold(
-    appBar: AppBar(title: Text(_isLoginMode ? 'Logowanie' : 'Rejestracja')),
-    body: Center(
-      child: Card(
-        elevation: 8,
-        margin: const EdgeInsets.all(24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _isLoginMode ? Icons.lock_open : Icons.person_add,
-                  size: 48,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _loginController,
-                  decoration: InputDecoration(
-                    labelText: 'Login',
-                    prefixIcon: const Icon(Icons.person),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(_isLoginMode ? 'Logowanie' : 'Rejestracja')),
+      body: Center(
+        child: Card(
+          elevation: 8,
+          margin: const EdgeInsets.all(24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isLoginMode ? Icons.lock_open : Icons.person_add,
+                    size: 48,
+                    color: theme.colorScheme.primary,
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _hasloController,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'Hasło',
-                    prefixIcon: const Icon(Icons.lock),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _loginController,
+                    decoration: InputDecoration(
+                      labelText: 'Login',
+                      prefixIcon: const Icon(Icons.person),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
-                ),
-                if (!_isLoginMode) ...[
                   const SizedBox(height: 16),
                   TextField(
-                    controller: _powtorzHasloController,
+                    controller: _hasloController,
                     obscureText: true,
                     decoration: InputDecoration(
-                      labelText: 'Powtórz hasło',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      labelText: 'Hasło',
+                      prefixIcon: const Icon(Icons.lock),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  if (!_isLoginMode) ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _powtorzHasloController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Powtórz hasło',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoginMode ? logowanie : rejestracja,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 2,
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: const Icon(Icons.email),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
-                    child: Text(
-                      _isLoginMode ? 'Zaloguj się' : 'Zarejestruj się',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Center(
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isLoginMode = !_isLoginMode),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoginMode ? logowanie : rejestracja,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
                       child: Text(
-                        _isLoginMode
-                            ? 'Nie masz konta? Zarejestruj się'
-                            : 'Masz już konto? Zaloguj się',
-                        style: TextStyle(
-                          color: theme.colorScheme.primary.withOpacity(0.9),
-                          fontWeight: FontWeight.w500,
+                        _isLoginMode ? 'Zaloguj się' : 'Zarejestruj się',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
                       ),
                     ),
                   ),
-                ),
-
-              ],
+                  const SizedBox(height: 12),
+                  Center(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap:
+                            () => setState(() => _isLoginMode = !_isLoginMode),
+                        child: Text(
+                          _isLoginMode
+                              ? 'Nie masz konta? Zarejestruj się'
+                              : 'Masz już konto? Zaloguj się',
+                          style: TextStyle(
+                            color: theme.colorScheme.primary.withOpacity(0.9),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

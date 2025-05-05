@@ -6,11 +6,16 @@ import 'logowanie.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:math';
 import 'dart:ui';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
 void main() async {
-   WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
     ByteData data = await rootBundle.load('assets/cert/interpage.cer');
-    SecurityContext.defaultContext.setTrustedCertificatesBytes(data.buffer.asUint8List());
+    SecurityContext.defaultContext.setTrustedCertificatesBytes(
+      data.buffer.asUint8List(),
+    );
   }
 
   runApp(MyApp());
@@ -28,7 +33,8 @@ class _MyAppState extends State<MyApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _themeMode =
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     });
   }
 
@@ -93,6 +99,35 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  void initState() {
+    super.initState();
+    final quotes = [
+      '„Nie uczysz się dla szkoły, lecz dla siebie.” – Seneka',
+      '„Nauka to potęgi klucz.” – Ignacy Krasicki',
+      '„Człowiek uczy się przez całe życie.”',
+      '„Wiedza to potęga.”',
+      '„Im więcej wiem, tym więcej wiem, że nic nie wiem.” – Sokrates',
+      '„Uczyć się to odkrywać to, co już wiesz. Działać to pokazywać, że to wiesz.” – Richard Bach',
+      '„Uczenie się jest jak wiosłowanie pod prąd – gdy przestajesz, cofasz się.” – Edward Benjamin Britten',
+      '„Kiedy uczymy innych, uczymy się podwójnie.” – Joseph Joubert',
+      '„Inwestycja w wiedzę zawsze przynosi największe zyski.” – Benjamin Franklin',
+      '„Nie ma większej siły niż wiedza i nie ma większej wolności niż edukacja.” – Malcolm X',
+      '„Edukacja jest najpotężniejszą bronią, której możesz użyć, aby zmienić świat.” – Nelson Mandela',
+      '„Nauka bez myślenia jest bezużyteczna. Myślenie bez nauki – niebezpieczne.” – Konfucjusz',
+      '„Błąd jest dowodem na to, że próbujesz.” – Jennifer Lim',
+      '„Ciekawość jest początkiem mądrości.” – Sokrates',
+      '„Uczymy się nie dla szkoły, lecz dla życia.” – Seneka Młodszy',
+      '„Sukces to suma niewielkiego wysiłku powtarzanego dzień po dniu.” – Robert Collier',
+      '„Edukacja to nie wypełnianie wiadra, lecz rozpalanie ognia.” – William Butler Yeats',
+      '„Nie musisz być wielki, by zacząć, ale musisz zacząć, by być wielki.” – Zig Ziglar',
+      '„Każdy mistrz kiedyś był początkującym.” – Robin Sharma',
+      '„Ucz się tak, jakbyś miał żyć wiecznie.” – Gandhi',
+      '„Ucz się, ucz, bo nauka to potęgi klucz, a kto ma dużo kluczy... zostaje woźnym.” – Ludowa mądrość z przestrogą',
+    ];
+    selectedQuote = quotes[Random().nextInt(quotes.length)];
+  }
+
+  late final String selectedQuote;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   List<String> getMenuItems(String category) {
@@ -128,7 +163,10 @@ class _MyHomePageState extends State<MyHomePage> {
             },
             child: Container(
               constraints: const BoxConstraints(minWidth: 80),
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 12,
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
                 color: Colors.transparent,
@@ -149,7 +187,6 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
 
-
     // Other categories use PopupMenuButton
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6.0),
@@ -157,33 +194,27 @@ class _MyHomePageState extends State<MyHomePage> {
         tooltip: title,
         offset: const Offset(0, kToolbarHeight),
         color: widget.isDarkMode ? Color(0xFF666666) : Color(0xFFAAAAAA),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (value) {
           _navigatorKey.currentState?.push(
             MaterialPageRoute(
-              builder: (context) => QualificationPage(
-                qualification: value,
-                isDarkMode: widget.isDarkMode,
-              ),
+              builder:
+                  (context) => QualificationPage(
+                    qualification: value,
+                    isDarkMode: widget.isDarkMode,
+                  ),
             ),
           );
         },
         itemBuilder: (context) {
           return getMenuItems(title).map((item) {
-            return PopupMenuItem<String>(
-              value: item,
-              child: Text(item),
-            );
+            return PopupMenuItem<String>(value: item, child: Text(item));
           }).toList();
         },
         child: Container(
           constraints: const BoxConstraints(minWidth: 80),
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(4)),
           child: Center(
             child: Text(
               title,
@@ -198,234 +229,264 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
-  Widget _drawerItem(BuildContext context, String title) {
-  return ListTile(
-    title: Text(title),
-    onTap: () {
-      Navigator.pop(context);
-      if (title == 'Strona Główna') {
-        _navigatorKey.currentState?.popUntil((route) => route.isFirst);
-      } else {
-        _navigatorKey.currentState?.push(
-          MaterialPageRoute(
-            builder: (context) => QualificationPage(
-              qualification: title,
-              isDarkMode: widget.isDarkMode,
-            ),
-          ),
-        );
-      }
-    },
-  );
-}
 
+  Widget _drawerItem(BuildContext context, String title) {
+    return ListTile(
+      title: Text(title),
+      onTap: () {
+        Navigator.pop(context);
+        if (title == 'Strona Główna') {
+          _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        } else {
+          _navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder:
+                  (context) => QualificationPage(
+                    qualification: title,
+                    isDarkMode: widget.isDarkMode,
+                  ),
+            ),
+          );
+        }
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-  drawer: MediaQuery.of(context).size.width <= 900
-      ? Drawer(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                child: Text(
-                  'Menu',
-                  style: TextStyle(color: Colors.white, fontSize: 24),
-                ),
-              ),
-              _drawerItem(context, 'Strona Główna'),
-              ExpansionTile(
-              title: const Text('Programista'),
-              children: getMenuItems('Programista').map((kwal) {
-                return ListTile(
-                  title: Text(kwal),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _navigatorKey.currentState?.push(
-                      MaterialPageRoute(
-                        builder: (context) => QualificationPage(
-                          qualification: kwal,
-                          isDarkMode: widget.isDarkMode,
-                        ),
+      drawer:
+          MediaQuery.of(context).size.width <= 900
+              ? Drawer(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    DrawerHeader(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                    );
-                  },
-                );
-              }).toList(),
-            ),
-              ExpansionTile(
-                title: const Text('Informatyk'),
-                children: getMenuItems('Informatyk').map((kwal) {
-                  return ListTile(
-                    title: Text(kwal),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigatorKey.currentState?.push(
-                        MaterialPageRoute(
-                          builder: (context) => QualificationPage(
-                            qualification: kwal,
-                            isDarkMode: widget.isDarkMode,
+                      child: Text(
+                        'Menu',
+                        style: TextStyle(color: Colors.white, fontSize: 24),
+                      ),
+                    ),
+                    _drawerItem(context, 'Strona Główna'),
+                    ExpansionTile(
+                      title: const Text('Programista'),
+                      children:
+                          getMenuItems('Programista').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Informatyk'),
+                      children:
+                          getMenuItems('Informatyk').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Elektryk'),
+                      children:
+                          getMenuItems('Elektryk').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Elektronik'),
+                      children:
+                          getMenuItems('Elektronik').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Teleinformatyk'),
+                      children:
+                          getMenuItems('Teleinformatyk').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Automatyk'),
+                      children:
+                          getMenuItems('Automatyk').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.login),
+                      title: const Text('Logowanie'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LogowaniePage(),
                           ),
-                        ),
-                      );
-                    },
-                  );
-                }).toList(),
-              ),
-              ExpansionTile(
-                title: const Text('Elektryk'),
-                children: getMenuItems('Elektryk').map((kwal) {
-                  return ListTile(
-                    title: Text(kwal),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigatorKey.currentState?.push(
-                        MaterialPageRoute(
-                          builder: (context) => QualificationPage(
-                            qualification: kwal,
-                            isDarkMode: widget.isDarkMode,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                }).toList(),
-              ),
-              ExpansionTile(
-                title: const Text('Elektronik'),
-                children: getMenuItems('Elektronik').map((kwal) {
-                  return ListTile(
-                    title: Text(kwal),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigatorKey.currentState?.push(
-                        MaterialPageRoute(
-                          builder: (context) => QualificationPage(
-                            qualification: kwal,
-                            isDarkMode: widget.isDarkMode,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                }).toList(),
-              ),
-              ExpansionTile(
-                title: const Text('Teleinformatyk'),
-                children: getMenuItems('Teleinformatyk').map((kwal) {
-                  return ListTile(
-                    title: Text(kwal),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigatorKey.currentState?.push(
-                        MaterialPageRoute(
-                          builder: (context) => QualificationPage(
-                            qualification: kwal,
-                            isDarkMode: widget.isDarkMode,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                }).toList(),
-              ),
-              ExpansionTile(
-                title: const Text('Automatyk'),
-                children: getMenuItems('Automatyk').map((kwal) {
-                  return ListTile(
-                    title: Text(kwal),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _navigatorKey.currentState?.push(
-                        MaterialPageRoute(
-                          builder: (context) => QualificationPage(
-                            qualification: kwal,
-                            isDarkMode: widget.isDarkMode,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                }).toList(),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.login),
-                title: const Text('Logowanie'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LogowaniePage()),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round),
-                title: const Text('Przełącz motyw'),
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onToggleTheme();
-                },
-              ),
-            ],
-          ),
-        )
-      : null,
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: Icon(
+                        widget.isDarkMode
+                            ? Icons.wb_sunny
+                            : Icons.nightlight_round,
+                      ),
+                      title: const Text('Przełącz motyw'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onToggleTheme();
+                      },
+                    ),
+                  ],
+                ),
+              )
+              : null,
 
-  appBar: AppBar(
-    title: Text(widget.title),
-    backgroundColor: Theme.of(context).colorScheme.primary,
-    actions: MediaQuery.of(context).size.width > 900
-        ? [
-            const Spacer(),
-            buildPopupMenu('Strona Główna'),
-            buildPopupMenu('Programista'),
-            buildPopupMenu('Informatyk'),
-            buildPopupMenu('Elektryk'),
-            buildPopupMenu('Elektronik'),
-            buildPopupMenu('Teleinformatyk'),
-            buildPopupMenu('Automatyk'),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.login),
-              tooltip: 'Logowanie',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LogowaniePage()),
-                );
-              },
-            ),
-            IconButton(
-              icon: Icon(widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round),
-              tooltip: 'Przełącz motyw',
-              onPressed: widget.onToggleTheme,
-            ),
-          ]
-        : null,
-  ),
+      appBar: AppBar(
+        title: Text(widget.title),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        actions:
+            MediaQuery.of(context).size.width > 900
+                ? [
+                  const Spacer(),
+                  buildPopupMenu('Strona Główna'),
+                  buildPopupMenu('Programista'),
+                  buildPopupMenu('Informatyk'),
+                  buildPopupMenu('Elektryk'),
+                  buildPopupMenu('Elektronik'),
+                  buildPopupMenu('Teleinformatyk'),
+                  buildPopupMenu('Automatyk'),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.login),
+                    tooltip: 'Logowanie',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LogowaniePage(),
+                        ),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      widget.isDarkMode
+                          ? Icons.wb_sunny
+                          : Icons.nightlight_round,
+                    ),
+                    tooltip: 'Przełącz motyw',
+                    onPressed: widget.onToggleTheme,
+                  ),
+                ]
+                : null,
+      ),
       body: Navigator(
         key: _navigatorKey,
         onGenerateRoute: (settings) {
           return MaterialPageRoute(
-            builder: (context) => HomeContent(
-              isDarkMode: widget.isDarkMode,
-              onQualificationTap: (qualification) {
-                _navigatorKey.currentState?.push(
-                  MaterialPageRoute(
-                    builder: (context) => QualificationPage(
-                      qualification: qualification,
-                      isDarkMode: widget.isDarkMode,
-                    ),
-                  ),
-                );
-              },
-            ),
+            builder:
+                (context) => HomeContent(
+                  isDarkMode: widget.isDarkMode,
+                  onQualificationTap: (qualification) {
+                    _navigatorKey.currentState?.push(
+                      MaterialPageRoute(
+                        builder:
+                            (context) => QualificationPage(
+                              qualification: qualification,
+                              isDarkMode: widget.isDarkMode,
+                            ),
+                      ),
+                    );
+                  },
+                  selectedQuote: selectedQuote,
+                ),
           );
         },
       ),
@@ -436,30 +497,17 @@ class _MyHomePageState extends State<MyHomePage> {
 class HomeContent extends StatelessWidget {
   final bool isDarkMode;
   final Function(String) onQualificationTap;
+  final String selectedQuote;
 
   const HomeContent({
     super.key,
     required this.isDarkMode,
     required this.onQualificationTap,
+    required this.selectedQuote,
   });
 
   @override
   Widget build(BuildContext context) {
-    final quotes = [
-  '„Nie uczysz się dla szkoły, lecz dla siebie.” – Seneka',
-  '„Nauka to potęgi klucz.” – Ignacy Krasicki',
-  '„Człowiek uczy się przez całe życie.”',
-  '„Wiedza to potęga.”',
-  '„Im więcej wiem, tym więcej wiem, że nic nie wiem.” – Sokrates',
-  '„Uczyć się to odkrywać to, co już wiesz. Działać to pokazywać, że to wiesz.” – Richard Bach',
-  '„Uczenie się jest jak wiosłowanie pod prąd – gdy przestajesz, cofasz się.” – Edward Benjamin Britten',
-  '„Kiedy uczymy innych, uczymy się podwójnie.” – Joseph Joubert',
-  '„Inwestycja w wiedzę zawsze przynosi największe zyski.” – Benjamin Franklin',
-  '„Nie ma większej siły niż wiedza i nie ma większej wolności niż edukacja.” – Malcolm X',
-];
-    final random = Random();
-    final selectedQuote = quotes[random.nextInt(quotes.length)];
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
       children: [
@@ -469,17 +517,17 @@ class HomeContent extends StatelessWidget {
             Text(
               'Witamy w aplikacji Egzaminy! 👋',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
               'Przygotuj się do egzaminu zawodowego z najlepszą bazą pytań! Poniżej znajdziesz kwalifikacje, które możesz przeglądać:',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -496,42 +544,122 @@ class HomeContent extends StatelessWidget {
         ),
         const SizedBox(height: 40),
         _buildGrid(context, '👨‍💻 Technik Programista', [
-          _item(context, Icons.code, 'INF.03', 'programowanie i aplikacje'),
-          _item(context, Icons.router, 'INF.04', 'administrowanie siecią'),
+          QuestionTile(
+            icon: Icons.code,
+            code: 'INF.03',
+            label: 'programowanie i aplikacje',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.router,
+            code: 'INF.04',
+            label: 'administrowanie siecią',
+            onTap: onQualificationTap,
+          ),
         ]),
         _buildGrid(context, '💻 Technik Informatyk', [
-          _item(context, Icons.code, 'INF.03', 'programowanie i aplikacje'),
-          _item(context, Icons.memory, 'INF.02', 'sprzęt, systemy i sieci'),
+          QuestionTile(
+            icon: Icons.code,
+            code: 'INF.03',
+            label: 'programowanie i aplikacje',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.memory,
+            code: 'INF.02',
+            label: 'sprzęt, systemy i sieci',
+            onTap: onQualificationTap,
+          ),
         ]),
         _buildGrid(context, '🌐 Technik Teleinformatyk', [
-          _item(context, Icons.security, 'INF.08', 'usługi sieciowe i bezpieczeństwo'),
-          _item(context, Icons.network_check, 'INF.07', 'systemy i urządzenia sieciowe'),
+          QuestionTile(
+            icon: Icons.security,
+            code: 'INF.08',
+            label: 'usługi sieciowe i bezpieczeństwo',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.network_check,
+            code: 'INF.07',
+            label: 'systemy i urządzenia sieciowe',
+            onTap: onQualificationTap,
+          ),
         ]),
         _buildGrid(context, '🧑‍🔧 Technik Elektronik', [
           Column(
             children: [
-              _item(context, Icons.devices_other, 'E.06', 'montaż urządzeń elektronicznych'),
+              QuestionTile(
+                icon: Icons.devices_other,
+                code: 'E.06',
+                label: 'montaż urządzeń elektronicznych',
+                onTap: onQualificationTap,
+              ),
               const SizedBox(height: 20),
-              _item(context, Icons.bolt, 'EE.22', 'eksploatacja instalacji elektrycznych'),
+              QuestionTile(
+                icon: Icons.bolt,
+                code: 'EE.22',
+                label: 'eksploatacja instalacji elektrycznych',
+                onTap: onQualificationTap,
+              ),
             ],
           ),
           Column(
             children: [
-              _item(context, Icons.analytics, 'ELM.02', 'instalacje i pomiary'),
+              QuestionTile(
+                icon: Icons.analytics,
+                code: 'ELM.02',
+                label: 'instalacje i pomiary',
+                onTap: onQualificationTap,
+              ),
               const SizedBox(height: 20),
-              _item(context, Icons.build, 'ELM.05', 'serwis urządzeń elektronicznych'),
+              QuestionTile(
+                icon: Icons.build,
+                code: 'ELM.05',
+                label: 'serwis urządzeń elektronicznych',
+                onTap: onQualificationTap,
+              ),
             ],
           ),
         ]),
         _buildGrid(context, '🧑‍🏭 Technik Elektryk', [
-          _item(context, Icons.precision_manufacturing, 'ELE.05', 'eksploatacja maszyn i urządzeń'),
-          _item(context, Icons.electrical_services, 'ELE.02', 'układy elektryczne'),
-          _item(context, Icons.cable, 'E.08', 'sieci lokalne i konfiguracja'),
+          QuestionTile(
+            icon: Icons.precision_manufacturing,
+            code: 'ELE.05',
+            label: 'eksploatacja maszyn i urządzeń',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.electrical_services,
+            code: 'ELE.02',
+            label: 'układy elektryczne',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.cable,
+            code: 'E.08',
+            label: 'sieci lokalne i konfiguracja',
+            onTap: onQualificationTap,
+          ),
         ]),
         _buildGrid(context, '🤖 Technik Automatyk', [
-          _item(context, Icons.build_circle, 'ELM.01', 'montaż automatyki przemysłowej'),
-          _item(context, Icons.settings_input_component, 'ELM.04', 'układy automatyki'),
-          _item(context, Icons.electrical_services, 'EE.18', '(opcjonalne)'),
+          QuestionTile(
+            icon: Icons.build_circle,
+            code: 'ELM.01',
+            label: 'montaż automatyki przemysłowej',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.settings_input_component,
+            code: 'ELM.04',
+            label: 'układy automatyki',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.electrical_services,
+            code: 'EE.18',
+            label: '(opcjonalne)',
+            onTap: onQualificationTap,
+          ),
         ]),
       ],
     );
@@ -558,53 +686,21 @@ class HomeContent extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _item(BuildContext context, IconData icon, String code, String label) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double itemWidth = screenWidth < 600 ? screenWidth - 40 : 300;
-
-    return InkWell(
-      onTap: () => onQualificationTap(code),
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: itemWidth,
-        height: 180,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 36, color: const Color(0xFFFF7373)),
-            const SizedBox(height: 12),
-            Text(
-              code,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            )
-          ],
-        ),
-      ),
-    );
+Future<int?> fetchQuestionCount(String kwalifikacja) async {
+  try {
+    final sanitized = kwalifikacja.replaceAll('.', '').toLowerCase();
+    final url = Uri.parse('https://interpage.pl/egzaminy/$sanitized.php');
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data.length;
+    }
+  } catch (e) {
+    print('Błąd pobierania danych: $e');
   }
+  return null;
 }
 
 // Widget for the qualification page
@@ -617,7 +713,7 @@ class QualificationPage extends StatelessWidget {
 
   final String qualification;
   final bool isDarkMode;
-Widget _buildQuestionsBox(
+  Widget _buildQuestionsBox(
     BuildContext context, {
     required String title,
     required String subtitle,
@@ -657,7 +753,9 @@ Widget _buildQuestionsBox(
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.7),
                 ),
               ),
             ],
@@ -666,6 +764,7 @@ Widget _buildQuestionsBox(
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -687,59 +786,162 @@ Widget _buildQuestionsBox(
             spacing: 20,
             runSpacing: 20,
             children: [
-             _buildQuestionsBox(
-  context,
-  title: 'Losuj 1 pytanie',
-  subtitle: 'Sprawdź swoją wiedzę',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EgzaminView(
-                tryb: TrybEgzaminu.jednoPytanie,
-                kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
-                isDarkMode: isDarkMode, // Przekazanie isDarkMode
-                ),
+              _buildQuestionsBox(
+                context,
+                title: 'Losuj 1 pytanie',
+                subtitle: 'Sprawdź swoją wiedzę',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) => EgzaminView(
+                            tryb: TrybEgzaminu.jednoPytanie,
+                            kwalifikacja: qualification
+                                .toLowerCase()
+                                .replaceAll('.', ''),
+                            isDarkMode: isDarkMode, // Przekazanie isDarkMode
+                          ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
-        _buildQuestionsBox(
-          context,
-          title: 'Test 40 losowych pytań',
-          subtitle: 'Pełny egzamin próbny',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => EgzaminView(
-                  tryb: TrybEgzaminu.czterdziesciPytan,
-                  kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
-                  isDarkMode: isDarkMode, // Przekazanie isDarkMode
-                ),
+              _buildQuestionsBox(
+                context,
+                title: 'Test 40 losowych pytań',
+                subtitle: 'Pełny egzamin próbny',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) => EgzaminView(
+                            tryb: TrybEgzaminu.czterdziesciPytan,
+                            kwalifikacja: qualification
+                                .toLowerCase()
+                                .replaceAll('.', ''),
+                            isDarkMode: isDarkMode, // Przekazanie isDarkMode
+                          ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
-        _buildQuestionsBox(
-          context,
-          title: 'Baza wszystkich odpowiedzi',
-          subtitle: 'Przeglądaj wszystkie pytania',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => EgzaminView(
-                  tryb: TrybEgzaminu.wszystkie,
-                  kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
-                  isDarkMode: isDarkMode, // Przekazanie isDarkMode
-                ),
+              _buildQuestionsBox(
+                context,
+                title: 'Baza wszystkich odpowiedzi',
+                subtitle: 'Przeglądaj wszystkie pytania',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) => EgzaminView(
+                            tryb: TrybEgzaminu.wszystkie,
+                            kwalifikacja: qualification
+                                .toLowerCase()
+                                .replaceAll('.', ''),
+                            isDarkMode: isDarkMode, // Przekazanie isDarkMode
+                          ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class QuestionTile extends StatefulWidget {
+  final IconData icon;
+  final String code;
+  final String label;
+  final Function(String) onTap;
+
+  const QuestionTile({
+    super.key,
+    required this.icon,
+    required this.code,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  State<QuestionTile> createState() => _QuestionTileState();
+}
+
+class _QuestionTileState extends State<QuestionTile> {
+  int? questionCount;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchQuestionCount(widget.code).then((value) {
+      if (mounted) {
+        setState(() {
+          questionCount = value;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double itemWidth = screenWidth < 600 ? screenWidth - 40 : 300;
+
+    return InkWell(
+      onTap: () => widget.onTap(widget.code),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: itemWidth,
+        height: 200,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(widget.icon, size: 36, color: const Color(0xFFFF7373)),
+            const SizedBox(height: 12),
+            Text(
+              widget.code,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              questionCount != null ? '$questionCount pytań' : '⏳ Ładowanie...',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -4,7 +4,6 @@ class EgzaminWynikView extends StatelessWidget {
   final int correctAnswers;
   final int totalQuestions;
 
-
   const EgzaminWynikView({
     Key? key,
     required this.correctAnswers,
@@ -17,9 +16,8 @@ class EgzaminWynikView extends StatelessWidget {
     final bool zdane = percentage >= 75;
 
     final resultText = "$correctAnswers / $totalQuestions";
-    final message = zdane
-        ? "Gratulacje! Zdałeś egzamin!"
-        : "Niestety, nie udało się zdać";
+    final message =
+        zdane ? "Gratulacje! Zdałeś egzamin!" : "Niestety, nie udało się zdać";
 
     final color = zdane ? Colors.green : Colors.red;
 
@@ -33,10 +31,7 @@ class EgzaminWynikView extends StatelessWidget {
             children: [
               Divider(thickness: 4, color: color),
               const SizedBox(height: 16),
-              Text(
-                "Twój wynik:",
-                style: TextStyle(fontSize: 20),
-              ),
+              Text("Twój wynik:", style: TextStyle(fontSize: 20)),
               Text(
                 resultText,
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),

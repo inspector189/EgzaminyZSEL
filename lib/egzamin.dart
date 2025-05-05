@@ -164,46 +164,50 @@ class _EgzaminViewState extends State<EgzaminView> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Egzamin")),
-      body: widget.tryb == TrybEgzaminu.jednoPytanie
-          ? _buildSingleQuestion(questions.first)
-          : _buildScrollableList(),
-      bottomNavigationBar: widget.tryb == TrybEgzaminu.czterdziesciPytan
-          ? Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: ElevatedButton(
-                onPressed: () async {
-                  final correct = calculateCorrectAnswers();
-                  final total = questions.length;
-                  final percent = (correct / total) * 100;
-                  final endTime = DateTime.now();
-                  final duration = endTime.difference(startTime).inSeconds;
+      body:
+          widget.tryb == TrybEgzaminu.jednoPytanie
+              ? _buildSingleQuestion(questions.first)
+              : _buildScrollableList(),
+      bottomNavigationBar:
+          widget.tryb == TrybEgzaminu.czterdziesciPytan
+              ? Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final correct = calculateCorrectAnswers();
+                    final total = questions.length;
+                    final percent = (correct / total) * 100;
+                    final endTime = DateTime.now();
+                    final duration = endTime.difference(startTime).inSeconds;
 
-                  await sendResultToServer(
-                    kwalifikacja: widget.kwalifikacja,
-                    wynik: percent,
-                    dataCzas: endTime.toIso8601String(),
-                    czasTrwania: duration,
-                  );
+                    await sendResultToServer(
+                      kwalifikacja: widget.kwalifikacja,
+                      wynik: percent,
+                      dataCzas: endTime.toIso8601String(),
+                      czasTrwania: duration,
+                    );
 
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EgzaminWynikView(
-                        correctAnswers: correct,
-                        totalQuestions: total,
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (_) => EgzaminWynikView(
+                              correctAnswers: correct,
+                              totalQuestions: total,
+                            ),
                       ),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.blue,
-                  foregroundColor: widget.isDarkMode ? Colors.white : Colors.black,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.blue,
+                    foregroundColor:
+                        widget.isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  child: const Text("Zakończ egzamin"),
                 ),
-                child: const Text("Zakończ egzamin"),
-              ),
-            )
-          : null,
+              )
+              : null,
     );
   }
 
@@ -215,21 +219,25 @@ class _EgzaminViewState extends State<EgzaminView> {
       style: {
         // Dynamiczne ustawienie koloru tekstu w zależności od trybu
         "body": Style(
-          color: widget.isDarkMode
-              ? Colors.white
-              : Colors.grey[800], // Ciemnoszary dla jasnego trybu
+          color:
+              widget.isDarkMode
+                  ? Colors.white
+                  : Colors.grey[800], // Ciemnoszary dla jasnego trybu
         ),
         "b": Style(
-          color: widget.isDarkMode
-              ? Colors.white
-              : Colors.grey[800], // Ciemnoszary dla jasnego trybu
+          color:
+              widget.isDarkMode
+                  ? Colors.white
+                  : Colors.grey[800], // Ciemnoszary dla jasnego trybu
         ),
         "span": Style(
-          color: html.contains("style='color:green;'")
-              ? Colors.green
-              : widget.isDarkMode
+          color:
+              html.contains("style='color:green;'")
+                  ? Colors.green
+                  : widget.isDarkMode
                   ? Colors.white
-                  : Colors.grey[800], // Zachowanie zielonego dla poprawnych odpowiedzi
+                  : Colors
+                      .grey[800], // Zachowanie zielonego dla poprawnych odpowiedzi
         ),
       },
       extensions: [
@@ -241,29 +249,32 @@ class _EgzaminViewState extends State<EgzaminView> {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 child: Builder(
-                  builder: (context) => Center(
-                    child: Tooltip(
-                      message: 'Kliknij, aby powiększyć',
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () => _showImageDialog(context, src),
-                          child: Image.network(
-                            src,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => Text(
-                              '❌ Nie udało się załadować obrazka',
-                              style: TextStyle(
-                                color: widget.isDarkMode
-                                    ? Colors.white
-                                    : Colors.grey[800],
+                  builder:
+                      (context) => Center(
+                        child: Tooltip(
+                          message: 'Kliknij, aby powiększyć',
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () => _showImageDialog(context, src),
+                              child: Image.network(
+                                src,
+                                fit: BoxFit.contain,
+                                errorBuilder:
+                                    (context, error, stackTrace) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            widget.isDarkMode
+                                                ? Colors.white
+                                                : Colors.grey[800],
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
                 ),
               );
             }
@@ -301,12 +312,14 @@ class _EgzaminViewState extends State<EgzaminView> {
                       child: GestureDetector(
                         onTap: () {},
                         child: Listener(
-                          onPointerDown: (_) => setState(() => isPressed = true),
+                          onPointerDown:
+                              (_) => setState(() => isPressed = true),
                           onPointerUp: (_) => setState(() => isPressed = false),
                           child: MouseRegion(
-                            cursor: isPressed
-                                ? SystemMouseCursors.grabbing
-                                : SystemMouseCursors.grab,
+                            cursor:
+                                isPressed
+                                    ? SystemMouseCursors.grabbing
+                                    : SystemMouseCursors.grab,
                             child: InteractiveViewer(
                               panEnabled: true,
                               minScale: 0.5,
@@ -315,15 +328,16 @@ class _EgzaminViewState extends State<EgzaminView> {
                                 imageUrl,
                                 width: screenSize.width * 0.8,
                                 fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Text(
-                                  '❌ Nie udało się załadować obrazka',
-                                  style: TextStyle(
-                                    color: widget.isDarkMode
-                                        ? Colors.white
-                                        : Colors.grey[800],
-                                  ),
-                                ),
+                                errorBuilder:
+                                    (context, error, stackTrace) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            widget.isDarkMode
+                                                ? Colors.white
+                                                : Colors.grey[800],
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -337,11 +351,16 @@ class _EgzaminViewState extends State<EgzaminView> {
                         icon: Icon(
                           Icons.close,
                           size: 30,
-                          color: widget.isDarkMode ? Colors.white : Colors.black,
+                          color:
+                              widget.isDarkMode ? Colors.white : Colors.black,
                         ),
                         tooltip: 'Zamknij',
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
+                        onPressed:
+                            () =>
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop(),
                       ),
                     ),
                   ],
@@ -405,13 +424,16 @@ class _EgzaminViewState extends State<EgzaminView> {
               icon: const Icon(Icons.refresh),
               label: const Text("Losuj kolejne"),
               style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 backgroundColor: Colors.blue,
-                foregroundColor: widget.isDarkMode ? Colors.white : Colors.black,
+                foregroundColor:
+                    widget.isDarkMode ? Colors.white : Colors.black,
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -505,7 +527,8 @@ class _InteractiveImageState extends State<_InteractiveImage> {
       onPointerDown: (_) => setState(() => _isPressed = true),
       onPointerUp: (_) => setState(() => _isPressed = false),
       child: MouseRegion(
-        cursor: _isPressed ? SystemMouseCursors.grabbing : SystemMouseCursors.grab,
+        cursor:
+            _isPressed ? SystemMouseCursors.grabbing : SystemMouseCursors.grab,
         child: InteractiveViewer(
           panEnabled: true,
           minScale: 0.5,
@@ -514,12 +537,13 @@ class _InteractiveImageState extends State<_InteractiveImage> {
             widget.imageUrl,
             fit: BoxFit.contain,
             width: screenSize.width * 0.9,
-            errorBuilder: (context, error, stackTrace) => Text(
-              '❌ Nie udało się załadować obrazka',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
+            errorBuilder:
+                (context, error, stackTrace) => Text(
+                  '❌ Nie udało się załadować obrazka',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
           ),
         ),
       ),
