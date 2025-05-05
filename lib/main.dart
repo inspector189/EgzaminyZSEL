@@ -42,7 +42,7 @@ class _MyAppState extends State<MyApp> {
           brightness: Brightness.light,
           primary: Color(0xFFFF7373),
           onPrimary: Color(0xFFFF7373),
-          surface: Color(0xFFD2D2D2),
+          surface: Colors.white,
           onSurface: Colors.black,
           secondary: Colors.blue,
           onSecondary: Colors.white,
@@ -687,54 +687,57 @@ Widget _buildQuestionsBox(
             spacing: 20,
             runSpacing: 20,
             children: [
-              _buildQuestionsBox(
-                context,
-                title: 'Losuj 1 pytanie',
-                subtitle: 'Sprawdź swoją wiedzę',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                MaterialPageRoute(
-                  builder: (context) => EgzaminView(
-                        tryb: TrybEgzaminu.jednoPytanie,
-                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''), 
-                      ),
-                    )
-                  );
-                },
+             _buildQuestionsBox(
+  context,
+  title: 'Losuj 1 pytanie',
+  subtitle: 'Sprawdź swoją wiedzę',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EgzaminView(
+                tryb: TrybEgzaminu.jednoPytanie,
+                kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
+                isDarkMode: isDarkMode, // Przekazanie isDarkMode
+                ),
               ),
-              _buildQuestionsBox(
-                context,
-                title: 'Test 40 losowych pytań',
-                subtitle: 'Pełny egzamin próbny',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EgzaminView(
-                        tryb: TrybEgzaminu.czterdziesciPytan,
-                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''), 
-                      ),
-                    )
-                  );
-                },
+            );
+          },
+        ),
+        _buildQuestionsBox(
+          context,
+          title: 'Test 40 losowych pytań',
+          subtitle: 'Pełny egzamin próbny',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EgzaminView(
+                  tryb: TrybEgzaminu.czterdziesciPytan,
+                  kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
+                  isDarkMode: isDarkMode, // Przekazanie isDarkMode
+                ),
               ),
-              _buildQuestionsBox(
-                context,
-                title: 'Baza wszystkich odpowiedzi',
-                subtitle: 'Przeglądaj wszystkie pytania',
-                onTap: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EgzaminView(
-                        tryb: TrybEgzaminu.wszystkie,
-                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''), 
-                      ),
-                    )
-                  );
-                },
+            );
+          },
+        ),
+        _buildQuestionsBox(
+          context,
+          title: 'Baza wszystkich odpowiedzi',
+          subtitle: 'Przeglądaj wszystkie pytania',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EgzaminView(
+                  tryb: TrybEgzaminu.wszystkie,
+                  kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
+                  isDarkMode: isDarkMode, // Przekazanie isDarkMode
+                ),
               ),
+            );
+          },
+        ),
             ],
           ),
         ),
