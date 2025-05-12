@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
+import 'egzamin_podglad.dart';
 
 class EgzaminWynikView extends StatelessWidget {
   final int correctAnswers;
   final int totalQuestions;
+  final List<dynamic> questions;
+  final List<String?> selectedAnswers;
+  final bool isDarkMode;
+  final bool returnToHome;
 
   const EgzaminWynikView({
-    Key? key,
+    super.key,
     required this.correctAnswers,
     required this.totalQuestions,
-  }) : super(key: key);
+    required this.questions,
+    required this.selectedAnswers,
+    required this.isDarkMode,
+    required this.returnToHome,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +31,19 @@ class EgzaminWynikView extends StatelessWidget {
     final color = zdane ? Colors.green : Colors.red;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Wynik egzaminu")),
+      appBar: AppBar(
+        title: const Text("Wynik egzaminu"),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (returnToHome) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -47,6 +68,33 @@ class EgzaminWynikView extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Divider(thickness: 4, color: color),
+              const SizedBox(height: 24),
+              if (questions.isNotEmpty && selectedAnswers.isNotEmpty)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EgzaminPodgladView(
+                          questions: questions,
+                          selectedAnswers: selectedAnswers,
+                          isDarkMode: isDarkMode,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    backgroundColor: Colors.blue,
+                  ),
+                  child: const Text(
+                    "Podgląd egzaminu",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
             ],
           ),
         ),
