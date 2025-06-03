@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'wyniki.dart';
 
@@ -11,6 +12,7 @@ class EgzaminView extends StatefulWidget {
   final String kwalifikacja;
   final bool isDarkMode;
   final bool returnToHome;
+  final String? userID; // Add userID parameter
 
   const EgzaminView({
     super.key,
@@ -18,6 +20,7 @@ class EgzaminView extends StatefulWidget {
     required this.kwalifikacja,
     required this.isDarkMode,
     required this.returnToHome,
+    this.userID, // Optional userID
   });
 
   @override
@@ -92,32 +95,36 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Future<void> sendResultToServer({
-    required String kwalifikacja,
-    required double wynik,
-    required String dataCzas,
-    required int czasTrwania,
-  }) async {
-    final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
-      },
-      body: {
-        'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
-        'wynik': wynik.toStringAsFixed(2),
-        'data_czas': dataCzas,
-        'czas_trwania': czasTrwania.toString(),
-      },
-    );
+  required String kwalifikacja,
+  required double wynik,
+  required String dataCzas,
+  required int czasTrwania,
+}) async {
+  // Use widget.userID if available, otherwise fall back to SharedPreferences
+  String userID = widget.userID ?? (await SharedPreferences.getInstance()).getString('userID') ?? 'anonymous';
 
-    if (response.statusCode != 200) {
-      print('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
-    } else {
-      print('✅ Wynik zapisany');
-    }
+  final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
+  final response = await http.post(
+    url,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+    },
+    body: {
+      'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
+      'wynik': wynik.toStringAsFixed(2),
+      'data_czas': dataCzas,
+      'czas_trwania': czasTrwania.toString(),
+      'userID': userID,
+    },
+  );
+
+  if (response.statusCode != 200) {
+    print('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
+  } else {
+    print('✅ Wynik zapisany dla userID: $userID');
   }
+}
 
   void checkAnswer(String answer) {
     setState(() {

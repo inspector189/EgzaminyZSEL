@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'logowanie.dart';
 import 'qualification_page.dart';
+import 'statistics.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -181,7 +182,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
     debugPrint('After checking: _isLoggedIn=$_isLoggedIn');
   }
-
+  void _openStatistics(BuildContext context) {
+  Future.delayed(Duration.zero, () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => StatisticsPage(
+        qualification: 'defaultQualification', // Replace with actual value
+        isDarkMode: widget.isDarkMode,
+      )),
+    );
+  });
+}
   Future<void> _signOut() async {
     // Clear the token
     await _oauth2Helper.removeAllTokens();
@@ -250,6 +261,12 @@ class _MyHomePageState extends State<MyHomePage> {
               ],
             ),
             const Divider(),
+            PopupMenuItem(
+              child: const Text('Statystyki'),
+              onTap: () {
+                _openStatistics(context);
+              },
+            ),
             PopupMenuItem(
               child: const Text('Wyloguj się'),
               onTap: _signOut,
