@@ -5,7 +5,9 @@ import 'logowanie.dart';
 import 'qualification_page.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:math';
-import 'dart:ui';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:oauth2_client/oauth2_client.dart';
+import 'package:oauth2_client/oauth2_helper.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -101,6 +103,10 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   late final String selectedQuote;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  bool _isLoggedIn = false;
+  String? _userName;
+  String? _userEmail;
+  late OAuth2Helper _oauth2Helper;
 
   @override
   void initState() {
@@ -129,7 +135,132 @@ class _MyHomePageState extends State<MyHomePage> {
       '„Ucz się, ucz, bo nauka to potęgi klucz, a kto ma dużo kluczy... zostaje woźnym.” – Ludowa mądrość z przestrogą',
     ];
     selectedQuote = quotes[Random().nextInt(quotes.length)];
+    
+    final String clientId = '67af475e-082d-4187-b1ef-5fa26fa0fe77';
+    final String authorizeUrl = 'https://login.microsoftonline.com/de78aefd-fda9-4eaf-a2d1-cf8492188649/oauth2/v2.0/authorize';
+    final String tokenUrl = 'https://login.microsoftonline.com/de78aefd-fda9-4eaf-a2d1-cf8492188649/oauth2/v2.0/token';
+    
+    final client = OAuth2Client(
+      authorizeUrl: authorizeUrl,
+      tokenUrl: tokenUrl,
+      redirectUri: kIsWeb ? 'http://localhost:8080/redirect.html' : 'com.example.myapp://oauthredirect',
+      customUriScheme: kIsWeb ? '' : 'com.example.myapp',
+    );
+    _oauth2Helper = OAuth2Helper(
+      client,
+      grantType: OAuth2Helper.authorizationCode,
+      clientId: clientId,
+      scopes: [
+        'openid',
+        'profile',
+        'email',
+        'User.Read',
+        'offline_access',
+      ],
+      enablePKCE: true,
+      authCodeParams: {'response_mode': 'query'},
+    );
+
+    _checkLoginState();
   }
+
+  Future<void> _checkLoginState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userName = prefs.getString('userName');
+    final userEmail = prefs.getString('userEmail');
+
+    debugPrint('Checking login state: userName=$userName, userEmail=$userEmail');
+
+    setState(() {
+      _isLoggedIn = userName != null && userEmail != null;
+      if (_isLoggedIn) {
+        _userName = userName;
+        _userEmail = userEmail;
+      }
+    });
+
+    debugPrint('After checking: _isLoggedIn=$_isLoggedIn');
+  }
+
+  Future<void> _signOut() async {
+    // Clear the token
+    await _oauth2Helper.removeAllTokens();
+    // Clear user info from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('userName');
+    await prefs.remove('userEmail');
+
+    setState(() {
+      _isLoggedIn = false;
+      _userName = null;
+      _userEmail = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Wylogowano')),
+    );
+  }
+
+  void _showProfilePopup(BuildContext context) {
+  showMenu(
+    context: context,
+    position: const RelativeRect.fromLTRB(1000, 80, 0, 0),
+    items: [
+      PopupMenuItem(
+        enabled: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.grey[300],
+                  child: Text(
+                    _userName![0].toUpperCase(),
+                    style: const TextStyle(fontSize: 20, color: Colors.black),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded( // Wrap the Column with Expanded to prevent overflow
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _userName!,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis, // Prevent text overflow
+                      ),
+                      Text(
+                        _userEmail!,
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis, // Prevent text overflow
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                const SizedBox(width: 5),
+                const Text('Dostępny', style: TextStyle(fontSize: 12)),
+              ],
+            ),
+            const Divider(),
+            PopupMenuItem(
+              child: const Text('Wyloguj się'),
+              onTap: _signOut,
+            ),
+          ],
+        ),
+      ),
+    ],
+    color: widget.isDarkMode ? const Color(0xFF333333) : Colors.white,
+  );
+}
 
   List<String> getMenuItems(String category) {
     switch (category) {
@@ -383,16 +514,20 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   const Divider(),
                   ListTile(
-                    leading: const Icon(Icons.login),
-                    title: const Text('Logowanie'),
+                    leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                    title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const LogowaniePage(),
-                        ),
-                      );
+                      if (_isLoggedIn) {
+                        _showProfilePopup(context);
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LogowaniePage(),
+                          ),
+                        );
+                      }
                     },
                   ),
                   ListTile(
@@ -426,15 +561,19 @@ class _MyHomePageState extends State<MyHomePage> {
                 buildPopupMenu('Automatyk'),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.login),
-                  tooltip: 'Logowanie',
+                  icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                  tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LogowaniePage(),
-                      ),
-                    );
+                    if (_isLoggedIn) {
+                      _showProfilePopup(context);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LogowaniePage(),
+                        ),
+                      );
+                    }
                   },
                 ),
                 IconButton(

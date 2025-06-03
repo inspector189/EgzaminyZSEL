@@ -32,7 +32,14 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_html: ^3.0.0-beta.2
-  http: ^0.13.4
+  http: ^1.4.0
+  oauth2_client: ^4.2.0
+  #openid_client: ^0.4.9
+  #aad_oauth: ^1.0.1
+  shared_preferences: ^2.5.3
+  url_launcher: ^6.3.0
+  flutter_secure_storage: ^10.0.0-beta.4
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -56,6 +63,7 @@ dev_dependencies:
 flutter:
   assets:
     - assets/cert/interpage.cer
+    - web/redirect.html
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:oauth2_client/oauth2_client.dart';
+import 'package:oauth2_client/oauth2_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LogowaniePage extends StatefulWidget {
   const LogowaniePage({super.key});
@@ -10,216 +13,120 @@ class LogowaniePage extends StatefulWidget {
 }
 
 class _LogowaniePageState extends State<LogowaniePage> {
-  final TextEditingController _loginController = TextEditingController();
-  final TextEditingController _hasloController = TextEditingController();
-  final TextEditingController _powtorzHasloController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  String? _userName;
+  String? _userEmail;
+  bool _isLoading = false;
+  late OAuth2Helper _oauth2Helper;
 
-  bool _isLoginMode = true;
+final String _clientId = '67af475e-082d-4187-b1ef-5fa26fa0fe77';
+final String _authorizeUrl = 'https://login.microsoftonline.com/de78aefd-fda9-4eaf-a2d1-cf8492188649/oauth2/v2.0/authorize';
+final String _tokenUrl = 'https://login.microsoftonline.com/de78aefd-fda9-4eaf-a2d1-cf8492188649/oauth2/v2.0/token';
+  final List<String> _scopes = [
+    'openid',
+    'profile',
+    'email',
+    'User.Read',
+    'offline_access',
+  ];
 
-  void showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  bool isEmailValid(String email) {
-    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
-    return emailRegex.hasMatch(email);
-  }
-
-  Future<void> logowanie() async {
-    if (_loginController.text.isEmpty || _hasloController.text.isEmpty) {
-      showMessage('Uzupełnij login i hasło');
-      return;
+  String get _redirectUri {
+    if (kIsWeb) {
+      return 'http://localhost:8080/redirect.html';
+    } else {
+      return 'com.example.myapp://oauthredirect';
     }
+  }
 
-    final url = Uri.parse('http://localhost/logowanie.php');
+  String get _customScheme {
+    if (kIsWeb) return '';
+    return 'com.example.myapp';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    final client = OAuth2Client(
+      authorizeUrl:
+          _authorizeUrl,
+      tokenUrl:
+          _tokenUrl,
+      redirectUri: _redirectUri,
+      customUriScheme: _customScheme,
+    );
+
+    _oauth2Helper = OAuth2Helper(
+      client,
+      grantType: OAuth2Helper.authorizationCode,
+      clientId: _clientId,
+      scopes: _scopes,
+      enablePKCE: true,
+      authCodeParams: {'response_mode': 'query'},
+    );
+  }
+
+  Future<void> _loginWithMicrosoft() async {
+    setState(() => _isLoading = true);
 
     try {
-      final response = await http.post(
-        url,
-        body: {'login': _loginController.text, 'haslo': _hasloController.text},
-      );
+      debugPrint('Logging in using redirect: $_redirectUri');
+      final tokenResponse = await _oauth2Helper.fetchToken();
+      debugPrint('Got token response: $tokenResponse');
+      if (tokenResponse.accessToken != null) {
+        debugPrint('Access token: ${tokenResponse.accessToken}');
 
-      final Map<String, dynamic> data = jsonDecode(response.body);
+        // Fetch user info
+        final userResponse = await _oauth2Helper.get(
+          'https://graph.microsoft.com/v1.0/me',
+          headers: {'Authorization': 'Bearer ${tokenResponse.accessToken}'},
+        );
 
-      if (response.statusCode == 200 && data['status'] == 'success') {
-        showMessage('Zalogowano pomyślnie!');
-        // Przejście do innej strony
+        if (userResponse.statusCode == 200) {
+          final json = jsonDecode(userResponse.body);
+
+          setState(() {
+            _userName = json['displayName'];
+            _userEmail = json['mail'] ?? json['userPrincipalName'];
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('userName', _userName!);
+          await prefs.setString('userEmail', _userEmail!);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Zalogowano jako $_userName')),
+          );
+
+          // Navigate back to MyHomePage
+          Navigator.pop(context, true);
+        } else {
+          throw Exception('Nie udało się pobrać informacji o użytkowniku');
+        }
       } else {
-        showMessage('Niepoprawne dane logowania');
+        throw Exception('Nie otrzymano tokenu dostępu');
       }
-    } catch (e) {
-      showMessage('Błąd połączenia z serwerem');
-    }
-  }
-
-  Future<void> rejestracja() async {
-    final login = _loginController.text.trim();
-    final haslo = _hasloController.text;
-    final powtorzHaslo = _powtorzHasloController.text;
-    final email = _emailController.text.trim();
-
-    if (login.isEmpty ||
-        haslo.isEmpty ||
-        powtorzHaslo.isEmpty ||
-        email.isEmpty) {
-      showMessage('Uzupełnij wszystkie pola');
-      return;
-    }
-
-    if (haslo != powtorzHaslo) {
-      showMessage('Hasła nie są takie same');
-      return;
-    }
-
-    if (!isEmailValid(email)) {
-      showMessage('Niepoprawny adres e-mail');
-      return;
-    }
-
-    final url = Uri.parse('http://localhost/rejestracja.php');
-
-    try {
-      final response = await http.post(
-        url,
-        body: {'login': login, 'haslo': haslo, 'email': email},
+    } catch (e, st) {
+      debugPrint('Login error: $e\n$st');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Błąd logowania: $e')),
       );
-
-      final Map<String, dynamic> data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data['status'] == 'success') {
-        showMessage('Rejestracja zakończona pomyślnie!');
-        setState(() => _isLoginMode = true);
-      } else {
-        showMessage(data['message'] ?? 'Błąd rejestracji');
-      }
-    } catch (e) {
-      showMessage('Błąd połączenia z serwerem');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(_isLoginMode ? 'Logowanie' : 'Rejestracja')),
+      appBar: AppBar(title: const Text("Microsoft Login")),
       body: Center(
-        child: Card(
-          elevation: 8,
-          margin: const EdgeInsets.all(24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isLoginMode ? Icons.lock_open : Icons.person_add,
-                    size: 48,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: _loginController,
-                    decoration: InputDecoration(
-                      labelText: 'Login',
-                      prefixIcon: const Icon(Icons.person),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _hasloController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'Hasło',
-                      prefixIcon: const Icon(Icons.lock),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  if (!_isLoginMode) ...[
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _powtorzHasloController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Powtórz hasło',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: const Icon(Icons.email),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoginMode ? logowanie : rejestracja,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: Text(
-                        _isLoginMode ? 'Zaloguj się' : 'Zarejestruj się',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap:
-                            () => setState(() => _isLoginMode = !_isLoginMode),
-                        child: Text(
-                          _isLoginMode
-                              ? 'Nie masz konta? Zarejestruj się'
-                              : 'Masz już konto? Zaloguj się',
-                          style: TextStyle(
-                            color: theme.colorScheme.primary.withOpacity(0.9),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        child:
+            _isLoading
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                  onPressed: _loginWithMicrosoft,
+                  child: const Text("Zaloguj się z Microsoft"),
+                ),
       ),
     );
   }
