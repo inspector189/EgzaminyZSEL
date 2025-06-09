@@ -66,7 +66,7 @@ class StatisticsPage extends StatelessWidget {
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer zT93@rPcV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
       },
       body: {
         'userName': userName,
