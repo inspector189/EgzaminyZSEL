@@ -13,7 +13,7 @@ $kwalifikacja = $_POST['kwalifikacja'] ?? null;
 $wynik = isset($_POST['wynik']) ? (float) $_POST['wynik'] : null;
 $data_czas = $_POST['data_czas'] ?? null;
 $czas_trwania = isset($_POST['czas_trwania']) ? (int) $_POST['czas_trwania'] : null;
-$userID = $_POST['userID'] ?? 'anonymous'; // Default to 'anonymous' if not provided
+$userID = $_POST['userName'] ?? 'anonymous'; // Default to 'anonymous' if not provided
 
 if (!$kwalifikacja || !$wynik || !$data_czas || !$czas_trwania || !$userID) {
     die("❌ Brakuje danych w żądaniu POST");

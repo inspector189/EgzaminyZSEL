@@ -182,17 +182,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
     debugPrint('After checking: _isLoggedIn=$_isLoggedIn');
   }
+
   void _openStatistics(BuildContext context) {
-  Future.delayed(Duration.zero, () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => StatisticsPage(
-        qualification: 'defaultQualification', // Replace with actual value
-        isDarkMode: widget.isDarkMode,
-      )),
-    );
-  });
-}
+    Future.delayed(Duration.zero, () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => StatisticsPage(
+          isDarkMode: widget.isDarkMode,
+        )),
+      );
+    });
+  }
+
   Future<void> _signOut() async {
     // Clear the token
     await _oauth2Helper.removeAllTokens();
@@ -213,71 +214,71 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _showProfilePopup(BuildContext context) {
-  showMenu(
-    context: context,
-    position: const RelativeRect.fromLTRB(1000, 80, 0, 0),
-    items: [
-      PopupMenuItem(
-        enabled: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.grey[300],
-                  child: Text(
-                    _userName![0].toUpperCase(),
-                    style: const TextStyle(fontSize: 20, color: Colors.black),
+    showMenu(
+      context: context,
+      position: const RelativeRect.fromLTRB(1000, 80, 0, 0),
+      items: [
+        PopupMenuItem(
+          enabled: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.grey[300],
+                    child: Text(
+                      _userName![0].toUpperCase(),
+                      style: const TextStyle(fontSize: 20, color: Colors.black),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded( // Wrap the Column with Expanded to prevent overflow
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _userName!,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis, // Prevent text overflow
-                      ),
-                      Text(
-                        _userEmail!,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                        overflow: TextOverflow.ellipsis, // Prevent text overflow
-                      ),
-                    ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _userName!,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          _userEmail!,
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                const SizedBox(width: 5),
-                const Text('Dostępny', style: TextStyle(fontSize: 12)),
-              ],
-            ),
-            const Divider(),
-            PopupMenuItem(
-              child: const Text('Statystyki'),
-              onTap: () {
-                _openStatistics(context);
-              },
-            ),
-            PopupMenuItem(
-              child: const Text('Wyloguj się'),
-              onTap: _signOut,
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                  const SizedBox(width: 5),
+                  const Text('Dostępny', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+              const Divider(),
+              PopupMenuItem(
+                child: const Text('Statystyki'),
+                onTap: () {
+                  _openStatistics(context);
+                },
+              ),
+              PopupMenuItem(
+                child: const Text('Wyloguj się'),
+                onTap: _signOut,
+              ),
+            ],
+          ),
         ),
-      ),
-    ],
-    color: widget.isDarkMode ? const Color(0xFF333333) : Colors.white,
-  );
-}
+      ],
+      color: widget.isDarkMode ? const Color(0xFF333333) : Colors.white,
+    );
+  }
 
   List<String> getMenuItems(String category) {
     switch (category) {

@@ -12,7 +12,7 @@ class EgzaminView extends StatefulWidget {
   final String kwalifikacja;
   final bool isDarkMode;
   final bool returnToHome;
-  final String? userID; // Add userID parameter
+  final String? userName; // Add userID parameter
 
   const EgzaminView({
     super.key,
@@ -20,7 +20,7 @@ class EgzaminView extends StatefulWidget {
     required this.kwalifikacja,
     required this.isDarkMode,
     required this.returnToHome,
-    this.userID, // Optional userID
+    this.userName, // Optional userID
   });
 
   @override
@@ -101,7 +101,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   required int czasTrwania,
 }) async {
   // Use widget.userID if available, otherwise fall back to SharedPreferences
-  String userID = widget.userID ?? (await SharedPreferences.getInstance()).getString('userID') ?? 'anonymous';
+  String userName = widget.userName ?? (await SharedPreferences.getInstance()).getString('userName') ?? 'anonymous';
 
   final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
   final response = await http.post(
@@ -115,14 +115,14 @@ class _EgzaminViewState extends State<EgzaminView> {
       'wynik': wynik.toStringAsFixed(2),
       'data_czas': dataCzas,
       'czas_trwania': czasTrwania.toString(),
-      'userID': userID,
+      'userName': userName,
     },
   );
 
   if (response.statusCode != 200) {
     print('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
   } else {
-    print('✅ Wynik zapisany dla userID: $userID');
+    print('✅ Wynik zapisany dla userName: $userName');
   }
 }
 
