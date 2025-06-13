@@ -144,22 +144,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     print('✅ Wynik zapisany dla userName: $userName');
   }
 }
-    Future<int?> fetchUpdatedDifficulty(int pytanieId, String kwalifikacja) async {
-    final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php?pytanie_id=$pytanieId&kwalifikacja=$kwalifikacja');
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['trudnosc'] != null) {
-          return int.tryParse(data['trudnosc'].toString());
-        }
-      }
-      print('❌ Błąd pobierania trudności dla pytania $pytanieId: ${response.statusCode} ${response.body}');
-    } catch (e) {
-      print('❌ Błąd pobierania trudności: $e');
-    }
-    return null;
-  }
 
   Future<void> zapiszTrudnoscDoBazy(int pytanieId, String kwalifikacja, bool poprawna) async {
     if (pytanieId <= 0) {
