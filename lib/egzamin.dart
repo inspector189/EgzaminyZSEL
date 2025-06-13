@@ -51,6 +51,25 @@ class _EgzaminViewState extends State<EgzaminView> {
     }
     return correct;
   }
+  Widget _buildBadge(dynamic trudnosc) {
+    if (trudnosc == null) {
+      return const SizedBox.shrink(); // No badge if trudnosc is null
+    }
+    final difficulty = (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0).toInt();
+    final isLatwe = difficulty >= 50;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isLatwe ? Colors.green : Colors.red,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        isLatwe ? 'ŁATWE' : 'TRUDNE',
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
 
   Future<void> fetchQuestions() async {
     final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
@@ -125,13 +144,66 @@ class _EgzaminViewState extends State<EgzaminView> {
     print('✅ Wynik zapisany dla userName: $userName');
   }
 }
-
-  void checkAnswer(String answer) {
-    setState(() {
-      selectedAnswer = answer;
-      selectedAnswers[current] = answer;
-    });
+    Future<int?> fetchUpdatedDifficulty(int pytanieId, String kwalifikacja) async {
+    final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php?pytanie_id=$pytanieId&kwalifikacja=$kwalifikacja');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['trudnosc'] != null) {
+          return int.tryParse(data['trudnosc'].toString());
+        }
+      }
+      print('❌ Błąd pobierania trudności dla pytania $pytanieId: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      print('❌ Błąd pobierania trudności: $e');
+    }
+    return null;
   }
+
+  Future<void> zapiszTrudnoscDoBazy(int pytanieId, String kwalifikacja, bool poprawna) async {
+    if (pytanieId <= 0) {
+      print('❌ Pominięto zapis, niepoprawny pytanie_id: $pytanieId');
+      return;
+    }
+    final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php');
+    final body = {
+      'pytanie_id': pytanieId.toString(),
+      'kwalifikacja': kwalifikacja,
+      'poprawna': poprawna ? '1' : '0',
+    };
+    print('Wysyłanie do zapis_trudnosci.php: $body');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      try {
+        final data = json.decode(response.body);
+        print('✅ Trudność zaktualizowana dla pytania $pytanieId: ${response.body}');
+      } catch (e) {
+        print('❌ Błąd parsowania odpowiedzi: $e');
+      }
+    } else {
+      print('❌ Błąd zapisu trudności dla pytania $pytanieId: ${response.statusCode} ${response.body}');
+    }
+  }
+    
+    void checkAnswer(String answer) {
+      setState(() {
+        selectedAnswer = answer;
+        selectedAnswers[current] = answer;
+      });
+          final pytanie = questions[current];
+      final poprawna = answer == pytanie['poprawna'];
+      zapiszTrudnoscDoBazy(
+        int.parse(pytanie['id']),
+        widget.kwalifikacja,
+        poprawna,
+      );
+    }
 
   void nextQuestion() {
     if (current < questions.length - 1) {
@@ -389,13 +461,19 @@ class _EgzaminViewState extends State<EgzaminView> {
     );
   }
 
-  Widget _buildSingleQuestion(dynamic q) {
+   Widget _buildSingleQuestion(dynamic q) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _html("<h3>Pytanie:</h3>${q['pytanie']}"),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: _html("<h3>Pytanie:</h3>${q['pytanie']}")),
+              _buildBadge(q['trudnosc']),
+            ],
+          ),
           const SizedBox(height: 16),
           ...['A', 'B', 'C', 'D'].map((litera) {
             final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
@@ -473,7 +551,13 @@ class _EgzaminViewState extends State<EgzaminView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _html("<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}"),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: _html("<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}")),
+                    _buildBadge(q['trudnosc']),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 ...['A', 'B', 'C', 'D'].map((litera) {
                   final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
@@ -491,9 +575,8 @@ class _EgzaminViewState extends State<EgzaminView> {
                         foregroundColor: widget.isDarkMode ? Colors.white : Colors.black,
                       ),
                       onPressed: () {
-                        setState(() {
-                          selectedAnswers[index] = litera;
-                        });
+                        current = index;
+                        checkAnswer(litera);
                       },
                       child: _html(odp ?? ""),
                     ),
