@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'wyniki.dart';
+import 'package:html/parser.dart' as html_parser;
 
 enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
 
@@ -52,31 +53,33 @@ class _EgzaminViewState extends State<EgzaminView> {
     return correct;
   }
   Widget _buildBadge(dynamic trudnosc) {
-    if (trudnosc == null) {
-      return const SizedBox.shrink(); // No badge if trudnosc is null
-    }
-    final difficulty = (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0).toInt();
-    final isLatwe = difficulty >= 50;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: isLatwe ? Colors.green : Colors.red,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        isLatwe ? 'ŁATWE' : 'TRUDNE',
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
-    );
+  if (trudnosc == null) {
+    return const SizedBox.shrink(); // Brak badge, jeśli null
   }
+  final difficulty = (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0).toInt();
+  final isLatwe = difficulty >= 50;
 
-  Future<void> fetchQuestions() async {
-    final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
-    final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: isLatwe ? Colors.green : Colors.red,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(
+      isLatwe ? 'ŁATWE' : 'TRUDNE',
+      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    ),
+  );
+}
+
+Future<void> fetchQuestions() async {
+  final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
+  final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
+  try {
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      // Zakładamy, że odpowiedź może być pusta lub nie w formacie JSON
+      if (response.body.isNotEmpty) {
         final decoded = json.decode(response.body);
         if (decoded is List && decoded.isNotEmpty) {
           List<dynamic> allQuestions = decoded;
@@ -95,23 +98,28 @@ class _EgzaminViewState extends State<EgzaminView> {
               break;
           }
 
+          // Ustaw domyślną trudność
+          for (var q in selected) {
+            q['trudnosc'] = 0.0; // Domyślna wartość
+          }
+
           setState(() {
             questions = selected;
             selectedAnswers = List.filled(selected.length, null);
             isLoading = false;
-            print('Załadowano ${questions.length} pytań');
-            print('selectedAnswers: $selectedAnswers');
+            print('Załadowano ${questions.length} pytań z domyślną trudnością');
           });
-        } else {
-          print('Pusta lub niepoprawna odpowiedź z API');
         }
       } else {
-        print('Błąd HTTP: ${response.statusCode}');
+        print('Brak danych z API');
       }
-    } catch (e) {
-      print("Błąd przy pobieraniu pytań: $e");
+    } else {
+      print('Błąd HTTP: ${response.statusCode}');
     }
+  } catch (e) {
+    print("Błąd przy pobieraniu pytań: $e");
   }
+}
 
   Future<void> sendResultToServer({
   required String kwalifikacja,
@@ -145,6 +153,31 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 }
 
+Future<Map<int, double>> fetchAllTrudnosci(String kwalifikacja) async {
+  final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php?kwalifikacja=$kwalifikacja');
+  try {
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      var document = html_parser.parse(response.body);
+      var rows = document.querySelectorAll('table tbody tr');
+      Map<int, double> trudnosciMap = {};
+      for (var row in rows) {
+        var cells = row.querySelectorAll('td');
+        if (cells.length >= 5) {
+          int pytanieId = int.parse(cells[0].text.trim());
+          double trudnosc = double.parse(cells[4].text.replaceAll('%', '').trim());
+          trudnosciMap[pytanieId] = trudnosc;
+        }
+      }
+      return trudnosciMap;
+    }
+    print('Błąd lub brak danych trudności: ${response.statusCode}');
+    return {};
+  } catch (e) {
+    print('Błąd pobierania trudności: $e');
+    return {};
+  }
+}
   Future<void> zapiszTrudnoscDoBazy(int pytanieId, String kwalifikacja, bool poprawna) async {
     if (pytanieId <= 0) {
       print('❌ Pominięto zapis, niepoprawny pytanie_id: $pytanieId');
@@ -174,20 +207,40 @@ class _EgzaminViewState extends State<EgzaminView> {
       print('❌ Błąd zapisu trudności dla pytania $pytanieId: ${response.statusCode} ${response.body}');
     }
   }
-    
-    void checkAnswer(String answer) {
-      setState(() {
-        selectedAnswer = answer;
-        selectedAnswers[current] = answer;
-      });
-          final pytanie = questions[current];
-      final poprawna = answer == pytanie['poprawna'];
-      zapiszTrudnoscDoBazy(
-        int.parse(pytanie['id']),
-        widget.kwalifikacja,
-        poprawna,
-      );
+    Future<double> fetchTrudnosc(int pytanieId, String kwalifikacja) async {
+  final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php?pytanie_id=$pytanieId&kwalifikacja=$kwalifikacja');
+  try {
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      // Jeśli błąd bazy, zwróć 0
+      return 0.0; // Tymczasowo, bo endpoint nie działa
     }
+    return 0.0;
+  } catch (e) {
+    print('Błąd pobierania trudności: $e');
+    return 0.0;
+  }
+}
+void checkAnswer(String answer) {
+  setState(() {
+    selectedAnswer = answer;
+    selectedAnswers[current] = answer;
+  });
+  final pytanie = questions[current];
+  final poprawna = answer == pytanie['poprawna'];
+  zapiszTrudnoscDoBazy(
+    int.parse(pytanie['id']),
+    widget.kwalifikacja,
+    poprawna,
+  ).then((_) {
+    // Po zapisaniu zaktualizuj trudność
+    fetchTrudnosc(int.parse(pytanie['id']), widget.kwalifikacja).then((trudnosc) {
+      setState(() {
+        questions[current]['trudnosc'] = trudnosc;
+      });
+    });
+  });
+}
 
   void nextQuestion() {
     if (current < questions.length - 1) {
