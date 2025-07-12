@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// Validating Authorization header
+// Walidacja nagłówka Authorization
 $headers = apache_request_headers();
 $authHeader = $headers['Authorization'] ?? '';
 
@@ -31,7 +31,7 @@ if ($token !== API_SECRET_TOKEN) {
     die('❌ Nieprawidłowy token dostępu');
 }
 
-// Retrieving POST data
+// Pobieranie danych POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Metoda nie dozwolona']);
@@ -45,22 +45,25 @@ if (empty($userName)) {
     echo json_encode(['error' => 'Brak parametru userName']);
     exit;
 }
-// Connecting to MySQL database
+
+// Połączenie z bazą danych MySQL
 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 if ($conn->connect_error) {
     http_response_code(500);
     die("❌ Błąd połączenia z bazą danych");
 }
 
-
-// Querying statistics from the wyniki_egzaminow table for the user
+// Zapytanie o statystyki dla każdej kwalifikacji
 $query = "SELECT 
+    kwalifikacja,
     COUNT(*) as liczba_egzaminow,
     AVG(wynik) as sredni_wynik,
     MAX(wynik) as najlepszy_wynik,
     MIN(wynik) as najgorszy_wynik
 FROM egzaminy_wyniki
-WHERE userID = ?";
+WHERE userID = ?
+GROUP BY kwalifikacja
+HAVING liczba_egzaminow > 0";
 $stmt = $conn->prepare($query);
 
 if (!$stmt) {
@@ -74,9 +77,18 @@ if (!$stmt) {
 $stmt->bind_param('s', $userName);
 $stmt->execute();
 $result = $stmt->get_result();
-$data = $result->fetch_assoc();
 
-if (!$data || $data['liczba_egzaminow'] == 0) {
+$statsByQualification = [];
+while ($row = $result->fetch_assoc()) {
+    $statsByQualification[$row['kwalifikacja']] = [
+        'Liczba podjętych egzaminów' => (int) $row['liczba_egzaminow'],
+        'Średni wynik' => number_format($row['sredni_wynik'], 2) . '%',
+        'Najlepszy wynik' => number_format($row['najlepszy_wynik'], 2) . '%',
+        'Najgorszy wynik' => number_format($row['najgorszy_wynik'], 2) . '%',
+    ];
+}
+
+if (empty($statsByQualification)) {
     http_response_code(404);
     echo json_encode(['error' => 'Nie znaleziono egzaminów dla tego użytkownika']);
     file_put_contents('debug.log', "No data for userName=$userName\n", FILE_APPEND);
@@ -85,22 +97,14 @@ if (!$data || $data['liczba_egzaminow'] == 0) {
     exit;
 }
 
-// Formatting the response to match Dart expectations
-$response = [
-    'Liczba podjętych egzaminów' => (int) $data['liczba_egzaminow'],
-    'Średni wynik' => number_format($data['sredni_wynik'], 2) . '%',
-    'Najlepszy wynik' => number_format($data['najlepszy_wynik'], 2) . '%',
-    'Najgorszy wynik' => number_format($data['najgorszy_wynik'], 2) . '%',
-];
+// Logowanie odpowiedzi
+file_put_contents('debug.log', "Response: " . json_encode($statsByQualification) . "\n", FILE_APPEND);
 
-// Logging successful response
-file_put_contents('debug.log', "Response: " . json_encode($response) . "\n", FILE_APPEND);
-
-// Closing database connections
+// Zamykanie połączeń z bazą danych
 $stmt->close();
 $conn->close();
 
-// Sending JSON response
+// Wysłanie odpowiedzi JSON
 http_response_code(200);
-echo json_encode($response);
+echo json_encode($statsByQualification);
 ?>

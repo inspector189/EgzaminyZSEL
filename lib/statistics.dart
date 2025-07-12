@@ -40,10 +40,27 @@ class StatisticsPage extends StatelessWidget {
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              ...stats.entries.map((entry) {
-                return ListTile(
-                  title: Text(entry.key),
-                  trailing: Text(entry.value.toString()),
+              ...stats.entries.map((qualificationEntry) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kwalifikacja: ${qualificationEntry.key}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...qualificationEntry.value.entries.map((statEntry) {
+                      return ListTile(
+                        title: Text(statEntry.key),
+                        trailing: Text(statEntry.value.toString()),
+                      );
+                    }).toList(),
+                    const Divider(), // Separator między kwalifikacjami
+                  ],
                 );
               }).toList(),
             ],
