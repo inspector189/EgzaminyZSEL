@@ -53,6 +53,7 @@ Future<Map<String, double>> fetchTrudnosciZdalnie() async {
           'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
         },
 );
+
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       final Map<String, double> map = {};

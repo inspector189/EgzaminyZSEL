@@ -531,23 +531,27 @@ class _MyHomePageState extends State<MyHomePage> {
                     }).toList(),
                   ),
                   const Divider(),
-                  ListTile(
-                    leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
-                    title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      if (_isLoggedIn) {
-                        _showProfilePopup(context);
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const LogowaniePage(),
-                          ),
-                        );
-                      }
-                    },
-                  ),
+                    ListTile(
+                      leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                      title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
+                      onTap: () async {   // ← async
+                        Navigator.pop(context);
+                        if (_isLoggedIn) {
+                          _showProfilePopup(context);
+                        } else {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LogowaniePage(),
+                            ),
+                          );
+
+                          if (result == true) {
+                            _checkLoginState();
+                          }
+                        }
+                      },
+                    ),
                   ListTile(
                     leading: Icon(
                       widget.isDarkMode
@@ -579,21 +583,25 @@ class _MyHomePageState extends State<MyHomePage> {
                 buildPopupMenu('Automatyk'),
                 const Spacer(),
                 IconButton(
-                  icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
-                  tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
-                  onPressed: () {
-                    if (_isLoggedIn) {
-                      _showProfilePopup(context);
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LogowaniePage(),
-                        ),
-                      );
+                icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
+                onPressed: () async {   
+                  if (_isLoggedIn) {
+                    _showProfilePopup(context);
+                  } else {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LogowaniePage(),
+                      ),
+                    );
+
+                    if (result == true) {
+                      _checkLoginState();
                     }
-                  },
-                ),
+                  }
+                },
+              ),
                 IconButton(
                   icon: Icon(
                     widget.isDarkMode
