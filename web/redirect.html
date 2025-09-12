@@ -4,7 +4,6 @@
   <title>OAuth Redirect</title>
   <script>
     window.onload = function () {
-      // Send the full redirect URL (including ?code=...&state=...) back to the app
       if (window.opener) {
         window.opener.postMessage(window.location.href, "*");
         window.close();
@@ -12,7 +11,7 @@
         document.body.innerText = "No window.opener found.";
       }
     };
-  </script>
+  </script> 
 </head>
 <body>
   Logging you in...

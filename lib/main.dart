@@ -7,10 +7,9 @@ import 'statistics.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:oauth2_client/oauth2_client.dart';
-import 'package:oauth2_client/oauth2_helper.dart';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'ouath2_service.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +20,7 @@ void main() async {
     );
   }
 
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
@@ -49,13 +48,13 @@ class _MyAppState extends State<MyApp> {
         brightness: Brightness.light,
         colorScheme: ColorScheme(
           brightness: Brightness.light,
-          primary: Color(0xFFFF7373),
-          onPrimary: Color(0xFFFF7373),
+          primary: const Color(0xFFFF7373),
+          onPrimary: const Color(0xFFFF7373),
           surface: Colors.white,
           onSurface: Colors.black,
           secondary: Colors.blue,
           onSecondary: Colors.white,
-          background: Color(0xFFD2D2D2),
+          background: const Color(0xFFD2D2D2),
           error: Colors.red,
           onError: Colors.redAccent,
         ),
@@ -64,13 +63,13 @@ class _MyAppState extends State<MyApp> {
         brightness: Brightness.dark,
         colorScheme: ColorScheme(
           brightness: Brightness.dark,
-          primary: Color(0xFFFF7373),
-          onPrimary: Color(0xFFFF7373),
-          surface: Color(0xFF222222),
+          primary: const Color(0xFFFF7373),
+          onPrimary: const Color(0xFFFF7373),
+          surface: const Color(0xFF222222),
           onSurface: Colors.white,
           secondary: Colors.blueAccent,
           onSecondary: Colors.white,
-          background: Color(0xFF222222),
+          background: const Color(0xFF222222),
           error: Colors.red,
           onError: Colors.redAccent,
         ),
@@ -107,7 +106,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isLoggedIn = false;
   String? _userName;
   String? _userEmail;
-  late OAuth2Helper _oauth2Helper;
+  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -136,32 +135,6 @@ class _MyHomePageState extends State<MyHomePage> {
       '„Ucz się, ucz, bo nauka to potęgi klucz, a kto ma dużo kluczy... zostaje woźnym.” – Ludowa mądrość z przestrogą',
     ];
     selectedQuote = quotes[Random().nextInt(quotes.length)];
-    
-    final String clientId = '67af475e-082d-4187-b1ef-5fa26fa0fe77';
-    final String authorizeUrl = 'https://login.microsoftonline.com/de78aefd-fda9-4eaf-a2d1-cf8492188649/oauth2/v2.0/authorize';
-    final String tokenUrl = 'https://login.microsoftonline.com/de78aefd-fda9-4eaf-a2d1-cf8492188649/oauth2/v2.0/token';
-    
-    final client = OAuth2Client(
-      authorizeUrl: authorizeUrl,
-      tokenUrl: tokenUrl,
-      redirectUri: 'https://interpage.pl/egzaminyzsel/redirect.html',
-      customUriScheme: '', 
-    );
-    _oauth2Helper = OAuth2Helper(
-      client,
-      grantType: OAuth2Helper.authorizationCode,
-      clientId: clientId,
-      scopes: [
-        'openid',
-        'profile',
-        'email',
-        'User.Read',
-        'offline_access',
-      ],
-      enablePKCE: true,
-      authCodeParams: {'response_mode': 'query'},
-    );
-
     _checkLoginState();
   }
 
@@ -180,34 +153,65 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     });
 
-    debugPrint('After checking: _isLoggedIn=$_isLoggedIn');
+    if (_isLoggedIn && _userEmail != null) {
+      await _verifyEmail(_userEmail!);
+    }
+
+    debugPrint('After checking: _isLoggedIn=$_isLoggedIn, _isAdmin=$_isAdmin');
+  }
+
+  Future<void> _verifyEmail(String email) async {
+    try {
+      final url = Uri.parse('https://interpage.pl/egzaminy/verify-email.php');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _isAdmin = data['isValid'] == true;
+        });
+        debugPrint('Email verification: _isAdmin set to $_isAdmin');
+      } else {
+        setState(() {
+          _isAdmin = false;
+        });
+        debugPrint('Email verification failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _isAdmin = false;
+      });
+      debugPrint('Error during email verification: $e');
+    }
   }
 
   void _openStatistics(BuildContext context) {
     Future.delayed(Duration.zero, () {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => StatisticsPage(
-          isDarkMode: widget.isDarkMode,
-        )),
+        MaterialPageRoute(
+            builder: (context) => StatisticsPage(
+                  isDarkMode: widget.isDarkMode,
+                )),
       );
     });
   }
 
   Future<void> _signOut() async {
-    // Clear the token
-    await _oauth2Helper.removeAllTokens();
-    // Clear user info from SharedPreferences
+    await OAuth2Service.instance.oauth2Helper.removeAllTokens();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('userName');
     await prefs.remove('userEmail');
-
     setState(() {
       _isLoggedIn = false;
       _userName = null;
       _userEmail = null;
+      _isAdmin = false;
     });
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Wylogowano')),
     );
@@ -341,7 +345,7 @@ class _MyHomePageState extends State<MyHomePage> {
       child: PopupMenuButton<String>(
         tooltip: title,
         offset: const Offset(0, kToolbarHeight),
-        color: widget.isDarkMode ? Color(0xFF666666) : Color(0xFFAAAAAA),
+        color: widget.isDarkMode ? const Color(0xFF666666) : const Color(0xFFAAAAAA),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (value) {
           _navigatorKey.currentState?.push(
@@ -410,7 +414,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.primary,
                     ),
-                    child: Text(
+                    child: const Text(
                       'Menu',
                       style: TextStyle(color: Colors.white, fontSize: 24),
                     ),
@@ -531,27 +535,27 @@ class _MyHomePageState extends State<MyHomePage> {
                     }).toList(),
                   ),
                   const Divider(),
-                    ListTile(
-                      leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
-                      title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
-                      onTap: () async {   // ← async
-                        Navigator.pop(context);
-                        if (_isLoggedIn) {
-                          _showProfilePopup(context);
-                        } else {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const LogowaniePage(),
-                            ),
-                          );
+                  ListTile(
+                    leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                    title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      if (_isLoggedIn) {
+                        _showProfilePopup(context);
+                      } else {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LogowaniePage(),
+                          ),
+                        );
 
-                          if (result == true) {
-                            _checkLoginState();
-                          }
+                        if (result == true) {
+                          _checkLoginState();
                         }
-                      },
-                    ),
+                      }
+                    },
+                  ),
                   ListTile(
                     leading: Icon(
                       widget.isDarkMode
@@ -583,25 +587,25 @@ class _MyHomePageState extends State<MyHomePage> {
                 buildPopupMenu('Automatyk'),
                 const Spacer(),
                 IconButton(
-                icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
-                tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
-                onPressed: () async {   
-                  if (_isLoggedIn) {
-                    _showProfilePopup(context);
-                  } else {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LogowaniePage(),
-                      ),
-                    );
+                  icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                  tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
+                  onPressed: () async {
+                    if (_isLoggedIn) {
+                      _showProfilePopup(context);
+                    } else {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LogowaniePage(),
+                        ),
+                      );
 
-                    if (result == true) {
-                      _checkLoginState();
+                      if (result == true) {
+                        _checkLoginState();
+                      }
                     }
-                  }
-                },
-              ),
+                  },
+                ),
                 IconButton(
                   icon: Icon(
                     widget.isDarkMode
