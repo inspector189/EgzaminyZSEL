@@ -144,8 +144,8 @@ class _MyHomePageState extends State<MyHomePage> {
     final client = OAuth2Client(
       authorizeUrl: authorizeUrl,
       tokenUrl: tokenUrl,
-      redirectUri: kIsWeb ? 'http://localhost:8080/redirect.html' : 'com.example.myapp://oauthredirect',
-      customUriScheme: kIsWeb ? '' : 'com.example.myapp',
+      redirectUri: 'https://interpage.pl/egzaminyzsel/redirect.html',
+      customUriScheme: '', 
     );
     _oauth2Helper = OAuth2Helper(
       client,

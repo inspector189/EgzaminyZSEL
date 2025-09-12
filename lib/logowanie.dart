@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:oauth2_client/oauth2_client.dart';
 import 'package:oauth2_client/oauth2_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io' show Platform;
 
 class LogowaniePage extends StatefulWidget {
   const LogowaniePage({super.key});
@@ -29,18 +30,21 @@ final String _tokenUrl = 'https://login.microsoftonline.com/de78aefd-fda9-4eaf-a
     'offline_access',
   ];
 
-  String get _redirectUri {
-    if (kIsWeb) {
-      return 'http://localhost:8080/redirect.html';
-    } else {
-      return 'com.example.myapp://oauthredirect';
-    }
+String get _redirectUri {
+  if (kIsWeb) {
+    return 'https://interpage.pl/egzaminyzsel/redirect.html';
+  } else if (Platform.isAndroid || Platform.isIOS) {
+    return 'com.example.myapp://oauthredirect';
   }
+  return 'https://interpage.pl/egzaminyzsel/redirect.html'; 
+}
 
-  String get _customScheme {
-    if (kIsWeb) return '';
-    return 'com.example.myapp';
+String get _customScheme {
+  if (kIsWeb) {
+    return ''; 
   }
+  return 'com.example.myapp';
+}
 
   @override
   void initState() {
@@ -67,7 +71,7 @@ final String _tokenUrl = 'https://login.microsoftonline.com/de78aefd-fda9-4eaf-a
 
   Future<void> _loginWithMicrosoft() async {
     setState(() => _isLoading = true);
-
+        debugPrint('Redirect URI being sent: $_redirectUri');
     try {
       debugPrint('Logging in using redirect: $_redirectUri');
       final tokenResponse = await _oauth2Helper.fetchToken();
