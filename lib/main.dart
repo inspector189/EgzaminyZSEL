@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'ouath2_service.dart'; 
+import 'admin_panel.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -218,71 +219,87 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _showProfilePopup(BuildContext context) {
-    showMenu(
-      context: context,
-      position: const RelativeRect.fromLTRB(1000, 80, 0, 0),
-      items: [
-        PopupMenuItem(
-          enabled: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.grey[300],
-                    child: Text(
-                      _userName![0].toUpperCase(),
-                      style: const TextStyle(fontSize: 20, color: Colors.black),
-                    ),
+  showMenu(
+    context: context,
+    position: const RelativeRect.fromLTRB(1000, 80, 0, 0),
+    items: [
+      PopupMenuItem(
+        enabled: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.grey[300],
+                  child: Text(
+                    _userName![0].toUpperCase(),
+                    style: const TextStyle(fontSize: 20, color: Colors.black),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _userName!,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          _userEmail!,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _userName!,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        _userEmail!,
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                  const SizedBox(width: 5),
-                  const Text('Dostępny', style: TextStyle(fontSize: 12)),
-                ],
-              ),
-              const Divider(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                const SizedBox(width: 5),
+                const Text('Dostępny', style: TextStyle(fontSize: 12)),
+              ],
+            ),
+            const Divider(),
+
+            /// 🔹 Tutaj pojawi się Admin Panel tylko dla admina
+            if (_isAdmin)
               PopupMenuItem(
-                child: const Text('Statystyki'),
+                child: const Text('Admin Panel'),
                 onTap: () {
-                  _openStatistics(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AdminPanelPage(), // <- musisz stworzyć stronę
+                    ),
+                  );
                 },
               ),
-              PopupMenuItem(
-                child: const Text('Wyloguj się'),
-                onTap: _signOut,
-              ),
-            ],
-          ),
+
+            PopupMenuItem(
+              child: const Text('Statystyki'),
+              onTap: () {
+                _openStatistics(context);
+              },
+            ),
+            PopupMenuItem(
+              child: const Text('Wyloguj się'),
+              onTap: _signOut,
+            ),
+          ],
         ),
-      ],
-      color: widget.isDarkMode ? const Color(0xFF333333) : Colors.white,
-    );
-  }
+      ),
+    ],
+    color: widget.isDarkMode ? const Color(0xFF333333) : Colors.white,
+  );
+}
+
 
   List<String> getMenuItems(String category) {
     switch (category) {
