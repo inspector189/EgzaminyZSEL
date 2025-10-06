@@ -13,15 +13,14 @@ class EgzaminView extends StatefulWidget {
   final String kwalifikacja;
   final bool isDarkMode;
   final bool returnToHome;
-  final String? userName; // Add userID parameter
-
+  final String? userName;
   const EgzaminView({
     super.key,
     required this.tryb,
     required this.kwalifikacja,
     required this.isDarkMode,
     required this.returnToHome,
-    this.userName, // Optional userID
+    this.userName,
   });
 
   @override
