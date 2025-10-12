@@ -29,7 +29,7 @@ class QualificationPage extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -51,7 +51,9 @@ class QualificationPage extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -63,8 +65,8 @@ class QualificationPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Check if returnToHome is passed as an argument in the route settings
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final returnToHome = args?['returnToHome'] ?? false;
 
     return Scaffold(
@@ -97,12 +99,16 @@ class QualificationPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => EgzaminView(
-                        tryb: TrybEgzaminu.jednoPytanie,
-                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
-                        isDarkMode: isDarkMode,
-                        returnToHome: false, // Default to false for single question
-                      ),
+                      builder:
+                          (context) => EgzaminView(
+                            tryb: TrybEgzaminu.jednoPytanie,
+                            kwalifikacja: qualification
+                                .toLowerCase()
+                                .replaceAll('.', ''),
+                            isDarkMode: isDarkMode,
+                            returnToHome:
+                                false,
+                          ),
                     ),
                   );
                 },
@@ -115,12 +121,16 @@ class QualificationPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => EgzaminView(
-                        tryb: TrybEgzaminu.czterdziesciPytan,
-                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
-                        isDarkMode: isDarkMode,
-                        returnToHome: false, // Default to false, set to true in EgzaminWynikView
-                      ),
+                      builder:
+                          (context) => EgzaminView(
+                            tryb: TrybEgzaminu.czterdziesciPytan,
+                            kwalifikacja: qualification
+                                .toLowerCase()
+                                .replaceAll('.', ''),
+                            isDarkMode: isDarkMode,
+                            returnToHome:
+                                false,
+                          ),
                     ),
                   );
                 },
@@ -133,12 +143,15 @@ class QualificationPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => EgzaminView(
-                        tryb: TrybEgzaminu.wszystkie,
-                        kwalifikacja: qualification.toLowerCase().replaceAll('.', ''),
-                        isDarkMode: isDarkMode,
-                        returnToHome: false, // Default to false
-                      ),
+                      builder:
+                          (context) => EgzaminView(
+                            tryb: TrybEgzaminu.wszystkie,
+                            kwalifikacja: qualification
+                                .toLowerCase()
+                                .replaceAll('.', ''),
+                            isDarkMode: isDarkMode,
+                            returnToHome: false,
+                          ),
                     ),
                   );
                 },

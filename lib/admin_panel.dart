@@ -19,14 +19,14 @@ class AdminPanelPage extends StatelessWidget {
         children: [
           Text(
             'Witaj w panelu administratora',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
             icon: const Icon(Icons.people),
-            label: const Text('Zarządzaj użytkownikami'),
+            label: const Text('Zarządzaj administratorami'),
             onPressed: () {
               Navigator.push(
                 context,
@@ -39,8 +39,9 @@ class AdminPanelPage extends StatelessWidget {
             icon: const Icon(Icons.bar_chart),
             label: const Text('Raporty i statystyki'),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Funkcja w przygotowaniu 🚧')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AdminStatsPage()),
               );
             },
           ),
@@ -85,7 +86,9 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
       print('Body: ${response.body}');
 
       if (response.statusCode == 200) {
-        if (response.body.isEmpty || response.body == '----------------------------------------------------------------------------------------------------') {
+        if (response.body.isEmpty ||
+            response.body ==
+                '----------------------------------------------------------------------------------------------------') {
           throw Exception('Pusta odpowiedź – sprawdź PHP na serwerze');
         }
         final data = json.decode(response.body);
@@ -108,16 +111,18 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         isLoading = false;
         errorMessage = e.toString();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Błąd ładowania: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Błąd ładowania: $e')));
     }
   }
 
   Future<void> addUser(String email) async {
     if (email.isEmpty || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Podaj poprawny email (musi zawierać @)')),
+        const SnackBar(
+          content: Text('Podaj poprawny email (musi zawierać znak "@")'),
+        ),
       );
       return;
     }
@@ -146,9 +151,9 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         throw Exception('Błąd HTTP: ${response.statusCode}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Błąd przy dodawaniu: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Błąd przy dodawaniu: $e')));
     }
   }
 
@@ -176,50 +181,60 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         throw Exception('Błąd HTTP: ${response.statusCode}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Błąd przy usuwaniu: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Błąd przy usuwaniu: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Zarządzaj użytkownikami')),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : errorMessage.isNotEmpty
-              ? Center(child: Text('Błąd: $errorMessage\n\nSpróbuj ponownie', textAlign: TextAlign.center))
+      appBar: AppBar(title: const Text('Zarządzaj administratorami')),
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : errorMessage.isNotEmpty
+              ? Center(
+                child: Text(
+                  'Błąd: $errorMessage\n\nSpróbuj ponownie',
+                  textAlign: TextAlign.center,
+                ),
+              )
               : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _emailController,
-                              decoration: const InputDecoration(
-                                labelText: 'Nowy email',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.email),
-                              ),
-                              keyboardType: TextInputType.emailAddress,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _emailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Nowy email',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.email),
                             ),
+                            keyboardType: TextInputType.emailAddress,
                           ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            onPressed: () => addUser(_emailController.text.trim()),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Dodaj'),
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed:
+                              () => addUser(_emailController.text.trim()),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Dodaj'),
+                        ),
+                      ],
                     ),
-                    Expanded(
-                      child: users.isEmpty
-                          ? const Center(child: Text('Brak adminów do zarządzania.'))
-                          : ListView.builder(
+                  ),
+                  Expanded(
+                    child:
+                        users.isEmpty
+                            ? const Center(
+                              child: Text('Brak adminów do zarządzania.'),
+                            )
+                            : ListView.builder(
                               itemCount: users.length,
                               itemBuilder: (context, index) {
                                 final user = users[index];
@@ -227,15 +242,316 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                                   leading: const Icon(Icons.email),
                                   title: Text(user['email']),
                                   trailing: IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () => deleteUser(int.parse(user['id'].toString())),
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed:
+                                        () => deleteUser(
+                                          int.parse(user['id'].toString()),
+                                        ),
                                   ),
                                 );
                               },
                             ),
+                  ),
+                ],
+              ),
+    );
+  }
+}
+
+class AdminStatsPage extends StatefulWidget {
+  const AdminStatsPage({super.key});
+
+  @override
+  State<AdminStatsPage> createState() => _AdminStatsPageState();
+}
+
+class _AdminStatsPageState extends State<AdminStatsPage> {
+  List<dynamic> allResults = [];
+  bool isLoading = true;
+  String? errorMessage;
+  String searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    fetchAllStats();
+  }
+
+  Future<void> fetchAllStats() async {
+    try {
+      final url = Uri.parse('https://interpage.pl/egzaminy/stats_all.php');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        },
+      );
+
+      print(
+        '📥 Admin statistics response: ${response.statusCode} - ${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List) {
+          setState(() {
+            allResults = data;
+            isLoading = false;
+          });
+        } else {
+          throw Exception('Unexpected response format');
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+      });
+    }
+  }
+
+  Map<String, List<dynamic>> groupByUser() {
+    final Map<String, List<dynamic>> grouped = {};
+    for (var r in allResults) {
+      String user = (r['userID'] ?? '').toString().trim();
+      if (user.isEmpty || user.toLowerCase() == 'anonymous') {
+        user = 'Użytkownik anonimowy';
+      }
+      if (!grouped.containsKey(user)) grouped[user] = [];
+      grouped[user]!.add(r);
+    }
+    return grouped;
+  }
+
+  Map<String, List<dynamic>> groupByQualification() {
+    final Map<String, List<dynamic>> grouped = {};
+    for (var r in allResults) {
+      final q = (r['kwalifikacja'] ?? 'Nieznana').toString();
+      if (!grouped.containsKey(q)) grouped[q] = [];
+      grouped[q]!.add(r);
+    }
+    return grouped;
+  }
+
+  /// Calculates basic statistics for a list of results
+  Map<String, dynamic> calculateStats(List<dynamic> results) {
+    final scores = results.map((e) => (e['wynik'] as num).toDouble()).toList();
+    final avg = scores.reduce((a, b) => a + b) / scores.length;
+    final best = scores.reduce((a, b) => a > b ? a : b);
+    final worst = scores.reduce((a, b) => a < b ? a : b);
+    return {'count': scores.length, 'avg': avg, 'best': best, 'worst': worst};
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorAccent =
+        isDark ? Theme.of(context).colorScheme.primary : Colors.white;
+
+    final users = groupByUser();
+    final qualifications = groupByQualification();
+
+    final filteredUsers =
+        users.entries
+            .where(
+              (e) => e.key.toLowerCase().contains(searchQuery.toLowerCase()),
+            )
+            .toList();
+
+    filteredUsers.sort((a, b) {
+      if (a.key == 'Użytkownik anonimowy') return 1;
+      if (b.key == 'Użytkownik anonimowy') return -1;
+      return a.key.compareTo(b.key);
+    });
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('📊 Statystyki Egzaminów'),
+        backgroundColor: colorAccent.withValues(alpha: 0.9),
+      ),
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : errorMessage != null
+              ? Center(child: Text(errorMessage!))
+              : RefreshIndicator(
+                onRefresh: fetchAllStats,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // Search Bar
+                    TextField(
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search),
+                        hintText: 'Szukaj użytkownika po nazwisku...',
+                        filled: true,
+                        fillColor: isDark ? Colors.grey[850] : Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          searchQuery = value;
+                        });
+                      },
                     ),
+                    const SizedBox(height: 24),
+
+                    Text(
+                      '👤 Statystyki według użytkownika',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (filteredUsers.isEmpty)
+                      const Text('Brak wyników dla tego użytkownika.'),
+
+                    ...filteredUsers.map((entry) {
+                      final user = entry.key;
+                      final userStats = calculateStats(entry.value);
+
+                      return Card(
+                        elevation: 3,
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Liczba egzaminów: ${userStats['count']}',
+                                  ),
+                                  Text(
+                                    'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}%',
+                                    style: TextStyle(color: colorAccent),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Najlepszy: ${userStats['best']}%'),
+                                  Text('Najgorszy: ${userStats['worst']}%'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+
+                    const SizedBox(height: 32),
+
+                    Text(
+                      '🎓 Statystyki według kwalifikacji',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    ...qualifications.entries.map((entry) {
+                      final q = entry.key.toUpperCase();
+                      final qStats = calculateStats(entry.value);
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors:
+                                isDark
+                                    ? [
+                                      Theme.of(context).colorScheme.primary
+                                          .withValues(alpha: 0.3),
+                                      Theme.of(context).colorScheme.primary
+                                          .withValues(alpha: 0.15),
+                                    ]
+                                    : [Colors.blue.shade100, Colors.white],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: colorAccent.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.school,
+                                    color: colorAccent,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    q,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Egzaminów: ${qStats['count']}'),
+                                  Text(
+                                    'Śr: ${qStats['avg'].toStringAsFixed(2)}%',
+                                    style: TextStyle(color: colorAccent),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Najlepszy: ${qStats['best']}%'),
+                                  Text('Najgorszy: ${qStats['worst']}%'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
                   ],
                 ),
+              ),
     );
   }
 }

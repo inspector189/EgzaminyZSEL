@@ -6,10 +6,7 @@ import 'dart:convert';
 class StatisticsPage extends StatelessWidget {
   final bool isDarkMode;
 
-  const StatisticsPage({
-    super.key,
-    required this.isDarkMode,
-  });
+  const StatisticsPage({super.key, required this.isDarkMode});
 
   @override
   Widget build(BuildContext context) {
@@ -24,9 +21,7 @@ class StatisticsPage extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(
-              child: Text('Błąd: ${snapshot.error}'),
-            );
+            return Center(child: Text('Błąd: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text('Brak danych statystycznych.'));
           }
@@ -59,10 +54,10 @@ class StatisticsPage extends StatelessWidget {
                         trailing: Text(statEntry.value.toString()),
                       );
                     }).toList(),
-                    const Divider(), // Separator między kwalifikacjami
+                    const Divider(),
                   ],
                 );
-              }).toList(),
+              }),
             ],
           );
         },
@@ -85,9 +80,7 @@ class StatisticsPage extends StatelessWidget {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
       },
-      body: {
-        'userName': userName,
-      },
+      body: {'userName': userName},
     );
 
     print('📥 Statistics response: ${response.statusCode} - ${response.body}');
@@ -98,8 +91,12 @@ class StatisticsPage extends StatelessWidget {
         throw Exception(data['error']);
       }
       return data;
+    } else if (response.statusCode == 404) {
+      throw Exception('Nie zrobiłeś jeszcze żadnego egzaminu!');
     } else {
-      throw Exception('Nie udało się pobrać statystyk: ${response.statusCode} - ${response.body}');
+      throw Exception(
+        'Nie udało się pobrać statystyk: ${response.statusCode} - ${response.body}',
+      );
     }
   }
 }

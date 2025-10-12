@@ -26,7 +26,7 @@ class EgzaminWynikView extends StatelessWidget {
 
     final resultText = "$correctAnswers / $totalQuestions";
     final message =
-        zdane ? "Gratulacje! Zdałeś egzamin!" : "Niestety, nie udało się zdać";
+        zdane ? "Gratulacje! Zdałeś egzamin!" : "Niestety, nie udało się zdać egzaminu";
 
     final color = zdane ? Colors.green : Colors.red;
 
@@ -75,11 +75,12 @@ class EgzaminWynikView extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => EgzaminPodgladView(
-                          questions: questions,
-                          selectedAnswers: selectedAnswers,
-                          isDarkMode: isDarkMode,
-                        ),
+                        builder:
+                            (_) => EgzaminPodgladView(
+                              questions: questions,
+                              selectedAnswers: selectedAnswers,
+                              isDarkMode: isDarkMode,
+                            ),
                       ),
                     );
                   },

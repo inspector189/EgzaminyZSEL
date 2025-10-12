@@ -9,7 +9,7 @@ import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'ouath2_service.dart'; 
+import 'ouath2_service.dart';
 import 'admin_panel.dart';
 
 void main() async {
@@ -55,7 +55,7 @@ class _MyAppState extends State<MyApp> {
           onSurface: Colors.black,
           secondary: Colors.blue,
           onSecondary: Colors.white,
-          background: const Color(0xFFD2D2D2),
+          surfaceContainer: const Color(0xFFD2D2D2),
           error: Colors.red,
           onError: Colors.redAccent,
         ),
@@ -70,7 +70,7 @@ class _MyAppState extends State<MyApp> {
           onSurface: Colors.white,
           secondary: Colors.blueAccent,
           onSecondary: Colors.white,
-          background: const Color(0xFF222222),
+          surfaceContainer: const Color(0xFF222222),
           error: Colors.red,
           onError: Colors.redAccent,
         ),
@@ -144,7 +144,9 @@ class _MyHomePageState extends State<MyHomePage> {
     final userName = prefs.getString('userName');
     final userEmail = prefs.getString('userEmail');
 
-    debugPrint('Checking login state: userName=$userName, userEmail=$userEmail');
+    debugPrint(
+      'Checking login state: userName=$userName, userEmail=$userEmail',
+    );
 
     setState(() {
       _isLoggedIn = userName != null && userEmail != null;
@@ -195,9 +197,8 @@ class _MyHomePageState extends State<MyHomePage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (context) => StatisticsPage(
-                  isDarkMode: widget.isDarkMode,
-                )),
+          builder: (context) => StatisticsPage(isDarkMode: widget.isDarkMode),
+        ),
       );
     });
   }
@@ -213,93 +214,93 @@ class _MyHomePageState extends State<MyHomePage> {
       _userEmail = null;
       _isAdmin = false;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Wylogowano')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Wylogowano')));
   }
 
   void _showProfilePopup(BuildContext context) {
-  showMenu(
-    context: context,
-    position: const RelativeRect.fromLTRB(1000, 80, 0, 0),
-    items: [
-      PopupMenuItem(
-        enabled: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.grey[300],
-                  child: Text(
-                    _userName![0].toUpperCase(),
-                    style: const TextStyle(fontSize: 20, color: Colors.black),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _userName!,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        _userEmail!,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                const SizedBox(width: 5),
-                const Text('Dostępny', style: TextStyle(fontSize: 12)),
-              ],
-            ),
-            const Divider(),
-
-            /// 🔹 Tutaj pojawi się Admin Panel tylko dla admina
-            if (_isAdmin)
-              PopupMenuItem(
-                child: const Text('Admin Panel'),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AdminPanelPage(), // <- musisz stworzyć stronę
+    showMenu(
+      context: context,
+      position: const RelativeRect.fromLTRB(1000, 80, 0, 0),
+      items: [
+        PopupMenuItem(
+          enabled: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.grey[300],
+                    child: Text(
+                      _userName![0].toUpperCase(),
+                      style: const TextStyle(fontSize: 20, color: Colors.black),
                     ),
-                  );
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _userName!,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          _userEmail!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                  const SizedBox(width: 5),
+                  const Text('Dostępny', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+              const Divider(),
+              
+              if (_isAdmin)
+                PopupMenuItem(
+                  child: const Text('Panel Administratora'),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) =>
+                                const AdminPanelPage(),
+                      ),
+                    );
+                  },
+                ),
+
+              PopupMenuItem(
+                child: const Text('Statystyki'),
+                onTap: () {
+                  _openStatistics(context);
                 },
               ),
-
-            PopupMenuItem(
-              child: const Text('Statystyki'),
-              onTap: () {
-                _openStatistics(context);
-              },
-            ),
-            PopupMenuItem(
-              child: const Text('Wyloguj się'),
-              onTap: _signOut,
-            ),
-          ],
+              PopupMenuItem(onTap: _signOut, child: const Text('Wyloguj się')),
+            ],
+          ),
         ),
-      ),
-    ],
-    color: widget.isDarkMode ? const Color(0xFF333333) : Colors.white,
-  );
-}
-
+      ],
+      color: widget.isDarkMode ? const Color(0xFF333333) : Colors.white,
+    );
+  }
 
   List<String> getMenuItems(String category) {
     switch (category) {
@@ -362,15 +363,19 @@ class _MyHomePageState extends State<MyHomePage> {
       child: PopupMenuButton<String>(
         tooltip: title,
         offset: const Offset(0, kToolbarHeight),
-        color: widget.isDarkMode ? const Color(0xFF666666) : const Color(0xFFAAAAAA),
+        color:
+            widget.isDarkMode
+                ? const Color(0xFF666666)
+                : const Color(0xFFAAAAAA),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (value) {
           _navigatorKey.currentState?.push(
             MaterialPageRoute(
-              builder: (context) => QualificationPage(
-                qualification: value,
-                isDarkMode: widget.isDarkMode,
-              ),
+              builder:
+                  (context) => QualificationPage(
+                    qualification: value,
+                    isDarkMode: widget.isDarkMode,
+                  ),
             ),
           );
         },
@@ -408,10 +413,11 @@ class _MyHomePageState extends State<MyHomePage> {
         } else {
           _navigatorKey.currentState?.push(
             MaterialPageRoute(
-              builder: (context) => QualificationPage(
-                qualification: title,
-                isDarkMode: widget.isDarkMode,
-              ),
+              builder:
+                  (context) => QualificationPage(
+                    qualification: title,
+                    isDarkMode: widget.isDarkMode,
+                  ),
             ),
           );
         }
@@ -422,141 +428,205 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: MediaQuery.of(context).size.width <= 900
-          ? Drawer(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  DrawerHeader(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
+      drawer:
+          MediaQuery.of(context).size.width <= 900
+              ? Drawer(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    DrawerHeader(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      child: const Text(
+                        'Menu',
+                        style: TextStyle(color: Colors.white, fontSize: 24),
+                      ),
                     ),
-                    child: const Text(
-                      'Menu',
-                      style: TextStyle(color: Colors.white, fontSize: 24),
+                    _drawerItem(context, 'Strona Główna'),
+                    ExpansionTile(
+                      title: const Text('Programista'),
+                      children:
+                          getMenuItems('Programista').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
                     ),
-                  ),
-                  _drawerItem(context, 'Strona Główna'),
-                  ExpansionTile(
-                    title: const Text('Programista'),
-                    children: getMenuItems('Programista').map((kwal) {
-                      return ListTile(
-                        title: Text(kwal),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _navigatorKey.currentState?.push(
+                    ExpansionTile(
+                      title: const Text('Informatyk'),
+                      children:
+                          getMenuItems('Informatyk').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Elektryk'),
+                      children:
+                          getMenuItems('Elektryk').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Elektronik'),
+                      children:
+                          getMenuItems('Elektronik').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Teleinformatyk'),
+                      children:
+                          getMenuItems('Teleinformatyk').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    ExpansionTile(
+                      title: const Text('Automatyk'),
+                      children:
+                          getMenuItems('Automatyk').map((kwal) {
+                            return ListTile(
+                              title: Text(kwal),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _navigatorKey.currentState?.push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => QualificationPage(
+                                          qualification: kwal,
+                                          isDarkMode: widget.isDarkMode,
+                                        ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                      title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        if (_isLoggedIn) {
+                          _showProfilePopup(context);
+                        } else {
+                          final result = await Navigator.push(
+                            context,
                             MaterialPageRoute(
-                              builder: (context) => QualificationPage(
-                                qualification: kwal,
-                                isDarkMode: widget.isDarkMode,
-                              ),
+                              builder: (context) => const LogowaniePage(),
                             ),
                           );
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  ExpansionTile(
-                    title: const Text('Informatyk'),
-                    children: getMenuItems('Informatyk').map((kwal) {
-                      return ListTile(
-                        title: Text(kwal),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _navigatorKey.currentState?.push(
-                            MaterialPageRoute(
-                              builder: (context) => QualificationPage(
-                                qualification: kwal,
-                                isDarkMode: widget.isDarkMode,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  ExpansionTile(
-                    title: const Text('Elektryk'),
-                    children: getMenuItems('Elektryk').map((kwal) {
-                      return ListTile(
-                        title: Text(kwal),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _navigatorKey.currentState?.push(
-                            MaterialPageRoute(
-                              builder: (context) => QualificationPage(
-                                qualification: kwal,
-                                isDarkMode: widget.isDarkMode,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  ExpansionTile(
-                    title: const Text('Elektronik'),
-                    children: getMenuItems('Elektronik').map((kwal) {
-                      return ListTile(
-                        title: Text(kwal),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _navigatorKey.currentState?.push(
-                            MaterialPageRoute(
-                              builder: (context) => QualificationPage(
-                                qualification: kwal,
-                                isDarkMode: widget.isDarkMode,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  ExpansionTile(
-                    title: const Text('Teleinformatyk'),
-                    children: getMenuItems('Teleinformatyk').map((kwal) {
-                      return ListTile(
-                        title: Text(kwal),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _navigatorKey.currentState?.push(
-                            MaterialPageRoute(
-                              builder: (context) => QualificationPage(
-                                qualification: kwal,
-                                isDarkMode: widget.isDarkMode,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  ExpansionTile(
-                    title: const Text('Automatyk'),
-                    children: getMenuItems('Automatyk').map((kwal) {
-                      return ListTile(
-                        title: Text(kwal),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _navigatorKey.currentState?.push(
-                            MaterialPageRoute(
-                              builder: (context) => QualificationPage(
-                                qualification: kwal,
-                                isDarkMode: widget.isDarkMode,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
-                    title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
-                    onTap: () async {
-                      Navigator.pop(context);
+
+                          if (result == true) {
+                            _checkLoginState();
+                          }
+                        }
+                      },
+                    ),
+                    ListTile(
+                      leading: Icon(
+                        widget.isDarkMode
+                            ? Icons.wb_sunny
+                            : Icons.nightlight_round,
+                      ),
+                      title: const Text('Przełącz motyw'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onToggleTheme();
+                      },
+                    ),
+                  ],
+                ),
+              )
+              : null,
+      appBar: AppBar(
+        title: Text(widget.title),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        actions:
+            MediaQuery.of(context).size.width > 900
+                ? [
+                  const Spacer(),
+                  buildPopupMenu('Strona Główna'),
+                  buildPopupMenu('Programista'),
+                  buildPopupMenu('Informatyk'),
+                  buildPopupMenu('Elektryk'),
+                  buildPopupMenu('Elektronik'),
+                  buildPopupMenu('Teleinformatyk'),
+                  buildPopupMenu('Automatyk'),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                    tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
+                    onPressed: () async {
                       if (_isLoggedIn) {
                         _showProfilePopup(context);
                       } else {
@@ -573,86 +643,38 @@ class _MyHomePageState extends State<MyHomePage> {
                       }
                     },
                   ),
-                  ListTile(
-                    leading: Icon(
+                  IconButton(
+                    icon: Icon(
                       widget.isDarkMode
                           ? Icons.wb_sunny
                           : Icons.nightlight_round,
                     ),
-                    title: const Text('Przełącz motyw'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      widget.onToggleTheme();
-                    },
+                    tooltip: 'Przełącz motyw',
+                    onPressed: widget.onToggleTheme,
                   ),
-                ],
-              ),
-            )
-          : null,
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        actions: MediaQuery.of(context).size.width > 900
-            ? [
-                const Spacer(),
-                buildPopupMenu('Strona Główna'),
-                buildPopupMenu('Programista'),
-                buildPopupMenu('Informatyk'),
-                buildPopupMenu('Elektryk'),
-                buildPopupMenu('Elektronik'),
-                buildPopupMenu('Teleinformatyk'),
-                buildPopupMenu('Automatyk'),
-                const Spacer(),
-                IconButton(
-                  icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
-                  tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
-                  onPressed: () async {
-                    if (_isLoggedIn) {
-                      _showProfilePopup(context);
-                    } else {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LogowaniePage(),
-                        ),
-                      );
-
-                      if (result == true) {
-                        _checkLoginState();
-                      }
-                    }
-                  },
-                ),
-                IconButton(
-                  icon: Icon(
-                    widget.isDarkMode
-                        ? Icons.wb_sunny
-                        : Icons.nightlight_round,
-                  ),
-                  tooltip: 'Przełącz motyw',
-                  onPressed: widget.onToggleTheme,
-                ),
-              ]
-            : null,
+                ]
+                : null,
       ),
       body: Navigator(
         key: _navigatorKey,
         onGenerateRoute: (settings) {
           return MaterialPageRoute(
-            builder: (context) => HomeContent(
-              isDarkMode: widget.isDarkMode,
-              onQualificationTap: (qualification) {
-                _navigatorKey.currentState?.push(
-                  MaterialPageRoute(
-                    builder: (context) => QualificationPage(
-                      qualification: qualification,
-                      isDarkMode: widget.isDarkMode,
-                    ),
-                  ),
-                );
-              },
-              selectedQuote: selectedQuote,
-            ),
+            builder:
+                (context) => HomeContent(
+                  isDarkMode: widget.isDarkMode,
+                  onQualificationTap: (qualification) {
+                    _navigatorKey.currentState?.push(
+                      MaterialPageRoute(
+                        builder:
+                            (context) => QualificationPage(
+                              qualification: qualification,
+                              isDarkMode: widget.isDarkMode,
+                            ),
+                      ),
+                    );
+                  },
+                  selectedQuote: selectedQuote,
+                ),
           );
         },
       ),
@@ -683,17 +705,17 @@ class HomeContent extends StatelessWidget {
             Text(
               'Witamy w aplikacji Egzaminy! 👋',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
               'Przygotuj się do egzaminu zawodowego z najlepszą bazą pytań! Poniżej znajdziesz kwalifikacje, które możesz przeglądać:',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -920,7 +942,7 @@ class _QuestionTileState extends State<QuestionTile> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.25),
+              color: Colors.black.withValues(alpha: 0.25),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -953,7 +975,7 @@ class _QuestionTileState extends State<QuestionTile> {
               questionCount != null ? '$questionCount pytań' : '⏳ Ładowanie...',
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],

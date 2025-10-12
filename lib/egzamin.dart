@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'wyniki.dart';
-import 'package:html/parser.dart' as html_parser;
+//import 'package:html/parser.dart' as html_parser;
 
 enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
 
@@ -28,6 +28,7 @@ class EgzaminView extends StatefulWidget {
 }
 
 class _EgzaminViewState extends State<EgzaminView> {
+  bool _isButtonDisabled = false;
   List<dynamic> questions = [];
   int current = 0;
   String? selectedAnswer;
@@ -43,36 +44,41 @@ class _EgzaminViewState extends State<EgzaminView> {
     fetchQuestions();
     startTime = DateTime.now();
   }
-Future<Map<String, double>> fetchTrudnosciZdalnie() async {
-  final url = Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php');
-  try {
-    final response = await http.get(
+
+  Future<Map<String, double>> fetchTrudnosciZdalnie() async {
+    final url = Uri.parse(
+      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
+    );
+    try {
+      final response = await http.get(
         url,
         headers: {
           'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
         },
-);
+      );
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      final Map<String, double> map = {};
-      for (var entry in data) {
-        final key = '${entry['pytanie_id']}_${entry['kwalifikacja'].toString().toLowerCase()}';
-        final trudnosc = (entry['trudnosc'] is num)
-            ? (entry['trudnosc'] as num).toDouble()
-            : double.tryParse(entry['trudnosc'].toString()) ?? 0.0;
-        map[key] = trudnosc;
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        final Map<String, double> map = {};
+        for (var entry in data) {
+          final key =
+              '${entry['pytanie_id']}_${entry['kwalifikacja'].toString().toLowerCase()}';
+          final trudnosc =
+              (entry['trudnosc'] is num)
+                  ? (entry['trudnosc'] as num).toDouble()
+                  : double.tryParse(entry['trudnosc'].toString()) ?? 0.0;
+          map[key] = trudnosc;
+        }
+        return map;
+      } else {
+        print('❌ Błąd HTTP przy pobieraniu trudności: ${response.statusCode}');
+        return {};
       }
-      return map;
-    } else {
-      print('❌ Błąd HTTP przy pobieraniu trudności: ${response.statusCode}');
+    } catch (e) {
+      print('❌ Błąd połączenia: $e');
       return {};
     }
-  } catch (e) {
-    print('❌ Błąd połączenia: $e');
-    return {};
   }
-}
 
   int calculateCorrectAnswers() {
     int correct = 0;
@@ -83,243 +89,264 @@ Future<Map<String, double>> fetchTrudnosciZdalnie() async {
     }
     return correct;
   }
+
   Widget _buildBadge(dynamic q) {
-  final trudnosc = q['trudnosc'];
-  final iloscOdp = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
+    final trudnosc = q['trudnosc'];
+    final iloscOdp = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
 
-  if (trudnosc == null || iloscOdp < 5) return const SizedBox.shrink();
+    if (trudnosc == null || iloscOdp < 5) return const SizedBox.shrink();
 
-  final difficulty = (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0).toInt();
-  final isTrudne = difficulty > 50;
+    final difficulty =
+        (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0)
+            .toInt();
+    final isTrudne = difficulty > 50;
 
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: isTrudne ? Colors.red : Colors.green,
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(
-      isTrudne ? 'TRUDNE' : 'ŁATWE',
-      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-    ),
-  );
-}
-
-
-
-
-Future<void> fetchQuestions() async {
-  final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
-  final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
-  try {
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      // Zakładamy, że odpowiedź może być pusta lub nie w formacie JSON
-      if (response.body.isNotEmpty) {
-        final decoded = json.decode(response.body);
-        if (decoded is List && decoded.isNotEmpty) {
-          List<dynamic> allQuestions = decoded;
-          List<dynamic> selected;
-
-          switch (widget.tryb) {
-            case TrybEgzaminu.jednoPytanie:
-              selected = [allQuestions..shuffle()].first;
-              break;
-            case TrybEgzaminu.czterdziesciPytan:
-              selected = List.from(allQuestions)..shuffle();
-              selected = selected.take(40).toList();
-              break;
-            case TrybEgzaminu.wszystkie:
-              selected = allQuestions;
-              break;
-          }
-
-          // Ustaw domyślną trudność
-          final trudnosci = await fetchTrudnosciZdalnie();
-          final kwalifikacja = widget.kwalifikacja.toLowerCase();
-
-          for (var q in selected) {
-            final key = '${q['id']}_$kwalifikacja';
-            q['trudnosc'] = trudnosci[key] ?? 0.0;
-          }
-
-
-          setState(() {
-            questions = selected;
-            selectedAnswers = List.filled(selected.length, null);
-            zapisanoOdpowiedz = List.filled(selected.length, false);
-            isLoading = false;
-            print('Załadowano ${questions.length} pytań z domyślną trudnością');
-          });
-          final trudnosciMap = await fetchAllTrudnosci(widget.kwalifikacja.replaceAll(' ', ''));
-
-for (var q in questions) {
-  final id = int.tryParse(q['id'].toString());
-  if (id != null && trudnosciMap.containsKey(id)) {
-    q['trudnosc'] = trudnosciMap[id]?['trudnosc'] ?? 0.0;
-    q['ilosc_odpowiedzi'] = trudnosciMap[id]?['ilosc_odpowiedzi'] ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isTrudne ? Colors.red : Colors.green,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        isTrudne ? 'TRUDNE' : 'ŁATWE',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
-}
-setState(() {}); // <- odświeża widok z uzupełnionymi danymi
 
+  Future<void> fetchQuestions() async {
+    final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
+    final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        // Zakładamy, że odpowiedź może być pusta lub nie w formacie JSON
+        if (response.body.isNotEmpty) {
+          final decoded = json.decode(response.body);
+          if (decoded is List && decoded.isNotEmpty) {
+            List<dynamic> allQuestions = decoded;
+            List<dynamic> selected;
+
+            switch (widget.tryb) {
+              case TrybEgzaminu.jednoPytanie:
+                selected = [allQuestions..shuffle()].first;
+                break;
+              case TrybEgzaminu.czterdziesciPytan:
+                selected = List.from(allQuestions)..shuffle();
+                selected = selected.take(40).toList();
+                break;
+              case TrybEgzaminu.wszystkie:
+                selected = allQuestions;
+                break;
+            }
+
+            // Ustaw domyślną trudność
+            final trudnosci = await fetchTrudnosciZdalnie();
+            final kwalifikacja = widget.kwalifikacja.toLowerCase();
+
+            for (var q in selected) {
+              final key = '${q['id']}_$kwalifikacja';
+              q['trudnosc'] = trudnosci[key] ?? 0.0;
+            }
+
+            setState(() {
+              questions = selected;
+              selectedAnswers = List.filled(selected.length, null);
+              zapisanoOdpowiedz = List.filled(selected.length, false);
+              isLoading = false;
+              print(
+                'Załadowano ${questions.length} pytań z domyślną trudnością',
+              );
+            });
+            final trudnosciMap = await fetchAllTrudnosci(
+              widget.kwalifikacja.replaceAll(' ', ''),
+            );
+
+            for (var q in questions) {
+              final id = int.tryParse(q['id'].toString());
+              if (id != null && trudnosciMap.containsKey(id)) {
+                q['trudnosc'] = trudnosciMap[id]?['trudnosc'] ?? 0.0;
+                q['ilosc_odpowiedzi'] =
+                    trudnosciMap[id]?['ilosc_odpowiedzi'] ?? 0;
+              }
+            }
+            setState(() {}); // <- odświeża widok z uzupełnionymi danymi
+          }
+        } else {
+          print('Brak danych z API');
         }
       } else {
-        print('Brak danych z API');
+        print('Błąd HTTP: ${response.statusCode}');
       }
-    } else {
-      print('Błąd HTTP: ${response.statusCode}');
+    } catch (e) {
+      print("Błąd przy pobieraniu pytań: $e");
     }
-  } catch (e) {
-    print("Błąd przy pobieraniu pytań: $e");
   }
-}
 
   Future<void> sendResultToServer({
-  required String kwalifikacja,
-  required double wynik,
-  required String dataCzas,
-  required int czasTrwania,
-}) async {
-  // Use widget.userID if available, otherwise fall back to SharedPreferences
-  String userName = widget.userName ?? (await SharedPreferences.getInstance()).getString('userName') ?? 'anonymous';
+    required String kwalifikacja,
+    required double wynik,
+    required String dataCzas,
+    required int czasTrwania,
+  }) async {
+    // Use widget.userID if available, otherwise fall back to SharedPreferences
+    String userName =
+        widget.userName ??
+        (await SharedPreferences.getInstance()).getString('userName') ??
+        'anonymous';
 
-  final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
-  final response = await http.post(
-    url,
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
-    },
-    body: {
-      'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
-      'wynik': wynik.toStringAsFixed(2),
-      'data_czas': dataCzas,
-      'czas_trwania': czasTrwania.toString(),
-      'userName': userName,
-    },
-  );
+    final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+      },
+      body: {
+        'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
+        'wynik': wynik.toStringAsFixed(2),
+        'data_czas': dataCzas,
+        'czas_trwania': czasTrwania.toString(),
+        'userName': userName,
+      },
+    );
 
-  if (response.statusCode != 200) {
-    print('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
-  } else {
-    print('✅ Wynik zapisany dla userName: $userName');
-  }
-}
-
-Future<Map<int, Map<String, dynamic>>> fetchAllTrudnosci(String kwalifikacja) async {
-  final url = Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php');
-  try {
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      final List<dynamic> jsonList = json.decode(response.body);
-      final Map<int, Map<String, dynamic>> result = {};
-
-      for (final item in jsonList) {
-        final int? id = int.tryParse(item['pytanie_id'].toString());
-        if (id != null) {
-          result[id] = {
-            'trudnosc': item['trudnosc'] ?? 0.0,
-            'ilosc_odpowiedzi': item['ilosc_odpowiedzi'] ?? 0,
-          };
-        }
-      }
-
-      return result;
+    if (response.statusCode != 200) {
+      print('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
     } else {
-      print('Błąd HTTP: ${response.statusCode}');
+      print('✅ Wynik zapisany dla userName: $userName');
+    }
+  }
+
+  Future<Map<int, Map<String, dynamic>>> fetchAllTrudnosci(
+    String kwalifikacja,
+  ) async {
+    final url = Uri.parse(
+      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
+    );
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = json.decode(response.body);
+        final Map<int, Map<String, dynamic>> result = {};
+
+        for (final item in jsonList) {
+          final int? id = int.tryParse(item['pytanie_id'].toString());
+          if (id != null) {
+            result[id] = {
+              'trudnosc': item['trudnosc'] ?? 0.0,
+              'ilosc_odpowiedzi': item['ilosc_odpowiedzi'] ?? 0,
+            };
+          }
+        }
+
+        return result;
+      } else {
+        print('Błąd HTTP: ${response.statusCode}');
+        return {};
+      }
+    } catch (e) {
+      print('❌ Błąd fetchAllTrudnosci: $e');
       return {};
     }
-  } catch (e) {
-    print('❌ Błąd fetchAllTrudnosci: $e');
-    return {};
-  }
-}
-
-  Future<void> zapiszTrudnoscDoBazy(int pytanieId, String kwalifikacja, bool poprawna) async {
-  if (pytanieId <= 0) {
-    print('❌ Pominięto zapis, niepoprawny pytanie_id: $pytanieId');
-    return;
   }
 
-  final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php');
-  final body = {
-    'pytanie_id': pytanieId.toString(),
-    'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
-    'poprawna': poprawna ? '1' : '0',
-  };
-
-  final response = await http.post(
-    url,
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^', // Taki sam token jak przy zapisie wyniku
-    },
-    body: body,
-  );
-
-  if (response.statusCode == 200) {
-    try {
-      final data = json.decode(response.body);
-      print('✅ Trudność zapisana: $data');
-    } catch (e) {
-      print('❌ Błąd parsowania odpowiedzi: $e');
+  Future<void> zapiszTrudnoscDoBazy(
+    int pytanieId,
+    String kwalifikacja,
+    bool poprawna,
+  ) async {
+    if (pytanieId <= 0) {
+      print('❌ Pominięto zapis, niepoprawny pytanie_id: $pytanieId');
+      return;
     }
-  } else {
-    print('❌ Błąd zapisu trudności: ${response.statusCode} ${response.body}');
-  }
-}
 
-    Future<double> fetchTrudnosc(int pytanieId, String kwalifikacja) async {
-  final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php?pytanie_id=$pytanieId&kwalifikacja=$kwalifikacja');
-  try {
-    final response = await http.get(url);
+    final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php');
+    final body = {
+      'pytanie_id': pytanieId.toString(),
+      'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
+      'poprawna': poprawna ? '1' : '0',
+    };
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization':
+            'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^', // Taki sam token jak przy zapisie wyniku
+      },
+      body: body,
+    );
+
     if (response.statusCode == 200) {
-      // Jeśli błąd bazy, zwróć 0
-      return 0.0; // Tymczasowo, bo endpoint nie działa
+      try {
+        final data = json.decode(response.body);
+        print('✅ Trudność zapisana: $data');
+      } catch (e) {
+        print('❌ Błąd parsowania odpowiedzi: $e');
+      }
+    } else {
+      print('❌ Błąd zapisu trudności: ${response.statusCode} ${response.body}');
     }
-    return 0.0;
-  } catch (e) {
-    print('Błąd pobierania trudności: $e');
-    return 0.0;
   }
-}
-void checkAnswer(String answer) {
-  if (odpowiedzZatwierdzona && widget.tryb == TrybEgzaminu.jednoPytanie) return;
 
-  setState(() {
-    selectedAnswer = answer;
-    selectedAnswers[current] = answer;
+  Future<double> fetchTrudnosc(int pytanieId, String kwalifikacja) async {
+    final url = Uri.parse(
+      'https://interpage.pl/egzaminy/zapis_trudnosci.php?pytanie_id=$pytanieId&kwalifikacja=$kwalifikacja',
+    );
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        // Jeśli błąd bazy, zwróć 0
+        return 0.0; // Tymczasowo, bo endpoint nie działa
+      }
+      return 0.0;
+    } catch (e) {
+      print('Błąd pobierania trudności: $e');
+      return 0.0;
+    }
+  }
 
-    if (widget.tryb == TrybEgzaminu.jednoPytanie) {
-  odpowiedzZatwierdzona = true;
+  void checkAnswer(String answer) {
+    if (odpowiedzZatwierdzona && widget.tryb == TrybEgzaminu.jednoPytanie) {
+      return;
+    }
 
-  final pytanie = questions[current];
-  final poprawna = answer == pytanie['poprawna'];
+    setState(() {
+      selectedAnswer = answer;
+      selectedAnswers[current] = answer;
 
-  zapiszTrudnoscDoBazy(
-    int.parse(pytanie['id']),
-    widget.kwalifikacja,
-    poprawna,
-  ).then((_) {
-    fetchTrudnosc(int.parse(pytanie['id']), widget.kwalifikacja).then((trudnosc) {
-      setState(() {
-        questions[current]['trudnosc'] = trudnosc;
-      });
+      if (widget.tryb == TrybEgzaminu.jednoPytanie) {
+        odpowiedzZatwierdzona = true;
+
+        final pytanie = questions[current];
+        final poprawna = answer == pytanie['poprawna'];
+
+        zapiszTrudnoscDoBazy(
+          int.parse(pytanie['id']),
+          widget.kwalifikacja,
+          poprawna,
+        ).then((_) {
+          fetchTrudnosc(int.parse(pytanie['id']), widget.kwalifikacja).then((
+            trudnosc,
+          ) {
+            setState(() {
+              questions[current]['trudnosc'] = trudnosc;
+            });
+          });
+        });
+      } else if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
+        // Zapamiętaj odpowiedź – potrzebne do późniejszego zapisu
+        selectedAnswers[current] = answer;
+      }
     });
-  });
-} else if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
-  // Zapamiętaj odpowiedź – potrzebne do późniejszego zapisu
-  selectedAnswers[current] = answer;
-}
 
-  });
-
-  // ⛔ W trybie "wszystkie" nie zapisujemy niczego
-  if (widget.tryb == TrybEgzaminu.wszystkie) return;
-}
-
-
-
+    // ⛔ W trybie "wszystkie" nie zapisujemy niczego
+    if (widget.tryb == TrybEgzaminu.wszystkie) return;
+  }
 
   void nextQuestion() {
     if (current < questions.length - 1) {
@@ -391,79 +418,102 @@ void checkAnswer(String answer) {
           },
         ),
       ),
-      body: widget.tryb == TrybEgzaminu.jednoPytanie
-          ? _buildSingleQuestion(questions.first)
-          : _buildScrollableList(),
-      bottomNavigationBar: widget.tryb == TrybEgzaminu.czterdziesciPytan
-          ? Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: ElevatedButton(
-                onPressed: () async {
-  final correct = calculateCorrectAnswers();
-  final total = questions.length;
-  final percent = (correct / total) * 100;
-  final endTime = DateTime.now();
-  final duration = endTime.difference(startTime).inSeconds;
+      body:
+          widget.tryb == TrybEgzaminu.jednoPytanie
+              ? _buildSingleQuestion(questions.first)
+              : _buildScrollableList(),
+      bottomNavigationBar:
+          widget.tryb == TrybEgzaminu.czterdziesciPytan
+              ? Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: ElevatedButton(
+                  onPressed:
+                      _isButtonDisabled
+                          ? null
+                          : () async {
+                            setState(() => _isButtonDisabled = true);
 
-  if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
-    final futures = <Future>[];
+                            final correct = calculateCorrectAnswers();
+                            final total = questions.length;
+                            final percent = (correct / total) * 100;
+                            final endTime = DateTime.now();
+                            final duration =
+                                endTime.difference(startTime).inSeconds;
 
-    for (int i = 0; i < questions.length; i++) {
-      final pytanie = questions[i];
-      final pytanieId = int.tryParse(pytanie['id'].toString());
-      final odpowiedz = selectedAnswers[i];
+                            if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
+                              final futures = <Future>[];
 
-      if (pytanieId != null && odpowiedz != null) {
-        final poprawna = odpowiedz == pytanie['poprawna'];
-        futures.add(zapiszTrudnoscDoBazy(
-          pytanieId,
-          widget.kwalifikacja,
-          poprawna,
-        ));
-      }
-    }
+                              for (int i = 0; i < questions.length; i++) {
+                                final pytanie = questions[i];
+                                final pytanieId = int.tryParse(
+                                  pytanie['id'].toString(),
+                                );
+                                final odpowiedz = selectedAnswers[i];
 
-    try {
-  await Future.wait(futures);
-  print('✅ Wszystkie trudności zapisane!');
-} catch (e) {
-  print('❌ Błąd przy zapisie trudności: $e');
-}
-  }
+                                if (pytanieId != null && odpowiedz != null) {
+                                  final poprawna =
+                                      odpowiedz == pytanie['poprawna'];
+                                  futures.add(
+                                    zapiszTrudnoscDoBazy(
+                                      pytanieId,
+                                      widget.kwalifikacja,
+                                      poprawna,
+                                    ),
+                                  );
+                                }
+                              }
 
-  await sendResultToServer(
-    kwalifikacja: widget.kwalifikacja,
-    wynik: percent,
-    dataCzas: endTime.toIso8601String(),
-    czasTrwania: duration,
-  );
+                              try {
+                                await Future.wait(futures);
+                                print('✅ Wszystkie trudności zapisane!');
+                              } catch (e) {
+                                print('❌ Błąd przy zapisie trudności: $e');
+                              }
+                            }
 
-  // 👇 Przejdź do widoku wyników
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => EgzaminWynikView(
-        correctAnswers: correct,
-        totalQuestions: total,
-        questions: questions,
-        selectedAnswers: selectedAnswers,
-        isDarkMode: widget.isDarkMode,
-        returnToHome: true,
-      ),
-      settings: const RouteSettings(name: 'EgzaminWynikView'),
-    ),
-  );
-},
+                            await sendResultToServer(
+                              kwalifikacja: widget.kwalifikacja,
+                              wynik: percent,
+                              dataCzas: endTime.toIso8601String(),
+                              czasTrwania: duration,
+                            );
 
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.blue,
-                  foregroundColor: widget.isDarkMode ? Colors.white : Colors.black,
+                            if (!mounted) return;
+                            setState(() => _isButtonDisabled = false);
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => EgzaminWynikView(
+                                      correctAnswers: correct,
+                                      totalQuestions: total,
+                                      questions: questions,
+                                      selectedAnswers: selectedAnswers,
+                                      isDarkMode: widget.isDarkMode,
+                                      returnToHome: true,
+                                    ),
+                                settings: const RouteSettings(
+                                  name: 'EgzaminWynikView',
+                                ),
+                              ),
+                            );
+                          },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.blue,
+                    foregroundColor:
+                        widget.isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  child: Text(
+                    _isButtonDisabled
+                        ? "Wysyłanie egzaminu ..."
+                        : "Zakończ egzamin",
+                    style: const TextStyle(fontSize: 16),
+                  ),
                 ),
-                child: const Text("Zakończ egzamin"),
-              ),
-            )
-          : null,
+              )
+              : null,
     );
   }
 
@@ -476,13 +526,12 @@ void checkAnswer(String answer) {
         "body": Style(
           color: widget.isDarkMode ? Colors.white : Colors.grey[800],
         ),
-        "b": Style(
-          color: widget.isDarkMode ? Colors.white : Colors.grey[800],
-        ),
+        "b": Style(color: widget.isDarkMode ? Colors.white : Colors.grey[800]),
         "span": Style(
-          color: html.contains("style='color:green;'")
-              ? Colors.green
-              : widget.isDarkMode
+          color:
+              html.contains("style='color:green;'")
+                  ? Colors.green
+                  : widget.isDarkMode
                   ? Colors.white
                   : Colors.grey[800],
         ),
@@ -496,27 +545,32 @@ void checkAnswer(String answer) {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 child: Builder(
-                  builder: (context) => Center(
-                    child: Tooltip(
-                      message: 'Kliknij, aby powiększyć',
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () => _showImageDialog(context, src),
-                          child: Image.network(
-                            src,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => Text(
-                              '❌ Nie udało się załadować obrazka',
-                              style: TextStyle(
-                                color: widget.isDarkMode ? Colors.white : Colors.grey[800],
+                  builder:
+                      (context) => Center(
+                        child: Tooltip(
+                          message: 'Kliknij, aby powiększyć',
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () => _showImageDialog(context, src),
+                              child: Image.network(
+                                src,
+                                fit: BoxFit.contain,
+                                errorBuilder:
+                                    (context, error, stackTrace) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            widget.isDarkMode
+                                                ? Colors.white
+                                                : Colors.grey[800],
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
                 ),
               );
             }
@@ -547,17 +601,21 @@ void checkAnswer(String answer) {
             return GestureDetector(
               onTap: () => Navigator.of(context, rootNavigator: true).pop(),
               child: Scaffold(
-                backgroundColor: Colors.black.withOpacity(0.9),
+                backgroundColor: Colors.black.withValues(alpha: 0.9),
                 body: Stack(
                   children: [
                     Center(
                       child: GestureDetector(
                         onTap: () {},
                         child: Listener(
-                          onPointerDown: (_) => setState(() => isPressed = true),
+                          onPointerDown:
+                              (_) => setState(() => isPressed = true),
                           onPointerUp: (_) => setState(() => isPressed = false),
                           child: MouseRegion(
-                            cursor: isPressed ? SystemMouseCursors.grabbing : SystemMouseCursors.grab,
+                            cursor:
+                                isPressed
+                                    ? SystemMouseCursors.grabbing
+                                    : SystemMouseCursors.grab,
                             child: InteractiveViewer(
                               panEnabled: true,
                               minScale: 0.5,
@@ -566,12 +624,16 @@ void checkAnswer(String answer) {
                                 imageUrl,
                                 width: screenSize.width * 0.8,
                                 fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => Text(
-                                  '❌ Nie udało się załadować obrazka',
-                                  style: TextStyle(
-                                    color: widget.isDarkMode ? Colors.white : Colors.grey[800],
-                                  ),
-                                ),
+                                errorBuilder:
+                                    (context, error, stackTrace) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            widget.isDarkMode
+                                                ? Colors.white
+                                                : Colors.grey[800],
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -585,10 +647,16 @@ void checkAnswer(String answer) {
                         icon: Icon(
                           Icons.close,
                           size: 30,
-                          color: widget.isDarkMode ? Colors.white : Colors.black,
+                          color:
+                              widget.isDarkMode ? Colors.white : Colors.black,
                         ),
                         tooltip: 'Zamknij',
-                        onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                        onPressed:
+                            () =>
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop(),
                       ),
                     ),
                   ],
@@ -601,7 +669,7 @@ void checkAnswer(String answer) {
     );
   }
 
-   Widget _buildSingleQuestion(dynamic q) {
+  Widget _buildSingleQuestion(dynamic q) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -636,11 +704,13 @@ void checkAnswer(String answer) {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: buttonColor,
-                  foregroundColor: widget.isDarkMode ? Colors.white : Colors.black,
+                  foregroundColor:
+                      widget.isDarkMode ? Colors.white : Colors.black,
                 ),
-                onPressed: (odpowiedzZatwierdzona && selectedAnswer != litera)
-                ? null
-                : () => checkAnswer(litera),
+                onPressed:
+                    (odpowiedzZatwierdzona && selectedAnswer != litera)
+                        ? null
+                        : () => checkAnswer(litera),
                 child: _html(odp ?? ""),
               ),
             );
@@ -659,9 +729,13 @@ void checkAnswer(String answer) {
               icon: const Icon(Icons.refresh),
               label: const Text("Losuj kolejne"),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 backgroundColor: Colors.blue,
-                foregroundColor: widget.isDarkMode ? Colors.white : Colors.black,
+                foregroundColor:
+                    widget.isDarkMode ? Colors.white : Colors.black,
               ),
             ),
           ),
@@ -670,14 +744,13 @@ void checkAnswer(String answer) {
     );
   }
 
-void _losujNowePytanie() {
-  setState(() {
-    questions.shuffle();
-    selectedAnswer = null;
-    odpowiedzZatwierdzona = false; 
-  });
-}
-
+  void _losujNowePytanie() {
+    setState(() {
+      questions.shuffle();
+      selectedAnswer = null;
+      odpowiedzZatwierdzona = false;
+    });
+  }
 
   Widget _buildScrollableList() {
     return ListView.builder(
@@ -698,7 +771,11 @@ void _losujNowePytanie() {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(child: _html("<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}")),
+                    Expanded(
+                      child: _html(
+                        "<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}",
+                      ),
+                    ),
                     _buildBadge(q),
                   ],
                 ),
@@ -716,7 +793,8 @@ void _losujNowePytanie() {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: buttonColor,
-                        foregroundColor: widget.isDarkMode ? Colors.white : Colors.black,
+                        foregroundColor:
+                            widget.isDarkMode ? Colors.white : Colors.black,
                       ),
                       onPressed: () {
                         setState(() {
@@ -726,7 +804,7 @@ void _losujNowePytanie() {
                       child: _html(odp ?? ""),
                     ),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),
@@ -755,7 +833,8 @@ class _InteractiveImageState extends State<_InteractiveImage> {
       onPointerDown: (_) => setState(() => _isPressed = true),
       onPointerUp: (_) => setState(() => _isPressed = false),
       child: MouseRegion(
-        cursor: _isPressed ? SystemMouseCursors.grabbing : SystemMouseCursors.grab,
+        cursor:
+            _isPressed ? SystemMouseCursors.grabbing : SystemMouseCursors.grab,
         child: InteractiveViewer(
           panEnabled: true,
           minScale: 0.5,
@@ -764,12 +843,13 @@ class _InteractiveImageState extends State<_InteractiveImage> {
             widget.imageUrl,
             fit: BoxFit.contain,
             width: screenSize.width * 0.9,
-            errorBuilder: (context, error, stackTrace) => Text(
-              '❌ Nie udało się załadować obrazka',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
+            errorBuilder:
+                (context, error, stackTrace) => Text(
+                  '❌ Nie udało się załadować obrazka',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
           ),
         ),
       ),

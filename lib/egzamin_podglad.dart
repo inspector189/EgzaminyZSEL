@@ -7,29 +7,25 @@ class EgzaminPodgladView extends StatelessWidget {
   final bool isDarkMode;
 
   const EgzaminPodgladView({
-    Key? key,
+    super.key,
     required this.questions,
     required this.selectedAnswers,
     required this.isDarkMode,
-  }) : super(key: key);
+  });
 
-  // Metoda _html do obsługi HTML i obrazków
   Html _html(BuildContext context, String html) {
     html = html.replaceAll('<img', '<br><img');
 
     return Html(
       data: html,
       style: {
-        "body": Style(
-          color: isDarkMode ? Colors.white : Colors.grey[800],
-        ),
-        "b": Style(
-          color: isDarkMode ? Colors.white : Colors.grey[800],
-        ),
+        "body": Style(color: isDarkMode ? Colors.white : Colors.grey[800]),
+        "b": Style(color: isDarkMode ? Colors.white : Colors.grey[800]),
         "span": Style(
-          color: html.contains("style='color:green;'")
-              ? Colors.green
-              : isDarkMode
+          color:
+              html.contains("style='color:green;'")
+                  ? Colors.green
+                  : isDarkMode
                   ? Colors.white
                   : Colors.grey[800],
         ),
@@ -43,27 +39,32 @@ class EgzaminPodgladView extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 child: Builder(
-                  builder: (context) => Center(
-                    child: Tooltip(
-                      message: 'Kliknij, aby powiększyć',
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () => _showImageDialog(context, src),
-                          child: Image.network(
-                            src,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => Text(
-                              '❌ Nie udało się załadować obrazka',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white : Colors.grey[800],
+                  builder:
+                      (context) => Center(
+                        child: Tooltip(
+                          message: 'Kliknij, aby powiększyć',
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () => _showImageDialog(context, src),
+                              child: Image.network(
+                                src,
+                                fit: BoxFit.contain,
+                                errorBuilder:
+                                    (context, error, stackTrace) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            isDarkMode
+                                                ? Colors.white
+                                                : Colors.grey[800],
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
                 ),
               );
             }
@@ -79,7 +80,6 @@ class EgzaminPodgladView extends StatelessWidget {
     );
   }
 
-  // Metoda _showImageDialog do powiększania obrazków
   void _showImageDialog(BuildContext context, String imageUrl) {
     showGeneralDialog(
       context: context,
@@ -95,19 +95,21 @@ class EgzaminPodgladView extends StatelessWidget {
             return GestureDetector(
               onTap: () => Navigator.of(context, rootNavigator: true).pop(),
               child: Scaffold(
-                backgroundColor: Colors.black.withOpacity(0.9),
+                backgroundColor: Colors.black.withValues(alpha: 0.9),
                 body: Stack(
                   children: [
                     Center(
                       child: GestureDetector(
                         onTap: () {},
                         child: Listener(
-                          onPointerDown: (_) => setState(() => isPressed = true),
+                          onPointerDown:
+                              (_) => setState(() => isPressed = true),
                           onPointerUp: (_) => setState(() => isPressed = false),
                           child: MouseRegion(
-                            cursor: isPressed
-                                ? SystemMouseCursors.grabbing
-                                : SystemMouseCursors.grab,
+                            cursor:
+                                isPressed
+                                    ? SystemMouseCursors.grabbing
+                                    : SystemMouseCursors.grab,
                             child: InteractiveViewer(
                               panEnabled: true,
                               minScale: 0.5,
@@ -116,12 +118,16 @@ class EgzaminPodgladView extends StatelessWidget {
                                 imageUrl,
                                 width: screenSize.width * 0.8,
                                 fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => Text(
-                                  '❌ Nie udało się załadować obrazka',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.grey[800],
-                                  ),
-                                ),
+                                errorBuilder:
+                                    (context, error, stackTrace) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            isDarkMode
+                                                ? Colors.white
+                                                : Colors.grey[800],
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -138,8 +144,12 @@ class EgzaminPodgladView extends StatelessWidget {
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
                         tooltip: 'Zamknij',
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
+                        onPressed:
+                            () =>
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop(),
                       ),
                     ),
                   ],
@@ -172,7 +182,10 @@ class EgzaminPodgladView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _html(context, "<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}"),
+                  _html(
+                    context,
+                    "<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}",
+                  ),
                   const SizedBox(height: 10),
                   ...['A', 'B', 'C', 'D'].map((litera) {
                     final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
@@ -181,11 +194,11 @@ class EgzaminPodgladView extends StatelessWidget {
 
                     Color? buttonColor;
                     if (isCorrectAnswer) {
-                      buttonColor = Colors.green; 
+                      buttonColor = Colors.green;
                     } else if (isSelected && !isCorrect) {
-                      buttonColor = Colors.red; 
+                      buttonColor = Colors.red;
                     } else {
-                      buttonColor = null; 
+                      buttonColor = null;
                     }
 
                     return Container(
@@ -193,13 +206,14 @@ class EgzaminPodgladView extends StatelessWidget {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: buttonColor,
-                          foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                          foregroundColor:
+                              isDarkMode ? Colors.white : Colors.black,
                         ),
-                        onPressed: () {}, 
+                        onPressed: () {},
                         child: _html(context, odp ?? ""),
                       ),
                     );
-                  }).toList(),
+                  }),
                   const SizedBox(height: 6),
                   if (selected != null)
                     _html(
