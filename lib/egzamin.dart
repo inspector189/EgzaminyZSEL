@@ -11,14 +11,12 @@ enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
 class EgzaminView extends StatefulWidget {
   final TrybEgzaminu tryb;
   final String kwalifikacja;
-  final bool isDarkMode;
   final bool returnToHome;
   final String? userName;
   const EgzaminView({
     super.key,
     required this.tryb,
     required this.kwalifikacja,
-    required this.isDarkMode,
     required this.returnToHome,
     this.userName,
   });
@@ -490,7 +488,6 @@ class _EgzaminViewState extends State<EgzaminView> {
                                       totalQuestions: total,
                                       questions: questions,
                                       selectedAnswers: selectedAnswers,
-                                      isDarkMode: widget.isDarkMode,
                                       returnToHome: true,
                                     ),
                                 settings: const RouteSettings(
@@ -501,9 +498,8 @@ class _EgzaminViewState extends State<EgzaminView> {
                           },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.blue,
-                    foregroundColor:
-                        widget.isDarkMode ? Colors.white : Colors.black,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
                   ),
                   child: Text(
                     _isButtonDisabled
@@ -523,17 +519,13 @@ class _EgzaminViewState extends State<EgzaminView> {
     return Html(
       data: html,
       style: {
-        "body": Style(
-          color: widget.isDarkMode ? Colors.white : Colors.grey[800],
-        ),
-        "b": Style(color: widget.isDarkMode ? Colors.white : Colors.grey[800]),
+        "body": Style(color: Theme.of(context).colorScheme.onSurface),
+        "b": Style(color: Theme.of(context).colorScheme.onSurface),
         "span": Style(
           color:
               html.contains("style='color:green;'")
                   ? Colors.green
-                  : widget.isDarkMode
-                  ? Colors.white
-                  : Colors.grey[800],
+                  : Theme.of(context).colorScheme.onSurface,
         ),
       },
       extensions: [
@@ -561,9 +553,9 @@ class _EgzaminViewState extends State<EgzaminView> {
                                       '❌ Nie udało się załadować obrazka',
                                       style: TextStyle(
                                         color:
-                                            widget.isDarkMode
-                                                ? Colors.white
-                                                : Colors.grey[800],
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.surface,
                                       ),
                                     ),
                               ),
@@ -576,9 +568,7 @@ class _EgzaminViewState extends State<EgzaminView> {
             }
             return Text(
               '⚠️ Brak obrazka',
-              style: TextStyle(
-                color: widget.isDarkMode ? Colors.white : Colors.grey[800],
-              ),
+              style: TextStyle(color: Theme.of(context).colorScheme.surface),
             );
           },
         ),
@@ -629,9 +619,9 @@ class _EgzaminViewState extends State<EgzaminView> {
                                       '❌ Nie udało się załadować obrazka',
                                       style: TextStyle(
                                         color:
-                                            widget.isDarkMode
-                                                ? Colors.white
-                                                : Colors.grey[800],
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.surface,
                                       ),
                                     ),
                               ),
@@ -647,8 +637,7 @@ class _EgzaminViewState extends State<EgzaminView> {
                         icon: Icon(
                           Icons.close,
                           size: 30,
-                          color:
-                              widget.isDarkMode ? Colors.white : Colors.black,
+                          color: Theme.of(context).colorScheme.surface,
                         ),
                         tooltip: 'Zamknij',
                         onPressed:
@@ -704,8 +693,7 @@ class _EgzaminViewState extends State<EgzaminView> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: buttonColor,
-                  foregroundColor:
-                      widget.isDarkMode ? Colors.white : Colors.black,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                 ),
                 onPressed:
                     (odpowiedzZatwierdzona && selectedAnswer != litera)
@@ -733,9 +721,8 @@ class _EgzaminViewState extends State<EgzaminView> {
                   horizontal: 24,
                   vertical: 12,
                 ),
-                backgroundColor: Colors.blue,
-                foregroundColor:
-                    widget.isDarkMode ? Colors.white : Colors.black,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
@@ -793,8 +780,9 @@ class _EgzaminViewState extends State<EgzaminView> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: buttonColor,
-                        foregroundColor:
+                        /*foregroundColor:
                             widget.isDarkMode ? Colors.white : Colors.black,
+                        */
                       ),
                       onPressed: () {
                         setState(() {

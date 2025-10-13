@@ -6,7 +6,6 @@ class EgzaminWynikView extends StatelessWidget {
   final int totalQuestions;
   final List<dynamic> questions;
   final List<String?> selectedAnswers;
-  final bool isDarkMode;
   final bool returnToHome;
 
   const EgzaminWynikView({
@@ -15,7 +14,6 @@ class EgzaminWynikView extends StatelessWidget {
     required this.totalQuestions,
     required this.questions,
     required this.selectedAnswers,
-    required this.isDarkMode,
     required this.returnToHome,
   });
 
@@ -79,7 +77,7 @@ class EgzaminWynikView extends StatelessWidget {
                             (_) => EgzaminPodgladView(
                               questions: questions,
                               selectedAnswers: selectedAnswers,
-                              isDarkMode: isDarkMode,
+                              //isDarkMode: isDarkMode,
                             ),
                       ),
                     );

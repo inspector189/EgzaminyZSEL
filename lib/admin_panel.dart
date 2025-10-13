@@ -339,7 +339,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     return grouped;
   }
 
-  /// Calculates basic statistics for a list of results
   Map<String, dynamic> calculateStats(List<dynamic> results) {
     final scores = results.map((e) => (e['wynik'] as num).toDouble()).toList();
     final avg = scores.reduce((a, b) => a + b) / scores.length;
@@ -352,7 +351,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorAccent =
-        isDark ? Theme.of(context).colorScheme.primary : Colors.white;
+        isDark ? Theme.of(context).colorScheme.primary : Colors.blue;
 
     final users = groupByUser();
     final qualifications = groupByQualification();
@@ -385,7 +384,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // Search Bar
+
                     TextField(
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.search),
@@ -402,6 +401,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         });
                       },
                     ),
+
                     const SizedBox(height: 24),
 
                     Text(
@@ -418,6 +418,66 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                     ...filteredUsers.map((entry) {
                       final user = entry.key;
                       final userStats = calculateStats(entry.value);
+                      final isAnonymous = user == 'Użytkownik anonimowy';
+
+                      final Map<String, List<dynamic>> examsByQual = {};
+                      for (final exam in entry.value) {
+                        final kwal = exam['kwalifikacja'] ?? 'Nieznana';
+                        examsByQual.putIfAbsent(kwal, () => []).add(exam);
+                      }
+
+                      final visibleQualifications =
+                          examsByQual.entries
+                              .where((e) => e.value.isNotEmpty)
+                              .toList();
+
+                      if (isAnonymous) {
+                        return Card(
+                          elevation: 3,
+                          margin: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Liczba egzaminów: ${userStats['count']}',
+                                    ),
+                                    Text(
+                                      'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}%',
+                                      style: TextStyle(color: colorAccent),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Najlepszy: ${userStats['best']}%'),
+                                    Text('Najgorszy: ${userStats['worst']}%'),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
 
                       return Card(
                         elevation: 3,
@@ -425,49 +485,82 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                user,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Liczba egzaminów: ${userStats['count']}',
-                                  ),
-                                  Text(
-                                    'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}%',
-                                    style: TextStyle(color: colorAccent),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Najlepszy: ${userStats['best']}%'),
-                                  Text('Najgorszy: ${userStats['worst']}%'),
-                                ],
-                              ),
-                            ],
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
                           ),
+                          title: Text(
+                            user,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}% • Egzaminów: ${userStats['count']}',
+                            style: TextStyle(color: colorAccent),
+                          ),
+                          childrenPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          children: [
+                            ...visibleQualifications.map((qualEntry) {
+                              final qual = qualEntry.key;
+                              final qualStats = calculateStats(qualEntry.value);
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '📘 $qual',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Egzaminów: ${qualStats['count']}',
+                                        ),
+                                        Text(
+                                          'Śr. wynik: ${qualStats['avg'].toStringAsFixed(2)}%',
+                                          style: TextStyle(color: colorAccent),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Najlepszy: ${qualStats['best']}%',
+                                        ),
+                                        Text(
+                                          'Najgorszy: ${qualStats['worst']}%',
+                                        ),
+                                      ],
+                                    ),
+                                    const Divider(thickness: 1, height: 16),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
                         ),
                       );
                     }),
 
                     const SizedBox(height: 32),
 
+                    // 🎓 Per qualification stats
                     Text(
                       '🎓 Statystyki według kwalifikacji',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(

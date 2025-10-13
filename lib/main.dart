@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'theme_manager.dart';
+import 'personalisation_page.dart';
+import 'app_themes.dart';
 import 'dart:io';
 import 'logowanie.dart';
 import 'qualification_page.dart';
@@ -21,7 +25,12 @@ void main() async {
     );
   }
 
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -32,70 +41,25 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = ThemeMode.dark;
-
-  void _toggleTheme() {
-    setState(() {
-      _themeMode =
-          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Egzaminy',
-      theme: ThemeData(
-        brightness: Brightness.light,
-        colorScheme: ColorScheme(
-          brightness: Brightness.light,
-          primary: const Color(0xFFFF7373),
-          onPrimary: const Color(0xFFFF7373),
-          surface: Colors.white,
-          onSurface: Colors.black,
-          secondary: Colors.blue,
-          onSecondary: Colors.white,
-          surfaceContainer: const Color(0xFFD2D2D2),
-          error: Colors.red,
-          onError: Colors.redAccent,
-        ),
-      ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme(
-          brightness: Brightness.dark,
-          primary: const Color(0xFFFF7373),
-          onPrimary: const Color(0xFFFF7373),
-          surface: const Color(0xFF222222),
-          onSurface: Colors.white,
-          secondary: Colors.blueAccent,
-          onSecondary: Colors.white,
-          surfaceContainer: const Color(0xFF222222),
-          error: Colors.red,
-          onError: Colors.redAccent,
-        ),
-      ),
-      themeMode: _themeMode,
-      home: MyHomePage(
-        title: 'Egzaminy',
-        onToggleTheme: _toggleTheme,
-        isDarkMode: _themeMode == ThemeMode.dark,
-      ),
+      theme: AppThemes.lightTheme(themeProvider.accentColor),
+      darkTheme: AppThemes.darkTheme(themeProvider.accentColor),
+      themeMode: themeProvider.themeMode,
+      home: const MyHomePage(title: 'Egzaminy'),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({
-    super.key,
-    required this.title,
-    required this.onToggleTheme,
-    required this.isDarkMode,
-  });
+  const MyHomePage({super.key, required this.title});
 
   final String title;
-  final VoidCallback onToggleTheme;
-  final bool isDarkMode;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -196,9 +160,7 @@ class _MyHomePageState extends State<MyHomePage> {
     Future.delayed(Duration.zero, () {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => StatisticsPage(isDarkMode: widget.isDarkMode),
-        ),
+        MaterialPageRoute(builder: (context) => StatisticsPage()),
       );
     });
   }
@@ -271,7 +233,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ],
               ),
               const Divider(),
-              
+
               if (_isAdmin)
                 PopupMenuItem(
                   child: const Text('Panel Administratora'),
@@ -279,13 +241,24 @@ class _MyHomePageState extends State<MyHomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder:
-                            (context) =>
-                                const AdminPanelPage(),
+                        builder: (context) => const AdminPanelPage(),
                       ),
                     );
                   },
                 ),
+              PopupMenuItem(
+                child: const Text('Personalizacja'),
+                onTap: () {
+                  Future.delayed(Duration.zero, () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PersonalisationPage(),
+                      ),
+                    );
+                  });
+                },
+              ),
 
               PopupMenuItem(
                 child: const Text('Statystyki'),
@@ -298,7 +271,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ),
       ],
-      color: widget.isDarkMode ? const Color(0xFF333333) : Colors.white,
+      color: Theme.of(context).colorScheme.surface,
     );
   }
 
@@ -363,10 +336,7 @@ class _MyHomePageState extends State<MyHomePage> {
       child: PopupMenuButton<String>(
         tooltip: title,
         offset: const Offset(0, kToolbarHeight),
-        color:
-            widget.isDarkMode
-                ? const Color(0xFF666666)
-                : const Color(0xFFAAAAAA),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (value) {
           _navigatorKey.currentState?.push(
@@ -374,7 +344,7 @@ class _MyHomePageState extends State<MyHomePage> {
               builder:
                   (context) => QualificationPage(
                     qualification: value,
-                    isDarkMode: widget.isDarkMode,
+                    //isDarkMode: widget.isDarkMode,
                   ),
             ),
           );
@@ -416,7 +386,7 @@ class _MyHomePageState extends State<MyHomePage> {
               builder:
                   (context) => QualificationPage(
                     qualification: title,
-                    isDarkMode: widget.isDarkMode,
+                    //isDarkMode: widget.isDarkMode,
                   ),
             ),
           );
@@ -457,7 +427,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isDarkMode: widget.isDarkMode,
+                                          //isDarkMode: widget.isDarkMode,
                                         ),
                                   ),
                                 );
@@ -478,7 +448,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isDarkMode: widget.isDarkMode,
                                         ),
                                   ),
                                 );
@@ -499,7 +468,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isDarkMode: widget.isDarkMode,
                                         ),
                                   ),
                                 );
@@ -520,7 +488,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isDarkMode: widget.isDarkMode,
                                         ),
                                   ),
                                 );
@@ -541,7 +508,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isDarkMode: widget.isDarkMode,
                                         ),
                                   ),
                                 );
@@ -562,7 +528,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isDarkMode: widget.isDarkMode,
                                         ),
                                   ),
                                 );
@@ -594,14 +559,14 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                     ListTile(
                       leading: Icon(
-                        widget.isDarkMode
+                        Theme.of(context).brightness == Brightness.dark
                             ? Icons.wb_sunny
                             : Icons.nightlight_round,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       title: const Text('Przełącz motyw'),
                       onTap: () {
                         Navigator.pop(context);
-                        widget.onToggleTheme();
                       },
                     ),
                   ],
@@ -643,15 +608,16 @@ class _MyHomePageState extends State<MyHomePage> {
                       }
                     },
                   ),
-                  IconButton(
+                  /*IconButton(
                     icon: Icon(
-                      widget.isDarkMode
+                      Theme.of(context).brightness == Brightness.dark
                           ? Icons.wb_sunny
                           : Icons.nightlight_round,
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                     tooltip: 'Przełącz motyw',
-                    onPressed: widget.onToggleTheme,
-                  ),
+                    
+                  ),*/
                 ]
                 : null,
       ),
@@ -661,15 +627,13 @@ class _MyHomePageState extends State<MyHomePage> {
           return MaterialPageRoute(
             builder:
                 (context) => HomeContent(
-                  isDarkMode: widget.isDarkMode,
+                  //isDarkMode: widget.isDarkMode,
                   onQualificationTap: (qualification) {
                     _navigatorKey.currentState?.push(
                       MaterialPageRoute(
                         builder:
-                            (context) => QualificationPage(
-                              qualification: qualification,
-                              isDarkMode: widget.isDarkMode,
-                            ),
+                            (context) =>
+                                QualificationPage(qualification: qualification),
                       ),
                     );
                   },
@@ -683,13 +647,11 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class HomeContent extends StatelessWidget {
-  final bool isDarkMode;
   final Function(String) onQualificationTap;
   final String selectedQuote;
 
   const HomeContent({
     super.key,
-    required this.isDarkMode,
     required this.onQualificationTap,
     required this.selectedQuote,
   });
@@ -951,7 +913,11 @@ class _QuestionTileState extends State<QuestionTile> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(widget.icon, size: 36, color: const Color(0xFFFF7373)),
+            Icon(
+              widget.icon,
+              size: 36,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(height: 12),
             Text(
               widget.code,
@@ -975,7 +941,9 @@ class _QuestionTileState extends State<QuestionTile> {
               questionCount != null ? '$questionCount pytań' : '⏳ Ładowanie...',
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],

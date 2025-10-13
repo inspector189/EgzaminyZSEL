@@ -4,13 +4,11 @@ import 'package:flutter_html/flutter_html.dart';
 class EgzaminPodgladView extends StatelessWidget {
   final List<dynamic> questions;
   final List<String?> selectedAnswers;
-  final bool isDarkMode;
 
   const EgzaminPodgladView({
     super.key,
     required this.questions,
     required this.selectedAnswers,
-    required this.isDarkMode,
   });
 
   Html _html(BuildContext context, String html) {
@@ -19,15 +17,13 @@ class EgzaminPodgladView extends StatelessWidget {
     return Html(
       data: html,
       style: {
-        "body": Style(color: isDarkMode ? Colors.white : Colors.grey[800]),
-        "b": Style(color: isDarkMode ? Colors.white : Colors.grey[800]),
+        "body": Style(color: Theme.of(context).colorScheme.onSurface),
+        "b": Style(color: Theme.of(context).colorScheme.onSurface),
         "span": Style(
           color:
               html.contains("style='color:green;'")
                   ? Colors.green
-                  : isDarkMode
-                  ? Colors.white
-                  : Colors.grey[800],
+                  : Theme.of(context).colorScheme.onSurface,
         ),
       },
       extensions: [
@@ -55,9 +51,9 @@ class EgzaminPodgladView extends StatelessWidget {
                                       '❌ Nie udało się załadować obrazka',
                                       style: TextStyle(
                                         color:
-                                            isDarkMode
-                                                ? Colors.white
-                                                : Colors.grey[800],
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                       ),
                                     ),
                               ),
@@ -70,9 +66,7 @@ class EgzaminPodgladView extends StatelessWidget {
             }
             return Text(
               '⚠️ Brak obrazka',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.grey[800],
-              ),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             );
           },
         ),
@@ -123,9 +117,9 @@ class EgzaminPodgladView extends StatelessWidget {
                                       '❌ Nie udało się załadować obrazka',
                                       style: TextStyle(
                                         color:
-                                            isDarkMode
-                                                ? Colors.white
-                                                : Colors.grey[800],
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                       ),
                                     ),
                               ),
@@ -141,7 +135,7 @@ class EgzaminPodgladView extends StatelessWidget {
                         icon: Icon(
                           Icons.close,
                           size: 30,
-                          color: isDarkMode ? Colors.white : Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                         tooltip: 'Zamknij',
                         onPressed:
@@ -207,7 +201,7 @@ class EgzaminPodgladView extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: buttonColor,
                           foregroundColor:
-                              isDarkMode ? Colors.white : Colors.black,
+                              Theme.of(context).colorScheme.onSurface,
                         ),
                         onPressed: () {},
                         child: _html(context, odp ?? ""),

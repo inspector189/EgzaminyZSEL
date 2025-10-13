@@ -2,14 +2,9 @@ import 'package:flutter/material.dart';
 import 'egzamin.dart';
 
 class QualificationPage extends StatelessWidget {
-  const QualificationPage({
-    super.key,
-    required this.qualification,
-    required this.isDarkMode,
-  });
+  const QualificationPage({super.key, required this.qualification});
 
   final String qualification;
-  final bool isDarkMode;
 
   Widget _buildQuestionsBox(
     BuildContext context, {
@@ -37,7 +32,7 @@ class QualificationPage extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(Icons.assignment, size: 50, color: const Color(0xFFFF7373)),
+              Icon(Icons.assignment, size: 50, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 16),
               Text(
                 title,
@@ -105,9 +100,7 @@ class QualificationPage extends StatelessWidget {
                             kwalifikacja: qualification
                                 .toLowerCase()
                                 .replaceAll('.', ''),
-                            isDarkMode: isDarkMode,
-                            returnToHome:
-                                false,
+                            returnToHome: false,
                           ),
                     ),
                   );
@@ -127,9 +120,7 @@ class QualificationPage extends StatelessWidget {
                             kwalifikacja: qualification
                                 .toLowerCase()
                                 .replaceAll('.', ''),
-                            isDarkMode: isDarkMode,
-                            returnToHome:
-                                false,
+                            returnToHome: false,
                           ),
                     ),
                   );
@@ -149,7 +140,6 @@ class QualificationPage extends StatelessWidget {
                             kwalifikacja: qualification
                                 .toLowerCase()
                                 .replaceAll('.', ''),
-                            isDarkMode: isDarkMode,
                             returnToHome: false,
                           ),
                     ),
