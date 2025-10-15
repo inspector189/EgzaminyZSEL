@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'egzamin.dart';
+import 'editQuestions.dart'; // ✅ nowy import
 
 class QualificationPage extends StatelessWidget {
   const QualificationPage({super.key, required this.qualification});
 
   final String qualification;
 
+  // 🔒 Tu możesz potem podmienić np. na dane z logowania
+  final bool _isAdmin = true;
+
   Widget _buildQuestionsBox(
     BuildContext context, {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    IconData icon = Icons.assignment,
   }) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -32,7 +37,7 @@ class QualificationPage extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(Icons.assignment, size: 50, color: Theme.of(context).colorScheme.primary),
+              Icon(icon, size: 50, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 16),
               Text(
                 title,
@@ -41,15 +46,18 @@ class QualificationPage extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.7),
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -82,70 +90,93 @@ class QualificationPage extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
         child: Center(
-          child: Wrap(
-            spacing: 20,
-            runSpacing: 20,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _buildQuestionsBox(
-                context,
-                title: 'Losuj 1 pytanie',
-                subtitle: 'Sprawdź swoją wiedzę',
-                onTap: () {
-                  Navigator.push(
+              // 🔹 Główne trzy kafelki w jednym rzędzie (Wrap) i wyśrodkowane
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 20,
+                runSpacing: 20,
+                children: [
+                  _buildQuestionsBox(
                     context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => EgzaminView(
+                    title: 'Losuj 1 pytanie',
+                    subtitle: 'Sprawdź swoją wiedzę',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EgzaminView(
                             tryb: TrybEgzaminu.jednoPytanie,
-                            kwalifikacja: qualification
-                                .toLowerCase()
-                                .replaceAll('.', ''),
+                            kwalifikacja:
+                                qualification.toLowerCase().replaceAll('.', ''),
                             returnToHome: false,
                           ),
-                    ),
-                  );
-                },
-              ),
-              _buildQuestionsBox(
-                context,
-                title: 'Test 40 losowych pytań',
-                subtitle: 'Pełny egzamin próbny',
-                onTap: () {
-                  Navigator.push(
+                        ),
+                      );
+                    },
+                  ),
+                  _buildQuestionsBox(
                     context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => EgzaminView(
+                    title: 'Test 40 losowych pytań',
+                    subtitle: 'Pełny egzamin próbny',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EgzaminView(
                             tryb: TrybEgzaminu.czterdziesciPytan,
-                            kwalifikacja: qualification
-                                .toLowerCase()
-                                .replaceAll('.', ''),
+                            kwalifikacja:
+                                qualification.toLowerCase().replaceAll('.', ''),
                             returnToHome: false,
                           ),
-                    ),
-                  );
-                },
-              ),
-              _buildQuestionsBox(
-                context,
-                title: 'Baza wszystkich odpowiedzi',
-                subtitle: 'Przeglądaj wszystkie pytania',
-                onTap: () {
-                  Navigator.push(
+                        ),
+                      );
+                    },
+                  ),
+                  _buildQuestionsBox(
                     context,
-                    MaterialPageRoute(
-                      builder:
-                          (context) => EgzaminView(
+                    title: 'Baza wszystkich odpowiedzi',
+                    subtitle: 'Przeglądaj wszystkie pytania',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EgzaminView(
                             tryb: TrybEgzaminu.wszystkie,
-                            kwalifikacja: qualification
-                                .toLowerCase()
-                                .replaceAll('.', ''),
+                            kwalifikacja:
+                                qualification.toLowerCase().replaceAll('.', ''),
                             returnToHome: false,
                           ),
-                    ),
-                  );
-                },
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
+
+              const SizedBox(height: 30), // odstęp między sekcją główną a admin
+
+              // 🛠️ Widoczne tylko dla administratora — osobno pod spodem i wyśrodkowany
+              if (_isAdmin)
+                _buildQuestionsBox(
+                  context,
+                  title: 'Edytuj pytania',
+                  subtitle: 'Zarządzaj bazą egzaminów',
+                  icon: Icons.edit_note,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditQuestionsPage(
+                          qualification: qualification.toLowerCase().replaceAll('.', ''),
+                        ),
+                      ),
+                    );
+
+                  },
+                ),
             ],
           ),
         ),

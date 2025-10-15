@@ -38,7 +38,7 @@ $czas_trwania = isset($_POST['czas_trwania']) ? (int) $_POST['czas_trwania'] : n
 $userID = $_POST['userName'] ?? 'anonymous';
 
 
-if (!$kwalifikacja || !$wynik || !$data_czas || !$czas_trwania || !$userID) {
+if (empty($kwalifikacja) || $wynik === null || empty($data_czas) || $czas_trwania === null || empty($userID)) {
     http_response_code(400);
     die("❌ Brakuje wymaganych danych");
 }

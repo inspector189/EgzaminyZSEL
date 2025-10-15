@@ -268,6 +268,7 @@ class AdminStatsPage extends StatefulWidget {
   State<AdminStatsPage> createState() => _AdminStatsPageState();
 }
 
+
 class _AdminStatsPageState extends State<AdminStatsPage> {
   List<dynamic> allResults = [];
   bool isLoading = true;
@@ -337,6 +338,13 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
       grouped[q]!.add(r);
     }
     return grouped;
+  }
+  
+  String _fmtDuration(int? seconds) {
+    if (seconds == null || seconds <= 0) return '-';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m}m ${s}s';
   }
 
   Map<String, dynamic> calculateStats(List<dynamic> results) {
@@ -524,51 +532,91 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                           children: [
                             ...visibleQualifications.map((qualEntry) {
                               final qual = qualEntry.key;
+
+                              // pełna lista egzaminów tej kwalifikacji dla danego użytkownika
+                              final List<dynamic> qualExams = List<dynamic>.from(qualEntry.value);
+
+                              // sort: najnowsze pierwsze
+                              qualExams.sort((a, b) {
+                                final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
+                                final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
+                                return db.compareTo(da);
+                              });
+
+                              // TOP 5 (lub mniej)
+                              final recent = qualExams.take(5).toList();
+
+                              // statystyki z Twojej istniejącej funkcji
                               final qualStats = calculateStats(qualEntry.value);
+
+                              String _scoreStr(dynamic v) {
+                                if (v is num) return v.toStringAsFixed(v % 1 == 0 ? 0 : 2);
+                                return v?.toString() ?? '-';
+                                }
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '📘 $qual',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                child: ExpansionTile(
+                                  tilePadding: EdgeInsets.zero,
+                                  childrenPadding: const EdgeInsets.only(left: 8, right: 0, bottom: 8),
+                                  title: Row(
+                                    children: [
+                                      const Text('📘 ', style: TextStyle(fontSize: 16)),
+                                      Expanded(
+                                        child: Text(
+                                          qual,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
+                                    ],
+                                  ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          'Egzaminów: ${qualStats['count']}',
-                                        ),
-                                        Text(
-                                          'Śr. wynik: ${qualStats['avg'].toStringAsFixed(2)}%',
-                                          style: TextStyle(color: colorAccent),
-                                        ),
+                                        Text('Egzaminów: ${qualStats['count']}'),
+                                        Text('Śr. wynik: ${qualStats['avg'].toStringAsFixed(2)}%',
+                                            style: TextStyle(color: colorAccent)),
                                       ],
                                     ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Najlepszy: ${qualStats['best']}%',
-                                        ),
-                                        Text(
-                                          'Najgorszy: ${qualStats['worst']}%',
-                                        ),
-                                      ],
-                                    ),
-                                    const Divider(thickness: 1, height: 16),
+                                  ),
+                                  // „strzałeczka” jest wbudowana w ExpansionTile (trailing)
+                                  children: [
+                                    if (recent.isEmpty)
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+                                        child: Text('Brak egzaminów dla tej kwalifikacji.'),
+                                      )
+                                    else
+                                      ...recent.map((exam) {
+                                        final date = (exam['data_czas'] ?? '-') as String;
+                                        final wynik = _scoreStr(exam['wynik']);
+                                        final czas = _fmtDuration(
+                                          (exam['czas_trwania_sec'] is int)
+                                              ? exam['czas_trwania_sec'] as int
+                                              : int.tryParse('${exam['czas_trwania_sec'] ?? ''}'),
+                                        );
+                                        final tryb = (exam['tryb'] ?? exam['mode'] ?? '') as String;
+
+                                        return ListTile(
+                                          contentPadding: const EdgeInsets.only(left: 12, right: 0),
+                                          leading: const Icon(Icons.history),
+                                          title: Text(date),
+                                          subtitle: Text(
+                                            'Wynik: $wynik% • Czas: $czas${tryb.isNotEmpty ? ' • Tryb: $tryb' : ''}',
+                                          ),
+                                          dense: true,
+                                          visualDensity: const VisualDensity(vertical: -2),
+                                        );
+                                      }),
+                                    const Divider(thickness: 1, height: 8),
                                   ],
                                 ),
                               );
                             }),
+
                           ],
                         ),
                       );
