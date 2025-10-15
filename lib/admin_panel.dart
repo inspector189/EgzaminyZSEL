@@ -417,6 +417,20 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
 
                     ...filteredUsers.map((entry) {
                       final user = entry.key;
+                      final exams = entry.value;
+
+                      // Sortowanie po dacie egzaminu (najnowszy pierwszy)
+                      exams.sort((a, b) {
+                        final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
+                        final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
+                        return db.compareTo(da);
+                      });
+
+                      // Ostatni egzamin
+                      final lastExam = exams.isNotEmpty ? exams.first : null;
+                      final lastExamScore = lastExam?['wynik']?.toString() ?? '-';
+                      final lastExamDate = lastExam?['data_czas']?.toString() ?? '-';
+
                       final userStats = calculateStats(entry.value);
                       final isAnonymous = user == 'Użytkownik anonimowy';
 
@@ -498,7 +512,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                             ),
                           ),
                           subtitle: Text(
-                            'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}% • Egzaminów: ${userStats['count']}',
+                            'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}% • '
+                            'Egzaminów: ${userStats['count']} • '
+                            'Ostatni: $lastExamScore% ($lastExamDate)',
                             style: TextStyle(color: colorAccent),
                           ),
                           childrenPadding: const EdgeInsets.symmetric(
