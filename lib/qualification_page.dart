@@ -3,12 +3,16 @@ import 'egzamin.dart';
 import 'editQuestions.dart'; // ✅ nowy import
 
 class QualificationPage extends StatelessWidget {
-  const QualificationPage({super.key, required this.qualification});
+  const QualificationPage({
+    super.key,
+    required this.qualification,
+    required this.isAdmin, // ⬅️ wymagany
+  });
 
   final String qualification;
+  final bool isAdmin; // ⬅️ DODAJ TO
 
   // 🔒 Tu możesz potem podmienić np. na dane z logowania
-  final bool _isAdmin = true;
 
   Widget _buildQuestionsBox(
     BuildContext context, {
@@ -159,7 +163,7 @@ class QualificationPage extends StatelessWidget {
               const SizedBox(height: 30), // odstęp między sekcją główną a admin
 
               // 🛠️ Widoczne tylko dla administratora — osobno pod spodem i wyśrodkowany
-              if (_isAdmin)
+              if (isAdmin)
                 _buildQuestionsBox(
                   context,
                   title: 'Edytuj pytania',

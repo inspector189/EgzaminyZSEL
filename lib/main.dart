@@ -344,6 +344,7 @@ class _MyHomePageState extends State<MyHomePage> {
               builder:
                   (context) => QualificationPage(
                     qualification: value,
+                    isAdmin: _isAdmin, // ⬅️
                     //isDarkMode: widget.isDarkMode,
                   ),
             ),
@@ -386,6 +387,7 @@ class _MyHomePageState extends State<MyHomePage> {
               builder:
                   (context) => QualificationPage(
                     qualification: title,
+                    isAdmin: _isAdmin, // ⬅️
                     //isDarkMode: widget.isDarkMode,
                   ),
             ),
@@ -427,6 +429,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
+                                          isAdmin: _isAdmin, 
                                           //isDarkMode: widget.isDarkMode,
                                         ),
                                   ),
@@ -448,6 +451,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
+                                          isAdmin: _isAdmin, // ⬅️
                                         ),
                                   ),
                                 );
@@ -468,6 +472,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
+                                          isAdmin: _isAdmin, // ⬅️
                                         ),
                                   ),
                                 );
@@ -488,6 +493,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
+                                          isAdmin: _isAdmin, // ⬅️
                                         ),
                                   ),
                                 );
@@ -508,6 +514,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
+                                          isAdmin: _isAdmin, // ⬅️
                                         ),
                                   ),
                                 );
@@ -528,6 +535,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
+                                          isAdmin: _isAdmin, // ⬅️
                                         ),
                                   ),
                                 );
@@ -633,7 +641,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       MaterialPageRoute(
                         builder:
                             (context) =>
-                                QualificationPage(qualification: qualification),
+                                QualificationPage(qualification: qualification, isAdmin: _isAdmin),
                       ),
                     );
                   },
