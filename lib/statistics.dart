@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,7 +22,7 @@ class StatisticsPage extends StatelessWidget {
           } else if (snapshot.hasError) {
             return Center(child: Text('Błąd: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Brak danych statystycznych.'));
+            return const Center(child: Text('❌ Brak danych statystycznych.'));
           }
 
           final stats = snapshot.data!;
@@ -66,15 +67,13 @@ class StatisticsPage extends StatelessWidget {
                             decoration: BoxDecoration(
                               color:
                                   isEven
-                                      ? Theme.of(
-                                        context,
-                                      ).colorScheme.surface.withValues(alpha: 0.05)
+                                      ? Theme.of(context).colorScheme.surface
+                                          .withValues(alpha: 0.05)
                                       : Colors.transparent,
                               border: Border(
                                 bottom: BorderSide(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withValues(alpha: 0.1),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.1),
                                   width: 1,
                                 ),
                               ),
@@ -114,7 +113,7 @@ class StatisticsPage extends StatelessWidget {
     final userName = prefs.getString('userName') ?? 'anonymous';
 
     if (userName == 'anonymous') {
-      throw Exception('Proszę się zalogować, aby zobaczyć statystyki');
+      throw Exception('ℹ️ Funkcja statystyk wymaga zalogowania.');
     }
 
     final url = Uri.parse('https://interpage.pl/egzaminy/stats.php');
@@ -127,7 +126,10 @@ class StatisticsPage extends StatelessWidget {
       body: {'userName': userName},
     );
 
-    print('📥 Statistics response: ${response.statusCode} - ${response.body}');
+    if (kDebugMode) {
+      debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
+      debugPrint('Treść odpowiedzi: ${response.body}');
+    }
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -136,10 +138,10 @@ class StatisticsPage extends StatelessWidget {
       }
       return data;
     } else if (response.statusCode == 404) {
-      throw Exception('Nie zrobiłeś jeszcze żadnego egzaminu!');
+      throw Exception('⚠️ Nie zrobiłeś jeszcze żadnego egzaminu!');
     } else {
       throw Exception(
-        'Nie udało się pobrać statystyk: ${response.statusCode} - ${response.body}',
+        '❌ Nie udało się pobrać statystyk: ${response.statusCode} - ${response.body}',
       );
     }
   }

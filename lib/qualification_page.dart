@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import 'egzamin.dart';
-import 'editQuestions.dart'; // ✅ nowy import
+import 'editQuestions.dart';
 
 class QualificationPage extends StatelessWidget {
   const QualificationPage({
     super.key,
     required this.qualification,
-    required this.isAdmin, // ⬅️ wymagany
+    required this.isAdmin,
   });
 
   final String qualification;
-  final bool isAdmin; // ⬅️ DODAJ TO
-
-  // 🔒 Tu możesz potem podmienić np. na dane z logowania
+  final bool isAdmin;
 
   Widget _buildQuestionsBox(
     BuildContext context, {
@@ -41,7 +39,11 @@ class QualificationPage extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(icon, size: 50, color: Theme.of(context).colorScheme.primary),
+              Icon(
+                icon,
+                size: 50,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(height: 16),
               Text(
                 title,
@@ -56,10 +58,9 @@ class QualificationPage extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.7),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -97,7 +98,6 @@ class QualificationPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 🔹 Główne trzy kafelki w jednym rzędzie (Wrap) i wyśrodkowane
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 20,
@@ -111,12 +111,14 @@ class QualificationPage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => EgzaminView(
-                            tryb: TrybEgzaminu.jednoPytanie,
-                            kwalifikacja:
-                                qualification.toLowerCase().replaceAll('.', ''),
-                            returnToHome: false,
-                          ),
+                          builder:
+                              (context) => EgzaminView(
+                                tryb: TrybEgzaminu.jednoPytanie,
+                                kwalifikacja: qualification
+                                    .toLowerCase()
+                                    .replaceAll('.', ''),
+                                returnToHome: false,
+                              ),
                         ),
                       );
                     },
@@ -129,12 +131,14 @@ class QualificationPage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => EgzaminView(
-                            tryb: TrybEgzaminu.czterdziesciPytan,
-                            kwalifikacja:
-                                qualification.toLowerCase().replaceAll('.', ''),
-                            returnToHome: false,
-                          ),
+                          builder:
+                              (context) => EgzaminView(
+                                tryb: TrybEgzaminu.czterdziesciPytan,
+                                kwalifikacja: qualification
+                                    .toLowerCase()
+                                    .replaceAll('.', ''),
+                                returnToHome: false,
+                              ),
                         ),
                       );
                     },
@@ -147,12 +151,14 @@ class QualificationPage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => EgzaminView(
-                            tryb: TrybEgzaminu.wszystkie,
-                            kwalifikacja:
-                                qualification.toLowerCase().replaceAll('.', ''),
-                            returnToHome: false,
-                          ),
+                          builder:
+                              (context) => EgzaminView(
+                                tryb: TrybEgzaminu.wszystkie,
+                                kwalifikacja: qualification
+                                    .toLowerCase()
+                                    .replaceAll('.', ''),
+                                returnToHome: false,
+                              ),
                         ),
                       );
                     },
@@ -160,9 +166,7 @@ class QualificationPage extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 30), // odstęp między sekcją główną a admin
-
-              // 🛠️ Widoczne tylko dla administratora — osobno pod spodem i wyśrodkowany
+              const SizedBox(height: 30),
               if (isAdmin)
                 _buildQuestionsBox(
                   context,
@@ -173,12 +177,14 @@ class QualificationPage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => EditQuestionsPage(
-                          qualification: qualification.toLowerCase().replaceAll('.', ''),
-                        ),
+                        builder:
+                            (_) => EditQuestionsPage(
+                              qualification: qualification
+                                  .toLowerCase()
+                                  .replaceAll('.', ''),
+                            ),
                       ),
                     );
-
                   },
                 ),
             ],

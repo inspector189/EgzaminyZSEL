@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -82,14 +83,16 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         Uri.parse('https://interpage.pl/egzaminy/showAdmins.php'),
         headers: {'Content-Type': 'application/json'},
       );
-      print('Status: ${response.statusCode}');
-      print('Body: ${response.body}');
+      if (kDebugMode) {
+        debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
+        debugPrint('Treść odpowiedzi: ${response.body}');
+      }
 
       if (response.statusCode == 200) {
         if (response.body.isEmpty ||
             response.body ==
                 '----------------------------------------------------------------------------------------------------') {
-          throw Exception('Pusta odpowiedź – sprawdź PHP na serwerze');
+          throw Exception('❌ Pusta odpowiedź od serwera – sprawdź PHP!');
         }
         final data = json.decode(response.body);
         if (data is List) {
@@ -99,31 +102,47 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
             errorMessage = '';
           });
         } else if (data is Map && data.containsKey('error')) {
-          throw Exception('Błąd serwera: ${data['error']}');
+          throw Exception('❌ Błąd serwera: ${data['error']}');
         } else {
-          throw Exception('Nieprawidłowy format odpowiedzi');
+          throw Exception('❌ Nieprawidłowy format odpowiedzi!');
         }
       } else {
-        throw Exception('Błąd HTTP: ${response.statusCode}');
+        throw Exception('❌ Kod błędu HTTP: ${response.statusCode}');
       }
     } catch (e) {
       setState(() {
         isLoading = false;
         errorMessage = e.toString();
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Błąd ładowania: $e')));
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Błąd ładowania użytkowników: $e')));
+      }
     }
   }
 
+  bool _isSnackBarVisible = false;
+
   Future<void> addUser(String email) async {
     if (email.isEmpty || !email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (_isSnackBarVisible) return;
+
+      _isSnackBarVisible = true;
+      final messenger = ScaffoldMessenger.of(context);
+
+      final controller = messenger.showSnackBar(
         const SnackBar(
-          content: Text('Podaj poprawny email (musi zawierać znak "@")'),
+          content: Text('❌ Podaj poprawny email (musi zawierać znak "@")'),
+          duration: Duration(seconds: 3),
         ),
       );
+
+      controller.closed.then((_) {
+        _isSnackBarVisible = false;
+      });
+
       return;
     }
 
@@ -133,27 +152,34 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {'email': email},
       );
-      print('Add Status: ${response.statusCode}');
-      print('Add Body: ${response.body}');
+      if (kDebugMode) {
+        debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
+        debugPrint('Treść odpowiedzi: ${response.body}');
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Administrator dodany ✅')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('✅ Administrator dodany')),
+            );
+          }
+
           _emailController.clear();
           fetchUsers();
         } else {
-          throw Exception('Nie udało się dodać');
+          throw Exception('❌ Dodanie administratora nie powiodło się!');
         }
       } else {
-        throw Exception('Błąd HTTP: ${response.statusCode}');
+        throw Exception('❌ Kod błędu HTTP: ${response.statusCode}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Błąd przy dodawaniu: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Błąd przy dodawaniu administratora: $e')),
+        );
+      }
     }
   }
 
@@ -164,26 +190,34 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {'id': id.toString()},
       );
-      print('Delete Status: ${response.statusCode}');
-      print('Delete Body: ${response.body}');
+      if (kDebugMode) {
+        debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
+        debugPrint('Treść odpowiedzi: ${response.body}');
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+
         if (data['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Administrator został usunięty ✅')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('✅ Administrator został usunięty')),
+            );
+          }
+
           fetchUsers();
         } else {
-          throw Exception('Nie udało się usunąć');
+          throw Exception('❌ Nie udało się usunąć administratora!');
         }
       } else {
-        throw Exception('Błąd HTTP: ${response.statusCode}');
+        throw Exception('❌ Kod błędu HTTP: ${response.statusCode}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Błąd przy usuwaniu: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Błąd przy usuwaniu administratora: $e')),
+        );
+      }
     }
   }
 
@@ -268,7 +302,6 @@ class AdminStatsPage extends StatefulWidget {
   State<AdminStatsPage> createState() => _AdminStatsPageState();
 }
 
-
 class _AdminStatsPageState extends State<AdminStatsPage> {
   List<dynamic> allResults = [];
   bool isLoading = true;
@@ -291,10 +324,10 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
           'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
         },
       );
-
-      print(
-        '📥 Admin statistics response: ${response.statusCode} - ${response.body}',
-      );
+      if (kDebugMode) {
+        debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
+        debugPrint('Treść odpowiedzi: ${response.body}');
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -304,10 +337,12 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
             isLoading = false;
           });
         } else {
-          throw Exception('Unexpected response format');
+          throw Exception(
+            '❌ Nieprawidłowy format - dane nie są listą, a: ${data.runtimeType}',
+          );
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('❌ Kod błędu HTTP: ${response.statusCode}');
       }
     } catch (e) {
       setState(() {
@@ -339,7 +374,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     }
     return grouped;
   }
-  
+
   String _fmtDuration(int? seconds) {
     if (seconds == null || seconds <= 0) return '-';
     final m = seconds ~/ 60;
@@ -392,11 +427,10 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-
                     TextField(
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.search),
-                        hintText: 'Szukaj użytkownika po nazwisku...',
+                        hintText: 'Wyszukaj użytkownika..',
                         filled: true,
                         fillColor: isDark ? Colors.grey[850] : Colors.white,
                         border: OutlineInputBorder(
@@ -429,15 +463,21 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
 
                       // Sortowanie po dacie egzaminu (najnowszy pierwszy)
                       exams.sort((a, b) {
-                        final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
-                        final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
+                        final da =
+                            DateTime.tryParse(a['data_czas'] ?? '') ??
+                            DateTime(2000);
+                        final db =
+                            DateTime.tryParse(b['data_czas'] ?? '') ??
+                            DateTime(2000);
                         return db.compareTo(da);
                       });
 
                       // Ostatni egzamin
                       final lastExam = exams.isNotEmpty ? exams.first : null;
-                      final lastExamScore = lastExam?['wynik']?.toString() ?? '-';
-                      final lastExamDate = lastExam?['data_czas']?.toString() ?? '-';
+                      final lastExamScore =
+                          lastExam?['wynik']?.toString() ?? '-';
+                      final lastExamDate =
+                          lastExam?['data_czas']?.toString() ?? '-';
 
                       final userStats = calculateStats(entry.value);
                       final isAnonymous = user == 'Użytkownik anonimowy';
@@ -533,39 +573,54 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                             ...visibleQualifications.map((qualEntry) {
                               final qual = qualEntry.key;
 
-                              // pełna lista egzaminów tej kwalifikacji dla danego użytkownika
-                              final List<dynamic> qualExams = List<dynamic>.from(qualEntry.value);
+                              final List<dynamic> qualExams =
+                                  List<dynamic>.from(qualEntry.value);
 
                               // sort: najnowsze pierwsze
                               qualExams.sort((a, b) {
-                                final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
-                                final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
+                                final da =
+                                    DateTime.tryParse(a['data_czas'] ?? '') ??
+                                    DateTime(2000);
+                                final db =
+                                    DateTime.tryParse(b['data_czas'] ?? '') ??
+                                    DateTime(2000);
                                 return db.compareTo(da);
                               });
 
                               // TOP 5 (lub mniej)
                               final recent = qualExams.take(5).toList();
 
-                              // statystyki z Twojej istniejącej funkcji
                               final qualStats = calculateStats(qualEntry.value);
 
-                              String _scoreStr(dynamic v) {
-                                if (v is num) return v.toStringAsFixed(v % 1 == 0 ? 0 : 2);
-                                return v?.toString() ?? '-';
+                              String scoreStr(dynamic v) {
+                                if (v is num) {
+                                  return v.toStringAsFixed(v % 1 == 0 ? 0 : 2);
                                 }
+                                return v?.toString() ?? '-';
+                              }
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: ExpansionTile(
                                   tilePadding: EdgeInsets.zero,
-                                  childrenPadding: const EdgeInsets.only(left: 8, right: 0, bottom: 8),
+                                  childrenPadding: const EdgeInsets.only(
+                                    left: 8,
+                                    right: 0,
+                                    bottom: 8,
+                                  ),
                                   title: Row(
                                     children: [
-                                      const Text('📘 ', style: TextStyle(fontSize: 16)),
+                                      const Text(
+                                        '📘 ',
+                                        style: TextStyle(fontSize: 16),
+                                      ),
                                       Expanded(
                                         child: Text(
                                           qual,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -574,41 +629,61 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                   subtitle: Padding(
                                     padding: const EdgeInsets.only(top: 4.0),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('Egzaminów: ${qualStats['count']}'),
-                                        Text('Śr. wynik: ${qualStats['avg'].toStringAsFixed(2)}%',
-                                            style: TextStyle(color: colorAccent)),
+                                        Text(
+                                          'Egzaminów: ${qualStats['count']}',
+                                        ),
+                                        Text(
+                                          'Śr. wynik: ${qualStats['avg'].toStringAsFixed(2)}%',
+                                          style: TextStyle(color: colorAccent),
+                                        ),
                                       ],
                                     ),
                                   ),
-                                  // „strzałeczka” jest wbudowana w ExpansionTile (trailing)
                                   children: [
                                     if (recent.isEmpty)
                                       const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
-                                        child: Text('Brak egzaminów dla tej kwalifikacji.'),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 12.0,
+                                          vertical: 8,
+                                        ),
+                                        child: Text(
+                                          '❌ Brak egzaminów dla tej kwalifikacji.',
+                                        ),
                                       )
                                     else
                                       ...recent.map((exam) {
-                                        final date = (exam['data_czas'] ?? '-') as String;
-                                        final wynik = _scoreStr(exam['wynik']);
+                                        final date =
+                                            (exam['data_czas'] ?? '-')
+                                                as String;
+                                        final wynik = scoreStr(exam['wynik']);
                                         final czas = _fmtDuration(
                                           (exam['czas_trwania_sec'] is int)
                                               ? exam['czas_trwania_sec'] as int
-                                              : int.tryParse('${exam['czas_trwania_sec'] ?? ''}'),
+                                              : int.tryParse(
+                                                '${exam['czas_trwania_sec'] ?? ''}',
+                                              ),
                                         );
-                                        final tryb = (exam['tryb'] ?? exam['mode'] ?? '') as String;
+                                        final tryb =
+                                            (exam['tryb'] ?? exam['mode'] ?? '')
+                                                as String;
 
                                         return ListTile(
-                                          contentPadding: const EdgeInsets.only(left: 12, right: 0),
+                                          contentPadding: const EdgeInsets.only(
+                                            left: 12,
+                                            right: 0,
+                                          ),
                                           leading: const Icon(Icons.history),
                                           title: Text(date),
                                           subtitle: Text(
                                             'Wynik: $wynik% • Czas: $czas${tryb.isNotEmpty ? ' • Tryb: $tryb' : ''}',
                                           ),
                                           dense: true,
-                                          visualDensity: const VisualDensity(vertical: -2),
+                                          visualDensity: const VisualDensity(
+                                            vertical: -2,
+                                          ),
                                         );
                                       }),
                                     const Divider(thickness: 1, height: 8),
@@ -616,7 +691,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                 ),
                               );
                             }),
-
                           ],
                         ),
                       );
@@ -624,7 +698,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
 
                     const SizedBox(height: 32),
 
-                    // 🎓 Per qualification stats
                     Text(
                       '🎓 Statystyki według kwalifikacji',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(

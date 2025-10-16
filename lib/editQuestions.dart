@@ -20,11 +20,12 @@ class EditQuestionsPage extends StatefulWidget {
 class _EditQuestionsPageState extends State<EditQuestionsPage> {
   // ====== ID nowego pytania (max istniejących + 1) ======
   int? get _nextId {
-    final ids = questions
-        .map((q) => int.tryParse(q['id']?.toString() ?? ''))
-        .where((v) => v != null)
-        .cast<int>()
-        .toList();
+    final ids =
+        questions
+            .map((q) => int.tryParse(q['id']?.toString() ?? ''))
+            .where((v) => v != null)
+            .cast<int>()
+            .toList();
     if (ids.isEmpty) return 1;
     ids.sort();
     return ids.last + 1;
@@ -43,12 +44,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   // ====== Boczny panel – wyszukiwarka ======
   final TextEditingController _textSearchCtrl = TextEditingController();
-final ScrollController _leftPanelScroll = ScrollController();
+  final ScrollController _leftPanelScroll = ScrollController();
 
   // ====== Formularz dodawania/edycji ======
   int? editingId; // jeśli != null -> edycja istniejącego pytania
-  final TextEditingController _imageCtrl = TextEditingController(); // URL gdy edycja
-  final TextEditingController _contentCtrl = TextEditingController(); // pytanie (HTML)
+  final TextEditingController _imageCtrl =
+      TextEditingController(); // URL gdy edycja
+  final TextEditingController _contentCtrl =
+      TextEditingController(); // pytanie (HTML)
   final TextEditingController _odp1Ctrl = TextEditingController();
   final TextEditingController _odp2Ctrl = TextEditingController();
   final TextEditingController _odp3Ctrl = TextEditingController();
@@ -111,14 +114,20 @@ final ScrollController _leftPanelScroll = ScrollController();
       });
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Błąd ładowania: $e')),
-      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Błąd ładowania: $e')));
+      }
     }
   }
 
   String _sanitizedTable() =>
-      widget.qualification.replaceAll('.', '').replaceAll(' ', '').toLowerCase();
+      widget.qualification
+          .replaceAll('.', '')
+          .replaceAll(' ', '')
+          .toLowerCase();
 
   Future<List<dynamic>> _fetchQuestions(String kval) async {
     final url = Uri.parse('https://interpage.pl/egzaminy/$kval.php');
@@ -126,24 +135,29 @@ final ScrollController _leftPanelScroll = ScrollController();
     if (res.statusCode == 200 && res.body.isNotEmpty) {
       final decoded = json.decode(res.body);
       if (decoded is List) return decoded;
-      throw 'Nieprawidłowy format danych pytań';
+      throw '❌ Nieprawidłowy format danych pytań';
     }
-    throw 'HTTP ${res.statusCode} przy pobieraniu pytań';
+    throw 'ℹ️ HTTP ${res.statusCode} przy pobieraniu pytań';
   }
 
   Future<Map<int, Map<String, dynamic>>> _fetchAllTrudnosci() async {
-    final url = Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php');
+    final url = Uri.parse(
+      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
+    );
     final res = await http.get(url);
     if (res.statusCode == 200) {
       final List<dynamic> jsonList = json.decode(res.body);
       final Map<int, Map<String, dynamic>> result = {};
+
       for (final item in jsonList) {
         final int? id = int.tryParse(item['pytanie_id'].toString());
+
         if (id != null) {
           result[id] = {
-            'trudnosc': (item['trudnosc'] is num)
-                ? (item['trudnosc'] as num).toDouble()
-                : double.tryParse('${item['trudnosc']}') ?? 0.0,
+            'trudnosc':
+                (item['trudnosc'] is num)
+                    ? (item['trudnosc'] as num).toDouble()
+                    : double.tryParse('${item['trudnosc']}') ?? 0.0,
             'ilosc_odpowiedzi': item['ilosc_odpowiedzi'] ?? 0,
           };
         }
@@ -183,19 +197,24 @@ final ScrollController _leftPanelScroll = ScrollController();
   void _openForEdit(Map<String, dynamic> q) {
     setState(() {
       editingId = int.tryParse(q['id'].toString());
-      final imgUrl = _extractFirstImageSrc(q['pytanie']?.toString() ?? '') ?? '';
+      final imgUrl =
+          _extractFirstImageSrc(q['pytanie']?.toString() ?? '') ?? '';
       _imageCtrl.text = imgUrl;
+
       _uploadedImageUrl = imgUrl.isNotEmpty ? imgUrl : null;
       _imageBytes = null;
       _imageName = null;
 
       _contentCtrl.text = q['pytanie']?.toString() ?? '';
+
       _odp1Ctrl.text = q['odp1']?.toString() ?? '';
       _odp2Ctrl.text = q['odp2']?.toString() ?? '';
       _odp3Ctrl.text = q['odp3']?.toString() ?? '';
       _odp4Ctrl.text = q['odp4']?.toString() ?? '';
+
       _opisPoprawneCtrl.text = q['opisPoprawne']?.toString() ?? '';
       _opisNiepoprawneCtrl.text = q['opisNiepoprawne']?.toString() ?? '';
+
       final poprawna = (q['poprawna']?.toString().toUpperCase() ?? 'A');
       _correct = ['A', 'B', 'C', 'D'].contains(poprawna) ? poprawna : 'A';
     });
@@ -204,14 +223,20 @@ final ScrollController _leftPanelScroll = ScrollController();
   String? _extractFirstImageSrc(String html) {
     final idx = html.indexOf('<img');
     if (idx == -1) return null;
+
     final srcIdx = html.indexOf('src=', idx);
     if (srcIdx == -1) return null;
-    final quote = html.contains('src="') ? '"' : (html.contains("src='") ? "'" : '"');
+
+    final quote =
+        html.contains('src="') ? '"' : (html.contains("src='") ? "'" : '"');
+
     final qIdx = html.indexOf('src=$quote', idx);
     if (qIdx == -1) return null;
+
     final start = qIdx + 5; // src="
     final end = html.indexOf(quote, start);
     if (end == -1) return null;
+
     return html.substring(start, end);
   }
 
@@ -222,6 +247,7 @@ final ScrollController _leftPanelScroll = ScrollController();
         label: 'images',
         extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'],
       );
+
       final XFile? file = await openFile(acceptedTypeGroups: [typeGroup]);
       if (file == null) return;
 
@@ -232,9 +258,13 @@ final ScrollController _leftPanelScroll = ScrollController();
         _uploadedImageUrl = null;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nie udało się otworzyć selektora plików: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Nie udało się otworzyć selektora plików: $e'),
+          ),
+        );
+      }
     }
   }
 
@@ -244,37 +274,48 @@ final ScrollController _leftPanelScroll = ScrollController();
 
     try {
       final uri = Uri.parse('https://interpage.pl/egzaminy/upload_image.php');
-      final req = http.MultipartRequest('POST', uri)
-        ..fields['kwalifikacja'] = _sanitizedTable()
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            _imageBytes!,
-            filename: _imageName!,
-            contentType: http_parser.MediaType('image', _imageName!.split('.').last),
-          ),
-        );
+
+      final req =
+          http.MultipartRequest('POST', uri)
+            ..fields['kwalifikacja'] = _sanitizedTable()
+            ..files.add(
+              http.MultipartFile.fromBytes(
+                'file',
+                _imageBytes!,
+                filename: _imageName!,
+                contentType: http_parser.MediaType(
+                  'image',
+                  _imageName!.split('.').last,
+                ),
+              ),
+            );
 
       final streamed = await req.send();
       final res = await http.Response.fromStream(streamed);
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
+
         if (data['ok'] == true && data['url'] is String) {
           setState(() => _uploadedImageUrl = data['url']);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Obrazek wgrany.')),
-          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('✅ Obrazek został wgrany.')),
+            );
+          }
         } else {
-          throw 'Nieprawidłowa odpowiedź serwera';
+          throw '❌ Nieprawidłowa odpowiedź serwera!';
         }
       } else {
         throw 'HTTP ${res.statusCode}';
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Błąd uploadu: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Błąd podczas wysyłania obrazka: $e')),
+        );
+      }
     } finally {
       setState(() => _isUploading = false);
     }
@@ -293,7 +334,7 @@ final ScrollController _leftPanelScroll = ScrollController();
     final src = _uploadedImageUrl ?? _imageCtrl.text.trim();
     if (src.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Brak obrazka do podglądu.')),
+        const SnackBar(content: Text('❌ Brak obrazka do podglądu.')),
       );
       return;
     }
@@ -324,9 +365,13 @@ final ScrollController _leftPanelScroll = ScrollController();
         (payload['odp2'] as String).isEmpty ||
         (payload['odp3'] as String).isEmpty ||
         (payload['odp4'] as String).isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Uzupełnij treść i wszystkie odpowiedzi.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Uzupełnij treść i wszystkie odpowiedzi.'),
+          ),
+        );
+      }
       return;
     }
 
@@ -344,55 +389,65 @@ final ScrollController _leftPanelScroll = ScrollController();
 
       final body = jsonDecode(res.body);
       if (body is! Map || body['ok'] != true) {
-        throw body['error'] ?? 'Nieznany błąd serwera';
+        throw body['error'] ?? '❌ Nieznany błąd serwera!';
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ Pytanie dodane')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('✅ Pytanie zostało dodane.')));
+      }
 
-      // wyczyść formularz i odśwież listę
       _startNewQuestion();
       await _loadAll();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Błąd zapisu: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Błąd podczas zapisu pytania: $e')),
+        );
+      }
     }
   }
 
   Future<void> _deleteQuestion(int id) async {
-  try {
-    final uri = Uri.parse('https://interpage.pl/egzaminy/delete_question.php');
-    final res = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
-      },
-      body: jsonEncode({
-        'egzamin': _sanitizedTable(), // np. "elm05"
-        'id': id,
-      }),
-    );
+    try {
+      final uri = Uri.parse(
+        'https://interpage.pl/egzaminy/delete_question.php',
+      );
 
-    if (res.statusCode != 200) {
-      throw 'HTTP ${res.statusCode}: ${res.body}';
+      final res = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        },
+        body: jsonEncode({'egzamin': _sanitizedTable(), 'id': id}),
+      );
+
+      if (res.statusCode != 200) {
+        throw 'HTTP ${res.statusCode}: ${res.body}';
+      }
+
+      final body = jsonDecode(res.body);
+      if (body['ok'] != true) {
+        throw body['error'] ?? 'Błąd usuwania';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Pytanie zostało usunięte.')),
+        );
+      }
+
+      await _loadAll();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Błąd podczas usuwania pytania: $e')),
+        );
+      }
     }
-    final body = jsonDecode(res.body);
-    if (body['ok'] != true) throw body['error'] ?? 'Błąd usuwania';
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Pytanie usunięte')),
-    );
-    await _loadAll(); // odśwież listę
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('❌ Błąd usuwania: $e')),
-    );
   }
-}
-
 
   // ====== Render HTML ======
   Html _html(String html) {
@@ -403,9 +458,10 @@ final ScrollController _leftPanelScroll = ScrollController();
         "body": Style(color: Theme.of(context).colorScheme.onSurface),
         "b": Style(color: Theme.of(context).colorScheme.onSurface),
         "span": Style(
-          color: html.contains("style='color:green;'")
-              ? Colors.green
-              : Theme.of(context).colorScheme.onSurface,
+          color:
+              html.contains("style='color:green;'")
+                  ? Colors.green
+                  : Theme.of(context).colorScheme.onSurface,
         ),
       },
       extensions: [
@@ -422,27 +478,30 @@ final ScrollController _leftPanelScroll = ScrollController();
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 18),
               child: Builder(
-                builder: (context) => Center(
-                  child: Tooltip(
-                    message: 'Kliknij, aby powiększyć',
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: () => _showImageDialog(context, src),
-                        child: Image.network(
-                          src,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => Text(
-                            '❌ Nie udało się załadować obrazka',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.surface,
+                builder:
+                    (context) => Center(
+                      child: Tooltip(
+                        message: 'Kliknij, aby powiększyć',
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () => _showImageDialog(context, src),
+                            child: Image.network(
+                              src,
+                              fit: BoxFit.contain,
+                              errorBuilder:
+                                  (context, error, stackTrace) => Text(
+                                    '❌ Nie udało się załadować obrazka',
+                                    style: TextStyle(
+                                      color:
+                                          Theme.of(context).colorScheme.surface,
+                                    ),
+                                  ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
               ),
             );
           },
@@ -454,12 +513,15 @@ final ScrollController _leftPanelScroll = ScrollController();
   void _showImageDialog(BuildContext context, String imageUrl) {
     showGeneralDialog(
       context: context,
+
       barrierDismissible: true,
       barrierLabel: 'Zamknij',
+
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (context, a1, a2) {
         final screen = MediaQuery.of(context).size;
         bool isPressed = false;
+
         return StatefulBuilder(
           builder: (context, setState) {
             return GestureDetector(
@@ -472,12 +534,14 @@ final ScrollController _leftPanelScroll = ScrollController();
                       child: GestureDetector(
                         onTap: () {},
                         child: Listener(
-                          onPointerDown: (_) => setState(() => isPressed = true),
+                          onPointerDown:
+                              (_) => setState(() => isPressed = true),
                           onPointerUp: (_) => setState(() => isPressed = false),
                           child: MouseRegion(
-                            cursor: isPressed
-                                ? SystemMouseCursors.grabbing
-                                : SystemMouseCursors.grab,
+                            cursor:
+                                isPressed
+                                    ? SystemMouseCursors.grabbing
+                                    : SystemMouseCursors.grab,
                             child: InteractiveViewer(
                               panEnabled: true,
                               minScale: 0.5,
@@ -486,12 +550,16 @@ final ScrollController _leftPanelScroll = ScrollController();
                                 imageUrl,
                                 width: screen.width * 0.8,
                                 fit: BoxFit.contain,
-                                errorBuilder: (context, error, stack) => Text(
-                                  '❌ Nie udało się załadować obrazka',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.surface,
-                                  ),
-                                ),
+                                errorBuilder:
+                                    (context, error, stack) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.surface,
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -508,8 +576,12 @@ final ScrollController _leftPanelScroll = ScrollController();
                           color: Theme.of(context).colorScheme.surface,
                         ),
                         tooltip: 'Zamknij',
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
+                        onPressed:
+                            () =>
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop(),
                       ),
                     ),
                   ],
@@ -524,10 +596,13 @@ final ScrollController _leftPanelScroll = ScrollController();
 
   Widget _buildBadge(dynamic q) {
     final trudnosc = q['trudnosc'];
+
     final iloscOdp = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
     if (trudnosc == null || iloscOdp < 5) return const SizedBox.shrink();
 
-    final diff = (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0).toInt();
+    final diff =
+        (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0)
+            .toInt();
     final isTrudne = diff > 50;
 
     return Container(
@@ -547,22 +622,28 @@ final ScrollController _leftPanelScroll = ScrollController();
   List<dynamic> get _filteredQuestions {
     if (searchText.isEmpty) return questions;
     final q = searchText.toLowerCase();
+
     return questions.where((e) {
       final txt = (e['pytanie']?.toString() ?? '').toLowerCase();
       final a = (e['odp1']?.toString() ?? '').toLowerCase();
       final b = (e['odp2']?.toString() ?? '').toLowerCase();
       final c = (e['odp3']?.toString() ?? '').toLowerCase();
       final d = (e['odp4']?.toString() ?? '').toLowerCase();
-      return txt.contains(q) || a.contains(q) || b.contains(q) || c.contains(q) || d.contains(q);
+      return txt.contains(q) ||
+          a.contains(q) ||
+          b.contains(q) ||
+          c.contains(q) ||
+          d.contains(q);
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final leftPanel = _buildLeftPanel(context);
-    final rightList = isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : _buildList();
+    final rightList =
+        isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _buildList();
 
     return Scaffold(
       appBar: AppBar(
@@ -588,242 +669,248 @@ final ScrollController _leftPanelScroll = ScrollController();
   }
 
   Widget _buildLeftPanel(BuildContext context) {
-  final labelStyle = TextStyle(
-    fontWeight: FontWeight.w600,
-    color: Theme.of(context).colorScheme.onSurface,
-  );
+    final labelStyle = TextStyle(
+      fontWeight: FontWeight.w600,
+      color: Theme.of(context).colorScheme.onSurface,
+    );
 
-  // całość panelu jest skrolowana
-  return Container(
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    child: Scrollbar(
-      controller: _leftPanelScroll,
-      thumbVisibility: true, // w razie czego możesz wyłączyć
-      child: SingleChildScrollView(
+    // całość panelu jest skrolowana
+    return Container(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Scrollbar(
         controller: _leftPanelScroll,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- wszystko co miałeś dotąd w panelu ---
-            Text('🔎 Wyszukaj', style: labelStyle),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _textSearchCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Szukaj w treści/odpowiedziach',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
+        thumbVisibility: true, // w razie czego możesz wyłączyć
+        child: SingleChildScrollView(
+          controller: _leftPanelScroll,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- wszystko co miałeś dotąd w panelu ---
+              Text('🔎 Wyszukaj', style: labelStyle),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _textSearchCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Szukaj w treści/odpowiedziach',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: _applyTextFilter,
               ),
-              onChanged: _applyTextFilter,
-            ),
-            const SizedBox(height: 16),
-            Divider(color: Theme.of(context).dividerColor, height: 1),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+              Divider(color: Theme.of(context).dividerColor, height: 1),
+              const SizedBox(height: 16),
 
-            Row(
-              children: [
-                Text(
-                  editingId == null
-                      ? '➕ Dodaj nowe pytanie${_nextId != null ? ' (ID ${_nextId})' : ''}'
-                      : '✏️ Edytujesz ID $editingId',
-                  style: labelStyle,
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _startNewQuestion,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Nowe'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-          // ======= OBRAZEK (opcjonalnie – UI) =======
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).dividerColor),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Obrazek (opcjonalnie)', style: labelStyle),
-                const SizedBox(height: 8),
-
-                if (_imageBytes == null &&
-                    _uploadedImageUrl == null &&
-                    _imageCtrl.text.trim().isEmpty)
-                  Row(
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _pickImage,
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Wgraj obrazek'),
-                      ),
-                    ],
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.image,
-                              size: 18,
-                              color: Theme.of(context).colorScheme.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _uploadedImageUrl != null
-                                  ? 'Wgrano: $_uploadedImageUrl'
-                                  : (_imageName ?? 'Załadowany obrazek'),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (_isUploading)
-                            const SizedBox(
-                              width: 18, height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (_imageBytes != null && _uploadedImageUrl == null)
-                            ElevatedButton.icon(
-                              onPressed: _isUploading ? null : _uploadImage,
-                              icon: const Icon(Icons.cloud_upload),
-                              label: const Text('Wyślij na serwer'),
-                            ),
-                          OutlinedButton.icon(
-                            onPressed: _previewImage,
-                            icon: const Icon(Icons.visibility),
-                            label: const Text('Podgląd'),
-                          ),
-                          TextButton.icon(
-                            onPressed: _removeImage,
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Usuń'),
-                          ),
-                          TextButton.icon(
-                            onPressed: _pickImage,
-                            icon: const Icon(Icons.swap_horiz),
-                            label: const Text('Zmień plik'),
-                          ),
-                        ],
-                      ),
-                    ],
+              Row(
+                children: [
+                  Text(
+                    editingId == null
+                        ? '➕ Dodaj nowe pytanie${_nextId != null ? ' (ID $_nextId)' : ''}'
+                        : '✏️ Edytujesz ID $editingId',
+                    style: labelStyle,
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          TextField(
-            controller: _contentCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Treść pytania (HTML do flutter_html)',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 8,
-            minLines: 8,
-          ),
-          const SizedBox(height: 16),
-
-          // NOWE: opisy
-          TextField(
-            controller: _opisPoprawneCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Opis (dla poprawnej odpowiedzi) - opcjonalnie',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 4,
-            minLines: 3,
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _opisNiepoprawneCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Opis (dla niepoprawnej odpowiedzi) - opcjonalnie',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 4,
-            minLines: 3,
-          ),
-          const SizedBox(height: 24),
-
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _odp1Ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'Odpowiedź A',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _odp2Ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'Odpowiedź B',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _odp3Ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'Odpowiedź C',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _odp4Ctrl,
-                decoration: const InputDecoration(
-                  labelText: 'Odpowiedź D',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ],
-          ),
-
-          Row(
-            children: [
-              const Text('Poprawna:'),
-              const SizedBox(width: 8),
-              DropdownButton<String>(
-                value: _correct,
-                onChanged: (v) => setState(() => _correct = v ?? 'A'),
-                items: const [
-                  DropdownMenuItem(value: 'A', child: Text('A')),
-                  DropdownMenuItem(value: 'B', child: Text('B')),
-                  DropdownMenuItem(value: 'C', child: Text('C')),
-                  DropdownMenuItem(value: 'D', child: Text('D')),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _startNewQuestion,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Nowe'),
+                  ),
                 ],
               ),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: _saveQuestion,
-                icon: const Icon(Icons.save),
-                label: const Text('Zapisz'),
+              const SizedBox(height: 8),
+
+              // ======= OBRAZEK (opcjonalnie – UI) =======
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Obrazek (opcjonalnie)', style: labelStyle),
+                    const SizedBox(height: 8),
+
+                    if (_imageBytes == null &&
+                        _uploadedImageUrl == null &&
+                        _imageCtrl.text.trim().isEmpty)
+                      Row(
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _pickImage,
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Wgraj obrazek'),
+                          ),
+                        ],
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.image,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _uploadedImageUrl != null
+                                      ? 'Wgrano: $_uploadedImageUrl'
+                                      : (_imageName ?? 'Załadowany obrazek'),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (_isUploading)
+                                const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (_imageBytes != null &&
+                                  _uploadedImageUrl == null)
+                                ElevatedButton.icon(
+                                  onPressed: _isUploading ? null : _uploadImage,
+                                  icon: const Icon(Icons.cloud_upload),
+                                  label: const Text('Wyślij na serwer'),
+                                ),
+                              OutlinedButton.icon(
+                                onPressed: _previewImage,
+                                icon: const Icon(Icons.visibility),
+                                label: const Text('Podgląd'),
+                              ),
+                              TextButton.icon(
+                                onPressed: _removeImage,
+                                icon: const Icon(Icons.delete_outline),
+                                label: const Text('Usuń'),
+                              ),
+                              TextButton.icon(
+                                onPressed: _pickImage,
+                                icon: const Icon(Icons.swap_horiz),
+                                label: const Text('Zmień plik'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              TextField(
+                controller: _contentCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Treść pytania (HTML do flutter_html)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 8,
+                minLines: 8,
+              ),
+              const SizedBox(height: 16),
+
+              // NOWE: opisy
+              TextField(
+                controller: _opisPoprawneCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Opis (dla poprawnej odpowiedzi) - opcjonalnie',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 4,
+                minLines: 3,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _opisNiepoprawneCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Opis (dla niepoprawnej odpowiedzi) - opcjonalnie',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 4,
+                minLines: 3,
+              ),
+              const SizedBox(height: 24),
+
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _odp1Ctrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Odpowiedź A',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _odp2Ctrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Odpowiedź B',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _odp3Ctrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Odpowiedź C',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _odp4Ctrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Odpowiedź D',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ],
+              ),
+
+              Row(
+                children: [
+                  const Text('Poprawna:'),
+                  const SizedBox(width: 8),
+                  DropdownButton<String>(
+                    value: _correct,
+                    onChanged: (v) => setState(() => _correct = v ?? 'A'),
+                    items: const [
+                      DropdownMenuItem(value: 'A', child: Text('A')),
+                      DropdownMenuItem(value: 'B', child: Text('B')),
+                      DropdownMenuItem(value: 'C', child: Text('C')),
+                      DropdownMenuItem(value: 'D', child: Text('D')),
+                    ],
+                  ),
+                  const Spacer(),
+                  ElevatedButton.icon(
+                    onPressed: _saveQuestion,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Zapisz'),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-        ),
         ),
       ),
     );
@@ -867,8 +954,14 @@ final ScrollController _leftPanelScroll = ScrollController();
                     margin: const EdgeInsets.only(bottom: 6),
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 240, 240, 240),
-                        foregroundColor: Theme.of(context).colorScheme.onSurface,
+                        backgroundColor: const Color.fromARGB(
+                          255,
+                          240,
+                          240,
+                          240,
+                        ),
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onSurface,
                       ),
                       onPressed: null,
                       child: _html(odp ?? ""),
@@ -888,32 +981,48 @@ final ScrollController _leftPanelScroll = ScrollController();
                     ),
                     const SizedBox(width: 8),
                     TextButton.icon(
-                      onPressed: id == null
-                        ? null
-                        : () async {
-                            final ok = await showDialog<bool>(
-                              context: context,
-                              builder: (dialogCtx) => AlertDialog(
-                                title: const Text('Usuń pytanie'),
-                                content: Text('Na pewno chcesz usunąć pytanie ID $id?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(dialogCtx, false),
-                                    child: const Text('Anuluj'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () => Navigator.pop(dialogCtx, true),
-                                    child: const Text('Usuń'),
-                                  ),
-                                ],
-                              ),
-                            ) ?? false;
+                      onPressed:
+                          id == null
+                              ? null
+                              : () async {
+                                final ok =
+                                    await showDialog<bool>(
+                                      context: context,
+                                      builder:
+                                          (dialogCtx) => AlertDialog(
+                                            title: const Text('Usuń pytanie'),
+                                            content: Text(
+                                              'Na pewno chcesz usunąć pytanie ID $id?',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed:
+                                                    () => Navigator.pop(
+                                                      dialogCtx,
+                                                      false,
+                                                    ),
+                                                child: const Text('Anuluj'),
+                                              ),
+                                              FilledButton(
+                                                onPressed:
+                                                    () => Navigator.pop(
+                                                      dialogCtx,
+                                                      true,
+                                                    ),
+                                                child: const Text('Usuń'),
+                                              ),
+                                            ],
+                                          ),
+                                    ) ??
+                                    false;
 
-                            if (!mounted) return;        // ✅ po await
-                            if (ok) {
-                              await _deleteQuestion(id); // ✅ wywołanie po dialogu
-                            }
-                          },
+                                if (!mounted) return; // ✅ po await
+                                if (ok) {
+                                  await _deleteQuestion(
+                                    id,
+                                  ); // ✅ wywołanie po dialogu
+                                }
+                              },
 
                       icon: const Icon(Icons.delete_outline),
                       label: const Text('Usuń'),

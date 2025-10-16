@@ -77,7 +77,6 @@ class EgzaminWynikView extends StatelessWidget {
                             (_) => EgzaminPodgladView(
                               questions: questions,
                               selectedAnswers: selectedAnswers,
-                              //isDarkMode: isDarkMode,
                             ),
                       ),
                     );

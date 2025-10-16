@@ -107,11 +107,11 @@ class _MyHomePageState extends State<MyHomePage> {
     final prefs = await SharedPreferences.getInstance();
     final userName = prefs.getString('userName');
     final userEmail = prefs.getString('userEmail');
-
-    debugPrint(
-      'Checking login state: userName=$userName, userEmail=$userEmail',
-    );
-
+    if (kDebugMode) {
+      debugPrint(
+        'ℹ️ Sprawdzanie statusu logowania: userName=$userName, userEmail=$userEmail',
+      );
+    }
     setState(() {
       _isLoggedIn = userName != null && userEmail != null;
       if (_isLoggedIn) {
@@ -124,7 +124,11 @@ class _MyHomePageState extends State<MyHomePage> {
       await _verifyEmail(_userEmail!);
     }
 
-    debugPrint('After checking: _isLoggedIn=$_isLoggedIn, _isAdmin=$_isAdmin');
+    if (kDebugMode) {
+      debugPrint(
+        '📥 Zweryfikowano parametry - Czy użytkownik jest zalogowany: _isLoggedIn=$_isLoggedIn, Czy użytkownik jest adminem: _isAdmin=$_isAdmin',
+      );
+    }
   }
 
   Future<void> _verifyEmail(String email) async {
@@ -141,27 +145,37 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           _isAdmin = data['isValid'] == true;
         });
-        debugPrint('Email verification: _isAdmin set to $_isAdmin');
+        if (kDebugMode) {
+          debugPrint('✅ Weryfikacja email: _isAdmin ustawiony na $_isAdmin');
+        }
       } else {
         setState(() {
           _isAdmin = false;
         });
-        debugPrint('Email verification failed: ${response.statusCode}');
+        if (kDebugMode) {
+          debugPrint(
+            '❌ Weryfikacja email nie powiodła się: ${response.statusCode}',
+          );
+        }
       }
     } catch (e) {
       setState(() {
         _isAdmin = false;
       });
-      debugPrint('Error during email verification: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Błąd podczas weryfikacji email: $e');
+      }
     }
   }
 
   void _openStatistics(BuildContext context) {
     Future.delayed(Duration.zero, () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => StatisticsPage()),
-      );
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => StatisticsPage()),
+        );
+      }
     });
   }
 
@@ -176,9 +190,11 @@ class _MyHomePageState extends State<MyHomePage> {
       _userEmail = null;
       _isAdmin = false;
     });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Wylogowano')));
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Wylogowano')));
+    }
   }
 
   void _showProfilePopup(BuildContext context) {
@@ -250,12 +266,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 child: const Text('Personalizacja'),
                 onTap: () {
                   Future.delayed(Duration.zero, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PersonalisationPage(),
-                      ),
-                    );
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PersonalisationPage(),
+                        ),
+                      );
+                    }
                   });
                 },
               ),
@@ -339,15 +357,15 @@ class _MyHomePageState extends State<MyHomePage> {
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (value) {
-          _navigatorKey.currentState?.push(
+          _navigatorKey.currentState?.pushAndRemoveUntil(
             MaterialPageRoute(
               builder:
                   (context) => QualificationPage(
                     qualification: value,
                     isAdmin: _isAdmin, // ⬅️
-                    //isDarkMode: widget.isDarkMode,
                   ),
             ),
+            ModalRoute.withName('/home'),
           );
         },
         itemBuilder: (context) {
@@ -388,7 +406,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   (context) => QualificationPage(
                     qualification: title,
                     isAdmin: _isAdmin, // ⬅️
-                    //isDarkMode: widget.isDarkMode,
                   ),
             ),
           );
@@ -429,8 +446,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isAdmin: _isAdmin, 
-                                          //isDarkMode: widget.isDarkMode,
+                                          isAdmin: _isAdmin,
                                         ),
                                   ),
                                 );
@@ -633,15 +649,17 @@ class _MyHomePageState extends State<MyHomePage> {
         key: _navigatorKey,
         onGenerateRoute: (settings) {
           return MaterialPageRoute(
+            settings: const RouteSettings(name: '/home'),
             builder:
                 (context) => HomeContent(
-                  //isDarkMode: widget.isDarkMode,
                   onQualificationTap: (qualification) {
                     _navigatorKey.currentState?.push(
                       MaterialPageRoute(
                         builder:
-                            (context) =>
-                                QualificationPage(qualification: qualification, isAdmin: _isAdmin),
+                            (context) => QualificationPage(
+                              qualification: qualification,
+                              isAdmin: _isAdmin,
+                            ),
                       ),
                     );
                   },
@@ -856,7 +874,9 @@ Future<int?> fetchQuestionCount(String kwalifikacja) async {
       return data.length;
     }
   } catch (e) {
-    print('Błąd pobierania danych: $e');
+    if (kDebugMode) {
+      debugPrint('❌ Błąd podczas pobierania danych: $e');
+    }
   }
   return null;
 }

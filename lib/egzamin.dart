@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
@@ -47,33 +48,45 @@ class _EgzaminViewState extends State<EgzaminView> {
     final url = Uri.parse(
       'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
     );
-    try {
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
-        },
-      );
+    if (mounted) {
+      try {
+        final response = await http.get(
+          url,
+          headers: {
+            'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+          },
+        );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        final Map<String, double> map = {};
-        for (var entry in data) {
-          final key =
-              '${entry['pytanie_id']}_${entry['kwalifikacja'].toString().toLowerCase()}';
-          final trudnosc =
-              (entry['trudnosc'] is num)
-                  ? (entry['trudnosc'] as num).toDouble()
-                  : double.tryParse(entry['trudnosc'].toString()) ?? 0.0;
-          map[key] = trudnosc;
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+          final Map<String, double> map = {};
+
+          for (var entry in data) {
+            final key =
+                '${entry['pytanie_id']}_${entry['kwalifikacja'].toString().toLowerCase()}';
+
+            final trudnosc =
+                (entry['trudnosc'] is num)
+                    ? (entry['trudnosc'] as num).toDouble()
+                    : double.tryParse(entry['trudnosc'].toString()) ?? 0.0;
+            map[key] = trudnosc;
+          }
+          return map;
+        } else {
+          if (kDebugMode) {
+            debugPrint(
+              '❌ Błąd HTTP przy pobieraniu trudności: ${response.statusCode}',
+            );
+          }
+          return {};
         }
-        return map;
-      } else {
-        print('❌ Błąd HTTP przy pobieraniu trudności: ${response.statusCode}');
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('❌ Błąd połączenia: $e');
+        }
         return {};
       }
-    } catch (e) {
-      print('❌ Błąd połączenia: $e');
+    } else {
       return {};
     }
   }
@@ -120,8 +133,8 @@ class _EgzaminViewState extends State<EgzaminView> {
     final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
     try {
       final response = await http.get(url);
+
       if (response.statusCode == 200) {
-        // Zakładamy, że odpowiedź może być pusta lub nie w formacie JSON
         if (response.body.isNotEmpty) {
           final decoded = json.decode(response.body);
           if (decoded is List && decoded.isNotEmpty) {
@@ -141,7 +154,6 @@ class _EgzaminViewState extends State<EgzaminView> {
                 break;
             }
 
-            // Ustaw domyślną trudność
             final trudnosci = await fetchTrudnosciZdalnie();
             final kwalifikacja = widget.kwalifikacja.toLowerCase();
 
@@ -150,37 +162,48 @@ class _EgzaminViewState extends State<EgzaminView> {
               q['trudnosc'] = trudnosci[key] ?? 0.0;
             }
 
-            setState(() {
-              questions = selected;
-              selectedAnswers = List.filled(selected.length, null);
-              zapisanoOdpowiedz = List.filled(selected.length, false);
-              isLoading = false;
-              print(
-                'Załadowano ${questions.length} pytań z domyślną trudnością',
-              );
-            });
-            final trudnosciMap = await fetchAllTrudnosci(
-              widget.kwalifikacja.replaceAll(' ', ''),
-            );
+            if (mounted) {
+              setState(() {
+                questions = selected;
+                selectedAnswers = List.filled(selected.length, null);
+                zapisanoOdpowiedz = List.filled(selected.length, false);
+                isLoading = false;
+                if (kDebugMode) {
+                  debugPrint(
+                    '✅ Załadowano ${questions.length} pytań z domyślną trudnością',
+                  );
+                }
+              });
 
-            for (var q in questions) {
-              final id = int.tryParse(q['id'].toString());
-              if (id != null && trudnosciMap.containsKey(id)) {
-                q['trudnosc'] = trudnosciMap[id]?['trudnosc'] ?? 0.0;
-                q['ilosc_odpowiedzi'] =
-                    trudnosciMap[id]?['ilosc_odpowiedzi'] ?? 0;
+              final trudnosciMap = await fetchAllTrudnosci(
+                widget.kwalifikacja.replaceAll(' ', ''),
+              );
+
+              for (var q in questions) {
+                final id = int.tryParse(q['id'].toString());
+                if (id != null && trudnosciMap.containsKey(id)) {
+                  q['trudnosc'] = trudnosciMap[id]?['trudnosc'] ?? 0.0;
+                  q['ilosc_odpowiedzi'] =
+                      trudnosciMap[id]?['ilosc_odpowiedzi'] ?? 0;
+                }
               }
+              setState(() {}); // <- odświeża widok z uzupełnionymi danymi
             }
-            setState(() {}); // <- odświeża widok z uzupełnionymi danymi
           }
         } else {
-          print('Brak danych z API');
+          if (kDebugMode) {
+            debugPrint('❌ Brak danych z API!');
+          }
         }
       } else {
-        print('Błąd HTTP: ${response.statusCode}');
+        if (kDebugMode) {
+          debugPrint('❌ Kod błędu HTTP: ${response.statusCode}');
+        }
       }
     } catch (e) {
-      print("Błąd przy pobieraniu pytań: $e");
+      if (kDebugMode) {
+        debugPrint("❌ Błąd przy pobieraniu pytań: $e");
+      }
     }
   }
 
@@ -190,7 +213,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     required String dataCzas,
     required int czasTrwania,
   }) async {
-    // Use widget.userID if available, otherwise fall back to SharedPreferences
     String userName =
         widget.userName ??
         (await SharedPreferences.getInstance()).getString('userName') ??
@@ -213,9 +235,13 @@ class _EgzaminViewState extends State<EgzaminView> {
     );
 
     if (response.statusCode != 200) {
-      print('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
+      if (kDebugMode) {
+        debugPrint('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
+      }
     } else {
-      print('✅ Wynik zapisany dla userName: $userName');
+      if (kDebugMode) {
+        debugPrint('✅ Wynik zapisany dla userName: $userName');
+      }
     }
   }
 
@@ -243,11 +269,15 @@ class _EgzaminViewState extends State<EgzaminView> {
 
         return result;
       } else {
-        print('Błąd HTTP: ${response.statusCode}');
+        if (kDebugMode) {
+          debugPrint('❌ Kod błędu HTTP: ${response.statusCode}');
+        }
         return {};
       }
     } catch (e) {
-      print('❌ Błąd fetchAllTrudnosci: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Błąd fetchAllTrudnosci: $e');
+      }
       return {};
     }
   }
@@ -258,7 +288,11 @@ class _EgzaminViewState extends State<EgzaminView> {
     bool poprawna,
   ) async {
     if (pytanieId <= 0) {
-      print('❌ Pominięto zapis, niepoprawny pytanie_id: $pytanieId');
+      if (kDebugMode) {
+        debugPrint(
+          '❌ Pominięto zapis - wartość pytanie_id jest niepoprawna: $pytanieId',
+        );
+      }
       return;
     }
 
@@ -274,7 +308,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization':
-            'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^', // Taki sam token jak przy zapisie wyniku
+            'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
       },
       body: body,
     );
@@ -282,12 +316,20 @@ class _EgzaminViewState extends State<EgzaminView> {
     if (response.statusCode == 200) {
       try {
         final data = json.decode(response.body);
-        print('✅ Trudność zapisana: $data');
+        if (kDebugMode) {
+          debugPrint('✅ Trudność zapisana: $data');
+        }
       } catch (e) {
-        print('❌ Błąd parsowania odpowiedzi: $e');
+        if (kDebugMode) {
+          debugPrint('❌ Błąd parsowania odpowiedzi: $e');
+        }
       }
     } else {
-      print('❌ Błąd zapisu trudności: ${response.statusCode} ${response.body}');
+      if (kDebugMode) {
+        debugPrint(
+          '❌ Błąd zapisu trudności: ${response.statusCode} ${response.body}',
+        );
+      }
     }
   }
 
@@ -303,7 +345,9 @@ class _EgzaminViewState extends State<EgzaminView> {
       }
       return 0.0;
     } catch (e) {
-      print('Błąd pobierania trudności: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Błąd pobierania trudności: $e');
+      }
       return 0.0;
     }
   }
@@ -337,7 +381,6 @@ class _EgzaminViewState extends State<EgzaminView> {
           });
         });
       } else if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
-        // Zapamiętaj odpowiedź – potrzebne do późniejszego zapisu
         selectedAnswers[current] = answer;
       }
     });
@@ -463,9 +506,17 @@ class _EgzaminViewState extends State<EgzaminView> {
 
                               try {
                                 await Future.wait(futures);
-                                print('✅ Wszystkie trudności zapisane!');
+                                if (kDebugMode) {
+                                  debugPrint(
+                                    '✅ Trudność pytań została zapisana!',
+                                  );
+                                }
                               } catch (e) {
-                                print('❌ Błąd przy zapisie trudności: $e');
+                                if (kDebugMode) {
+                                  debugPrint(
+                                    '❌ Błąd przy zapisie trudności: $e',
+                                  );
+                                }
                               }
                             }
 
@@ -476,25 +527,25 @@ class _EgzaminViewState extends State<EgzaminView> {
                               czasTrwania: duration,
                             );
 
-                            if (!mounted) return;
                             setState(() => _isButtonDisabled = false);
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => EgzaminWynikView(
-                                      correctAnswers: correct,
-                                      totalQuestions: total,
-                                      questions: questions,
-                                      selectedAnswers: selectedAnswers,
-                                      returnToHome: true,
-                                    ),
-                                settings: const RouteSettings(
-                                  name: 'EgzaminWynikView',
+                            if (context.mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => EgzaminWynikView(
+                                        correctAnswers: correct,
+                                        totalQuestions: total,
+                                        questions: questions,
+                                        selectedAnswers: selectedAnswers,
+                                        returnToHome: true,
+                                      ),
+                                  settings: const RouteSettings(
+                                    name: 'EgzaminWynikView',
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
+                            }
                           },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -780,9 +831,8 @@ class _EgzaminViewState extends State<EgzaminView> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: buttonColor,
-                        /*foregroundColor:
-                            widget.isDarkMode ? Colors.white : Colors.black,
-                        */
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
                       ),
                       onPressed: () {
                         setState(() {
