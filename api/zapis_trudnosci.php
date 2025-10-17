@@ -103,7 +103,7 @@ while ($row = $result->fetch_assoc()) {
 
 echo json_encode($questions);
 $stmt->close();
-}  else { header('Content-Type: text/html; charset=UTF-8'); ?>
+}  else { header('Content-Type: text/html; charset=UTF-8'); header('Content-Type: application/json');; ?>
      <?php $result = $conn->query("SELECT pt.pytanie_id, pt.kwalifikacja, pt.ilosc_odpowiedzi, pt.ilosc_poprawnych_odpowiedzi, IF(pt.ilosc_odpowiedzi > 0, (pt.ilosc_poprawnych_odpowiedzi / pt.ilosc_odpowiedzi * 100), 0) AS trudnosc FROM pytania_trudnosc pt ORDER BY trudnosc ASC");
 
 
