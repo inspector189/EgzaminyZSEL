@@ -346,68 +346,126 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       s.replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
   Future<void> _saveQuestion() async {
-    // (Na razie) obrazek pomijamy w zapisie nowego pytania – backend dodamy później.
-    final payload = {
-      'egzamin': _sanitizedTable(),
-      'pytanie': _sanitizeForDb(_contentCtrl.text.trim()),
-      'odp1': _sanitizeForDb(_odp1Ctrl.text.trim()),
-      'odp2': _sanitizeForDb(_odp2Ctrl.text.trim()),
-      'odp3': _sanitizeForDb(_odp3Ctrl.text.trim()),
-      'odp4': _sanitizeForDb(_odp4Ctrl.text.trim()),
-      'poprawna': _correct,
-      'opisPoprawne': _sanitizeForDb(_opisPoprawneCtrl.text.trim()),
-      'opisNiepoprawne': _sanitizeForDb(_opisNiepoprawneCtrl.text.trim()),
-    };
+  // 1) Walidacja pól
+  final pyt = _contentCtrl.text.trim();
+  final a = _odp1Ctrl.text.trim();
+  final b = _odp2Ctrl.text.trim();
+  final c = _odp3Ctrl.text.trim();
+  final d = _odp4Ctrl.text.trim();
 
-    // Walidacja
-    if ((payload['pytanie'] as String).isEmpty ||
-        (payload['odp1'] as String).isEmpty ||
-        (payload['odp2'] as String).isEmpty ||
-        (payload['odp3'] as String).isEmpty ||
-        (payload['odp4'] as String).isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Uzupełnij treść i wszystkie odpowiedzi.'),
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      final uri = Uri.parse('https://interpage.pl/egzaminy/add_question.php');
-      final res = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json; charset=utf-8'},
-        body: jsonEncode(payload),
-      );
-
-      if (res.statusCode != 200) {
-        throw 'HTTP ${res.statusCode}: ${res.body}';
-      }
-
-      final body = jsonDecode(res.body);
-      if (body is! Map || body['ok'] != true) {
-        throw body['error'] ?? '❌ Nieznany błąd serwera!';
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('✅ Pytanie zostało dodane.')));
-      }
-
-      _startNewQuestion();
-      await _loadAll();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd podczas zapisu pytania: $e')),
-        );
-      }
-    }
+  if (pyt.isEmpty || a.isEmpty || b.isEmpty || c.isEmpty || d.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Uzupełnij treść i wszystkie odpowiedzi.')),
+    );
+    return;
   }
+
+  // 2) (opcjonalnie) upload obrazu dopiero teraz
+  String? imageUrl;
+if (_imageBytes != null && _imageBytes!.isNotEmpty) {
+  try {
+    final uri = Uri.parse('https://interpage.pl/egzaminy/upload_image_next.php');
+
+    // wykrycie rozszerzenia -> typ MIME
+    String ext = (_imageName ?? 'jpg').split('.').last.toLowerCase();
+    if (ext.isEmpty) ext = 'jpg';
+    final mediaType = http_parser.MediaType('image', ext == 'jpg' ? 'jpeg' : ext);
+
+    final req = http.MultipartRequest('POST', uri)
+  ..headers['Authorization'] = 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+  ..headers['X-API-Key']     = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+  ..headers['Accept']        = 'application/json'
+  // ⬇️ WYŚLIJ OBA POLA
+  ..fields['kwalifikacja']   = _sanitizedTable()   // np. "inf03"
+  ..fields['egzamin']        = _sanitizedTable()   // kompatybilność z inną wersją PHP
+  ..files.add(
+    http.MultipartFile.fromBytes(
+      'file',
+      _imageBytes!,
+      filename: _imageName ?? 'upload.$ext',
+      contentType: mediaType,
+    ),
+  );
+
+
+    final streamed = await req.send();
+    final res = await http.Response.fromStream(streamed);
+    if (res.statusCode != 200) {
+      throw 'Upload HTTP ${res.statusCode}: ${res.body}';
+    }
+    final data = jsonDecode(res.body);
+    if (data['ok'] != true || data['url'] == null) {
+      throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
+    }
+
+    imageUrl = data['url'] as String; // np. https://interpage.pl/egzaminy/inf03/obrazy/image123.jpg
+    setState(() => _uploadedImageUrl = imageUrl);
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('❌ Błąd uploadu obrazka: $e')),
+    );
+    return;
+  }
+}
+
+  // 3) zbuduj treść HTML z <style> i <img> (jeśli jest obraz)
+  const style = '<style>img{display:block;max-width:100%;height:auto;margin:12px auto;}</style>';
+final sanitizedContent = _sanitizeForDb(pyt); // tylko < i > wewnątrz treści
+String finalHtml = '$style$sanitizedContent';
+if (imageUrl != null && imageUrl!.isNotEmpty) {
+  finalHtml += ' <img alt="" src="$imageUrl"/>';
+}
+
+
+  // 4) wyślij pytanie do add_question.php
+  final payload = {
+    'egzamin': _sanitizedTable(),
+    'pytanie': finalHtml, // już zawiera style + ewentualny <img>
+    'odp1': _sanitizeForDb(a),
+    'odp2': _sanitizeForDb(b),
+    'odp3': _sanitizeForDb(c),
+    'odp4': _sanitizeForDb(d),
+    'poprawna': _correct,
+    'opisPoprawne': _sanitizeForDb(_opisPoprawneCtrl.text.trim()),
+    'opisNiepoprawne': _sanitizeForDb(_opisNiepoprawneCtrl.text.trim()),
+  };
+
+  try {
+    final uri = Uri.parse('https://interpage.pl/egzaminy/add_question.php');
+    final res = await http.post(
+      Uri.parse('https://interpage.pl/egzaminy/add_question.php'),
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(payload),
+    );
+
+
+    if (res.statusCode != 200) {
+      throw 'HTTP ${res.statusCode}: ${res.body}';
+    }
+    final body = jsonDecode(res.body);
+    if (body is! Map || body['ok'] != true) {
+      throw body['error'] ?? 'Nieznany błąd serwera';
+    }
+
+    final int? newId = (body['id'] is int) ? body['id'] as int : int.tryParse('${body['id']}');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ Pytanie dodane (ID ${newId ?? '—'})')),
+    );
+
+    _startNewQuestion();
+    await _loadAll();
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('❌ Błąd zapisu: $e')),
+    );
+  }
+}
+
 
   Future<void> _deleteQuestion(int id) async {
     try {
@@ -416,13 +474,16 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       );
 
       final res = await http.post(
-        uri,
+        Uri.parse('https://interpage.pl/egzaminy/delete_question.php'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json',
           'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+          'X-API-Key': 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
         },
         body: jsonEncode({'egzamin': _sanitizedTable(), 'id': id}),
       );
+
 
       if (res.statusCode != 200) {
         throw 'HTTP ${res.statusCode}: ${res.body}';
@@ -620,22 +681,27 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   // ====== Widok ======
   List<dynamic> get _filteredQuestions {
-    if (searchText.isEmpty) return questions;
-    final q = searchText.toLowerCase();
+  if (searchText.isEmpty) return questions;
+  final q = searchText.toLowerCase();
 
-    return questions.where((e) {
-      final txt = (e['pytanie']?.toString() ?? '').toLowerCase();
-      final a = (e['odp1']?.toString() ?? '').toLowerCase();
-      final b = (e['odp2']?.toString() ?? '').toLowerCase();
-      final c = (e['odp3']?.toString() ?? '').toLowerCase();
-      final d = (e['odp4']?.toString() ?? '').toLowerCase();
-      return txt.contains(q) ||
-          a.contains(q) ||
-          b.contains(q) ||
-          c.contains(q) ||
-          d.contains(q);
-    }).toList();
-  }
+  return questions.where((e) {
+    // --- istniejące pola ---
+    final txt = (e['pytanie']?.toString() ?? '').toLowerCase();
+    final a = (e['odp1']?.toString() ?? '').toLowerCase();
+    final b = (e['odp2']?.toString() ?? '').toLowerCase();
+    final c = (e['odp3']?.toString() ?? '').toLowerCase();
+    final d = (e['odp4']?.toString() ?? '').toLowerCase();
+
+    // --- NOWE: wyszukiwanie po ID ---
+    final idStr = (e['id']?.toString() ?? '').toLowerCase();
+
+    // dopasowanie jeśli ID dokładnie zawiera wpisany ciąg
+    final matchId = idStr.contains(q);
+
+    return matchId || txt.contains(q) || a.contains(q) || b.contains(q) || c.contains(q) || d.contains(q);
+  }).toList();
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -692,7 +758,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               TextField(
                 controller: _textSearchCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Szukaj w treści/odpowiedziach',
+                  labelText: 'Szukaj w treści/odpowiedziach/ID',
                   prefixIcon: Icon(Icons.search),
                   border: OutlineInputBorder(),
                   isDense: true,
@@ -782,13 +848,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              if (_imageBytes != null &&
-                                  _uploadedImageUrl == null)
-                                ElevatedButton.icon(
-                                  onPressed: _isUploading ? null : _uploadImage,
-                                  icon: const Icon(Icons.cloud_upload),
-                                  label: const Text('Wyślij na serwer'),
-                                ),
+
                               OutlinedButton.icon(
                                 onPressed: _previewImage,
                                 icon: const Icon(Icons.visibility),
@@ -816,7 +876,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               TextField(
                 controller: _contentCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Treść pytania (HTML do flutter_html)',
+                  labelText: 'Treść pytania',
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 8,
