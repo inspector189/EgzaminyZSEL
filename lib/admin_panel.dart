@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_html/flutter_html.dart';
 
+const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+
 class AdminPanelPage extends StatelessWidget {
   final bool isDarkMode;
 
@@ -93,7 +95,10 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
     try {
       final response = await http.get(
         Uri.parse('https://interpage.pl/egzaminy/showAdmins.php'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
       );
       if (kDebugMode) {
         debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
@@ -161,7 +166,10 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
     try {
       final response = await http.post(
         Uri.parse('https://interpage.pl/egzaminy/add_admin.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Bearer $_apiKey',
+        },
         body: {'email': email},
       );
       if (kDebugMode) {
@@ -199,7 +207,10 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
     try {
       final response = await http.post(
         Uri.parse('https://interpage.pl/egzaminy/delete_admin.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Bearer $_apiKey',
+        },
         body: {'id': id.toString()},
       );
       if (kDebugMode) {

@@ -29,6 +29,9 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  universal_html: ^2.2.4
+  video_player: ^2.9.1
+  chewie: ^1.7.5
   file_selector: ^1.0.3
   flutter:
     sdk: flutter
