@@ -9,20 +9,20 @@ class PersonalisationPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
-    final colors = [
-      Colors.red,
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.purple,
-      Colors.teal,
-      Colors.pink,
-    ];
+    final colorMap = {
+      Colors.red: Colors.redAccent,
+      Colors.blue: Colors.blueAccent,
+      Colors.green: Colors.greenAccent,
+      Colors.orange: Colors.orangeAccent,
+      Colors.purple: Colors.purpleAccent,
+      Colors.teal: Colors.tealAccent,
+      Colors.pink: Colors.pinkAccent,
+    };
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Personalizacja motywu'),
-        backgroundColor: themeProvider.accentColor,
+        backgroundColor: themeProvider.primaryColor,
       ),
       body: Center(
         child: Padding(
@@ -40,27 +40,32 @@ class PersonalisationPage extends StatelessWidget {
                 spacing: 20,
                 runSpacing: 20,
                 alignment: WrapAlignment.center,
-                children: colors.map((color) {
-                  return GestureDetector(
-                    onTap: () {
-                      themeProvider.setAccentColor(color);
-                    },
-                    child: Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: themeProvider.accentColor == color
-                              ? Colors.black
-                              : Colors.transparent,
-                          width: 4,
+                children:
+                    colorMap.keys.map((primaryColor) {
+                      return GestureDetector(
+                        onTap: () {
+                          themeProvider.setAccentColor(
+                            primaryColor,
+                            colorMap[primaryColor]!,
+                          );
+                        },
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            color: primaryColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color:
+                                  themeProvider.primaryColor == primaryColor
+                                      ? Colors.black
+                                      : Colors.transparent,
+                              width: 4,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
               ),
             ],
           ),

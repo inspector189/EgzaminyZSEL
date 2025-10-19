@@ -11,7 +11,6 @@ import 'package:chewie/chewie.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-/// UŻYJ universal_html, żeby nie psuć buildu poza web:
 import 'package:universal_html/html.dart' as html;
 import 'dart:async';
 
@@ -67,16 +66,17 @@ class EditQuestionsPage extends StatefulWidget {
   @override
   State<EditQuestionsPage> createState() => _EditQuestionsPageState();
 }
+
 class _InlineVideoPlayer extends StatefulWidget {
+  const _InlineVideoPlayer({this.url, this.filePath, this.blobUrl, this.height})
+    : assert(
+        url != null || filePath != null || blobUrl != null,
+        'Podaj url, filePath albo blobUrl (co najmniej jedno)',
+      );
 
-  
-  const _InlineVideoPlayer({this.url, this.filePath, this.blobUrl, this.height, super.key})
-      : assert(url != null || filePath != null || blobUrl != null,
-            'Podaj url, filePath albo blobUrl (co najmniej jedno)');
-
-  final String? url;       // https://...
-  final String? filePath;  // ścieżka lokalna (mobile/desktop)
-  final String? blobUrl;   // blob:... (web)
+  final String? url;
+  final String? filePath;
+  final String? blobUrl;
   final double? height;
 
   @override
@@ -99,22 +99,25 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
         _vp = VideoPlayerController.networkUrl(Uri.parse(src));
       }
 
-      _vp!.initialize().then((_) {
-        if (!mounted) return;
-        _chewie = ChewieController(
-          videoPlayerController: _vp!,
-          autoInitialize: true,
-          autoPlay: false,
-          looping: false,
-          showControls: true,
-          allowMuting: true,
-          allowFullScreen: true,
-          allowPlaybackSpeedChanging: true,
-        );
-        setState(() {});
-      }).catchError((_) {
-        if (mounted) setState(() => _initError = true);
-      });
+      _vp!
+          .initialize()
+          .then((_) {
+            if (!mounted) return;
+            _chewie = ChewieController(
+              videoPlayerController: _vp!,
+              autoInitialize: true,
+              autoPlay: false,
+              looping: false,
+              showControls: true,
+              allowMuting: true,
+              allowFullScreen: true,
+              allowPlaybackSpeedChanging: true,
+            );
+            setState(() {});
+          })
+          .catchError((_) {
+            if (mounted) setState(() => _initError = true);
+          });
     } catch (_) {
       _initError = true;
     }
@@ -127,18 +130,24 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
     super.dispose();
   }
 
-   @override
+  @override
   Widget build(BuildContext context) {
     if (_initError || _vp == null) {
-      return Text('❌ Nie udało się zainicjalizować wideo.',
-          style: TextStyle(color: Theme.of(context).colorScheme.surface));
+      return Text(
+        '❌ Nie udało się zainicjalizować wideo.',
+        style: TextStyle(color: Theme.of(context).colorScheme.surface),
+      );
     }
     if (_chewie == null || !_vp!.value.isInitialized) {
-      return const SizedBox(height: 160, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+      return const SizedBox(
+        height: 160,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
     }
 
     final h = widget.height;
-    final aspect = _vp!.value.aspectRatio == 0 ? 16 / 9 : _vp!.value.aspectRatio;
+    final aspect =
+        _vp!.value.aspectRatio == 0 ? 16 / 9 : _vp!.value.aspectRatio;
 
     Widget player = Chewie(controller: _chewie!);
     if (h != null) {
@@ -166,74 +175,75 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
       child: player,
     );
   }
-
 }
 
 class _EditQuestionsPageState extends State<EditQuestionsPage> {
+  String _lastPreviewSignature = '';
 
-String _lastPreviewSignature = '';
+  String _currentMediaSignature() {
+    // Co wpływa na wygląd podglądu mediów:
+    // - rodzaj media (none/image/video)
+    // - źródło obrazka (URL / dataURI) lub nazwa+rozmiar w bajtach
+    // - źródło filmu (URL) lub nazwa+rozmiar w bajtach
+    // - aktualna wysokość (px)
+    final kind = _mediaKind.name;
 
-String _currentMediaSignature() {
-  // Co wpływa na wygląd podglądu mediów:
-  // - rodzaj media (none/image/video)
-  // - źródło obrazka (URL / dataURI) lub nazwa+rozmiar w bajtach
-  // - źródło filmu (URL) lub nazwa+rozmiar w bajtach
-  // - aktualna wysokość (px)
-  final kind = _mediaKind.name;
+    final imgUrl = (_uploadedImageUrl ?? _imageCtrl.text.trim());
+    final imgBytesSig =
+        (_imageBytes != null && _imageBytes!.isNotEmpty)
+            ? '${_imageName ?? ''}|${_imageBytes!.length}'
+            : '';
 
-  final imgUrl = (_uploadedImageUrl ?? _imageCtrl.text.trim());
-  final imgBytesSig = (_imageBytes != null && _imageBytes!.isNotEmpty)
-      ? '${_imageName ?? ''}|${_imageBytes!.length}'
-      : '';
+    final vidUrl = _uploadedVideoUrl ?? '';
+    final vidBytesSig =
+        (_videoBytes != null && _videoBytes!.isNotEmpty)
+            ? '${_videoName ?? ''}|${_videoBytes!.length}'
+            : '';
 
-  final vidUrl = _uploadedVideoUrl ?? '';
-  final vidBytesSig = (_videoBytes != null && _videoBytes!.isNotEmpty)
-      ? '${_videoName ?? ''}|${_videoBytes!.length}'
-      : '';
+    final height = _imageHeightPx?.toString() ?? '';
 
-  final height = _imageHeightPx?.toString() ?? '';
-
-  // To wystarczy, by wychwycić: zamianę typu, podmianę pliku/URL, usunięcie,
-  // i zmianę wysokości.
-  return [kind, imgUrl, imgBytesSig, vidUrl, vidBytesSig, height].join('::');
-}
+    // To wystarczy, by wychwycić: zamianę typu, podmianę pliku/URL, usunięcie,
+    // i zmianę wysokości.
+    return [kind, imgUrl, imgBytesSig, vidUrl, vidBytesSig, height].join('::');
+  }
 
   // ====== WEB/MOBILE helpers dla lokalnego wideo ======
-  String? _tempVideoPath;   // ścieżka pliku tymczasowego (mobile/desktop)
-  String? _webBlobUrl;      // blob:... (web)
+  String? _tempVideoPath; // ścieżka pliku tymczasowego (mobile/desktop)
+  String? _webBlobUrl; // blob:... (web)
   Timer? _previewDebounce;
 
-    void _refreshTextPreview() {
-  if (_showPreview && mounted) setState(() {});
-}
-void _refreshIfPreview({bool immediate = false}) {
-
-  if (!_showPreview) return;
-
-  final newSig = _currentMediaSignature();
-  if (newSig == _lastPreviewSignature) {
-    // Nic się nie zmieniło w mediach — nie przeładowuj podglądu.
-    return;
+  void _refreshTextPreview() {
+    if (_showPreview && mounted) setState(() {});
   }
-  _lastPreviewSignature = newSig;
 
-  if (immediate) {
-    if (mounted) setState(() {});
-    return;
+  void _refreshIfPreview({bool immediate = false}) {
+    if (!_showPreview) return;
+
+    final newSig = _currentMediaSignature();
+    if (newSig == _lastPreviewSignature) {
+      // Nic się nie zmieniło w mediach — nie przeładowuj podglądu.
+      return;
+    }
+    _lastPreviewSignature = newSig;
+
+    if (immediate) {
+      if (mounted) setState(() {});
+      return;
+    }
+    _previewDebounce?.cancel();
+    _previewDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      // Utrzymaj spójność, jeśli w międzyczasie zaszła kolejna zmiana.
+      if (_currentMediaSignature() != _lastPreviewSignature) return;
+      setState(() {});
+    });
   }
-  _previewDebounce?.cancel();
-  _previewDebounce = Timer(const Duration(milliseconds: 300), () {
-    if (!mounted) return;
-    // Utrzymaj spójność, jeśli w międzyczasie zaszła kolejna zmiana.
-    if (_currentMediaSignature() != _lastPreviewSignature) return;
-    setState(() {});
-  });
-}
-
 
   void _revokeWebBlobUrl() {
     if (kIsWeb && _webBlobUrl != null) {
-      try { html.Url.revokeObjectUrl(_webBlobUrl!); } catch (_) {}
+      try {
+        html.Url.revokeObjectUrl(_webBlobUrl!);
+      } catch (_) {}
       _webBlobUrl = null;
     }
   }
@@ -246,8 +256,8 @@ void _refreshIfPreview({bool immediate = false}) {
       final ext = (_videoName?.split('.').last.toLowerCase() ?? 'mp4');
       final mime = switch (ext) {
         'webm' => 'video/webm',
-        'ogg'  => 'video/ogg',
-        _      => 'video/mp4',
+        'ogg' => 'video/ogg',
+        _ => 'video/mp4',
       };
       final blob = html.Blob([_videoBytes!], mime);
       _webBlobUrl = html.Url.createObjectUrlFromBlob(blob);
@@ -256,7 +266,9 @@ void _refreshIfPreview({bool immediate = false}) {
       final dir = await getTemporaryDirectory();
       final ext = (_videoName?.split('.').last.toLowerCase() ?? 'mp4')
           .replaceAll(RegExp(r'[^a-z0-9]'), '');
-      final file = File('${dir.path}/editq_local_preview.${ext.isEmpty ? 'mp4' : ext}');
+      final file = File(
+        '${dir.path}/editq_local_preview.${ext.isEmpty ? 'mp4' : ext}',
+      );
       await file.writeAsBytes(_videoBytes!, flush: true);
       _tempVideoPath = file.path;
       return _tempVideoPath;
@@ -276,7 +288,7 @@ void _refreshIfPreview({bool immediate = false}) {
 
   // ====== stałe i pomocniki dla trybu edycji ======
   static const _kStyleTag =
-      '<style>img,video{display:block;max-width:100%;height:auto;margin:12px auto;}</style>';
+      '<style>img, video { display: block; max-width: 100%; height: auto; }</style>';
   static final _kStyleTagEsc = const HtmlEscape().convert(_kStyleTag);
 
   static final _imgTagRawRe = RegExp(
@@ -299,35 +311,44 @@ void _refreshIfPreview({bool immediate = false}) {
     dotAll: true,
   );
 
-String _stripStyleAndImage(String html) {
-  var out = html;
+  String _stripStyleAndImage(String html) {
+    var out = html;
 
-  // 1) usuń DOWOLNY <style>…</style> (także z atrybutami) + wersję escaped
-  out = out.replaceAll(
-    RegExp(r'<style\b[^>]*>.*?<\/style>', caseSensitive: false, dotAll: true),
-    '',
-  );
-  out = out.replaceAll(
-    RegExp(r'&lt;style\b[^&]*&gt;.*?&lt;\/style&gt;', caseSensitive: false, dotAll: true),
-    '',
-  );
+    // 1) usuń DOWOLNY <style>…</style> (także z atrybutami) + wersję escaped
+    out = out.replaceAll(
+      RegExp(r'<style\b[^>]*>.*?<\/style>', caseSensitive: false, dotAll: true),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(
+        r'&lt;style\b[^&]*&gt;.*?&lt;\/style&gt;',
+        caseSensitive: false,
+        dotAll: true,
+      ),
+      '',
+    );
 
-  // 2) usuń nasze media (raw i escaped)
-  out = out.replaceAll(_imgTagRawRe, '');
-  out = out.replaceAll(_imgTagEscRe, '');
-  out = out.replaceAll(_videoTagRawRe, '');
-  out = out.replaceAll(_videoTagEscRe, '');
+    // 2) usuń nasze media (raw i escaped)
+    out = out.replaceAll(_imgTagRawRe, '');
+    out = out.replaceAll(_imgTagEscRe, '');
+    out = out.replaceAll(_videoTagRawRe, '');
+    out = out.replaceAll(_videoTagEscRe, '');
 
-  // 3) oczyść nadmiarowe <br> / &nbsp; na krawędziach
-  out = out.replaceAll(RegExp(r'(<br\s*\/?>|\s|&nbsp;)+$', caseSensitive: false), '');
-  out = out.replaceAll(RegExp(r'^(<br\s*\/?>|\s|&nbsp;)+', caseSensitive: false), '');
+    // 3) oczyść nadmiarowe <br> / &nbsp; na krawędziach
+    out = out.replaceAll(
+      RegExp(r'(<br\s*\/?>|\s|&nbsp;)+$', caseSensitive: false),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(r'^(<br\s*\/?>|\s|&nbsp;)+', caseSensitive: false),
+      '',
+    );
 
-  // 4) skompresuj białe znaki
-  out = out.replaceAll(RegExp(r'\s+'), ' ').trim();
+    // 4) skompresuj białe znaki
+    out = out.replaceAll(RegExp(r'\s+'), ' ').trim();
 
-  return out;
-}
-
+    return out;
+  }
 
   String _unescapeLtGt(String s) =>
       s.replaceAll('&lt;', '<').replaceAll('&gt;', '>');
@@ -351,11 +372,12 @@ String _stripStyleAndImage(String html) {
   }
 
   int? get _nextId {
-    final ids = questions
-        .map((q) => int.tryParse(q['id']?.toString() ?? ''))
-        .where((v) => v != null)
-        .cast<int>()
-        .toList();
+    final ids =
+        questions
+            .map((q) => int.tryParse(q['id']?.toString() ?? ''))
+            .where((v) => v != null)
+            .cast<int>()
+            .toList();
     if (ids.isEmpty) return 1;
     ids.sort();
     return ids.last + 1;
@@ -455,14 +477,18 @@ String _stripStyleAndImage(String html) {
     } catch (e) {
       setState(() => isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Błąd ładowania: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Błąd ładowania: $e')));
       }
     }
   }
 
   String _sanitizedTable() =>
-      widget.qualification.replaceAll('.', '').replaceAll(' ', '').toLowerCase();
+      widget.qualification
+          .replaceAll('.', '')
+          .replaceAll(' ', '')
+          .toLowerCase();
 
   Future<List<dynamic>> _fetchQuestions(String kval) async {
     final url = Uri.parse('https://interpage.pl/egzaminy/$kval.php');
@@ -476,41 +502,41 @@ String _stripStyleAndImage(String html) {
   }
 
   Future<Map<int, Map<String, dynamic>>> _fetchAllTrudnosci() async {
-  final url = Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php');
-  final res = await http.get(url);
+    final url = Uri.parse(
+      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
+    );
+    final res = await http.get(url);
 
-  if (res.statusCode != 200) return {};
+    if (res.statusCode != 200) return {};
 
-  final String kval = _sanitizedTable(); // np. "inf03"
-  final List<dynamic> jsonList = json.decode(res.body);
-  final Map<int, Map<String, dynamic>> result = {};
+    final String kval = _sanitizedTable(); // np. "inf03"
+    final List<dynamic> jsonList = json.decode(res.body);
+    final Map<int, Map<String, dynamic>> result = {};
 
-  for (final item in jsonList) {
-    // filtr po kwalifikacji (bez spacji, małe litery – tak samo jak _sanitizedTable)
-    final String itemKval = (item['kwalifikacja'] ?? '')
-        .toString()
-        .replaceAll(' ', '')
-        .toLowerCase();
-    if (itemKval != kval) continue;
+    for (final item in jsonList) {
+      // filtr po kwalifikacji (bez spacji, małe litery – tak samo jak _sanitizedTable)
+      final String itemKval =
+          (item['kwalifikacja'] ?? '')
+              .toString()
+              .replaceAll(' ', '')
+              .toLowerCase();
+      if (itemKval != kval) continue;
 
-    final int? id = int.tryParse('${item['pytanie_id']}');
-    if (id == null) continue;
+      final int? id = int.tryParse('${item['pytanie_id']}');
+      if (id == null) continue;
 
-    final double trud = (item['trudnosc'] is num)
-        ? (item['trudnosc'] as num).toDouble()
-        : double.tryParse('${item['trudnosc']}') ?? 0.0;
+      final double trud =
+          (item['trudnosc'] is num)
+              ? (item['trudnosc'] as num).toDouble()
+              : double.tryParse('${item['trudnosc']}') ?? 0.0;
 
-    final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
+      final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
 
-    result[id] = {
-      'trudnosc': trud,
-      'ilosc_odpowiedzi': ilosc,
-    };
+      result[id] = {'trudnosc': trud, 'ilosc_odpowiedzi': ilosc};
+    }
+
+    return result;
   }
-
-  return result;
-}
-
 
   // ====== wyszukiwarka ======
   void _applyTextFilter(String value) {
@@ -613,7 +639,10 @@ String _stripStyleAndImage(String html) {
     if (tagEnd == -1) return null;
     final tag = html.substring(tagStart, tagEnd + 1);
 
-    final styleRe = RegExp(r'''style\s*=\s*["']([^"']+)["']''', caseSensitive: false);
+    final styleRe = RegExp(
+      r'''style\s*=\s*["']([^"']+)["']''',
+      caseSensitive: false,
+    );
     final styleMatch = styleRe.firstMatch(tag);
     if (styleMatch == null) return null;
     final style = styleMatch.group(1)!;
@@ -632,51 +661,14 @@ String _stripStyleAndImage(String html) {
     if (idx == -1) return null;
     final srcIdx = html.indexOf('src=', idx);
     if (srcIdx == -1) return null;
-    final quote = html.contains('src="') ? '"' : (html.contains("src='") ? "'" : '"');
+    final quote =
+        html.contains('src="') ? '"' : (html.contains("src='") ? "'" : '"');
     final qIdx = html.indexOf('src=$quote', idx);
     if (qIdx == -1) return null;
     final start = qIdx + 5;
     final end = html.indexOf(quote, start);
     if (end == -1) return null;
     return html.substring(start, end);
-  }
-
-  // ====== HTML podgląd ======
-  String _buildPreviewHtml() {
-    final escapedBody = _escapeLtGt(_contentCtrl.text.trim());
-    String mediaPart = '';
-
-    if (_mediaKind == MediaKind.image) {
-      String? imgSrc;
-      if ((_uploadedImageUrl ?? '').isNotEmpty) {
-        imgSrc = _uploadedImageUrl!;
-      } else if (_imageCtrl.text.trim().isNotEmpty) {
-        imgSrc = _imageCtrl.text.trim();
-      } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
-        final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
-        final mime = (ext == 'jpg') ? 'jpeg' : ext;
-        imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
-      }
-      final h = _imageHeightPx;
-      mediaPart = (imgSrc == null)
-          ? ''
-          : '<img alt="" src="$imgSrc"${h != null ? ' style="height: ${h}px;"' : ''}/>';
-    } else if (_mediaKind == MediaKind.video) {
-      final h = _imageHeightPx;
-      if (_uploadedVideoUrl != null) {
-        mediaPart =
-            '<video src="${_uploadedVideoUrl!}"${h != null ? ' style=""' : ''} controls preload="metadata"></video>';
-      } else if (_videoBytes != null && _videoBytes!.isNotEmpty) {
-        mediaPart =
-            '<video${h != null ? ' style="height: ${h}px;"' : ''} controls preload="metadata"></video>';
-      } else {
-        mediaPart = '';
-      }
-    }
-    if (_mediaKind == MediaKind.video && mediaPart.isNotEmpty) {
-      mediaPart = '<br>' + mediaPart;
-    }
-    return _kStyleTag + escapedBody + mediaPart;
   }
 
   // ====== Obraz ======
@@ -695,14 +687,14 @@ String _stripStyleAndImage(String html) {
         _imageName = file.name;
         _uploadedImageUrl = null;
         _uploadedImageFilename = null;
-        
       });
       _refreshIfPreview(immediate: true);
-    }
-     catch (e) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Nie udało się otworzyć selektora plików: $e')),
+          SnackBar(
+            content: Text('❌ Nie udało się otworzyć selektora plików: $e'),
+          ),
         );
       }
     }
@@ -711,27 +703,39 @@ String _stripStyleAndImage(String html) {
   Future<void> _uploadImage() async {
     if (_imageBytes == null || _imageName == null) return;
     setState(() => _isUploading = true);
-  _refreshIfPreview(immediate: true);
+    _refreshIfPreview(immediate: true);
     try {
-      final uri = Uri.parse('https://interpage.pl/egzaminy/upload_image_next.php');
+      final uri = Uri.parse(
+        'https://interpage.pl/egzaminy/upload_image_next.php',
+      );
       String ext = (_imageName ?? 'jpg').split('.').last.toLowerCase();
       if (ext.isEmpty) ext = 'jpg';
-      final mediaType = http_parser.MediaType('image', ext == 'jpg' ? 'jpeg' : ext);
+      final mediaType = http_parser.MediaType(
+        'image',
+        ext == 'jpg' ? 'jpeg' : ext,
+      );
 
-      final req = http.MultipartRequest('POST', uri)
-        ..headers['Authorization'] = 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-        ..headers['X-API-Key']     = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-        ..headers['Accept']        = 'application/json'
-        ..fields['kwalifikacja']   = _sanitizedTable()
-        ..fields['egzamin']        = _sanitizedTable()
-        ..files.add(http.MultipartFile.fromBytes(
-          'file', _imageBytes!,
-          filename: _imageName ?? 'upload.$ext',
-          contentType: mediaType,
-        ));
+      final req =
+          http.MultipartRequest('POST', uri)
+            ..headers['Authorization'] =
+                'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+            ..headers['X-API-Key'] = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+            ..headers['Accept'] = 'application/json'
+            ..fields['kwalifikacja'] = _sanitizedTable()
+            ..fields['egzamin'] = _sanitizedTable()
+            ..files.add(
+              http.MultipartFile.fromBytes(
+                'file',
+                _imageBytes!,
+                filename: _imageName ?? 'upload.$ext',
+                contentType: mediaType,
+              ),
+            );
 
       final res = await http.Response.fromStream(await req.send());
-      if (res.statusCode != 200) throw 'Upload HTTP ${res.statusCode}: ${res.body}';
+      if (res.statusCode != 200) {
+        throw 'Upload HTTP ${res.statusCode}: ${res.body}';
+      }
       final data = jsonDecode(res.body);
       if (data['ok'] != true || data['url'] == null) {
         throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
@@ -740,7 +744,8 @@ String _stripStyleAndImage(String html) {
       setState(() {
         _uploadedImageUrl = data['url'] as String;
         _uploadedImageFilename =
-            (data['filename'] as String?) ?? _filenameFromUrl(_uploadedImageUrl!);
+            (data['filename'] as String?) ??
+            _filenameFromUrl(_uploadedImageUrl!);
         _mediaKind = MediaKind.image;
       });
       if (mounted) {
@@ -776,25 +781,30 @@ String _stripStyleAndImage(String html) {
 
   void _showImageDialogUrl(String imageUrl) {
     _showImageDialogBody(
-      builder: (screen) => Image.network(
-        imageUrl,
-        height: _imageHeightPx?.toDouble(),
-        fit: BoxFit.contain,
-        errorBuilder: (c, e, s) => Text(
-          '❌ Nie udało się załadować obrazka',
-          style: TextStyle(color: Theme.of(context).colorScheme.surface),
-        ),
-      ),
+      builder:
+          (screen) => Image.network(
+            imageUrl,
+            height: _imageHeightPx?.toDouble(),
+            fit: BoxFit.contain,
+            errorBuilder:
+                (c, e, s) => Text(
+                  '❌ Nie udało się załadować obrazka',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.surface,
+                  ),
+                ),
+          ),
     );
   }
 
   void _showImageDialogBytes(Uint8List bytes) {
     _showImageDialogBody(
-      builder: (screen) => Image.memory(
-        bytes,
-        height: _imageHeightPx?.toDouble(),
-        fit: BoxFit.contain,
-      ),
+      builder:
+          (screen) => Image.memory(
+            bytes,
+            height: _imageHeightPx?.toDouble(),
+            fit: BoxFit.contain,
+          ),
     );
   }
 
@@ -813,19 +823,23 @@ String _stripStyleAndImage(String html) {
             return GestureDetector(
               onTap: () => Navigator.of(context, rootNavigator: true).pop(),
               child: Scaffold(
-                backgroundColor: Colors.black.withValues(alpha: 0.9),
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.9),
                 body: Stack(
                   children: [
                     Center(
                       child: GestureDetector(
                         onTap: () {},
                         child: Listener(
-                          onPointerDown: (_) => setState(() => isPressed = true),
+                          onPointerDown:
+                              (_) => setState(() => isPressed = true),
                           onPointerUp: (_) => setState(() => isPressed = false),
                           child: MouseRegion(
-                            cursor: isPressed
-                                ? SystemMouseCursors.grabbing
-                                : SystemMouseCursors.grab,
+                            cursor:
+                                isPressed
+                                    ? SystemMouseCursors.grabbing
+                                    : SystemMouseCursors.grab,
                             child: InteractiveViewer(
                               panEnabled: true,
                               minScale: 0.5,
@@ -840,12 +854,18 @@ String _stripStyleAndImage(String html) {
                       top: 16,
                       right: 16,
                       child: IconButton(
-                        icon: Icon(Icons.close,
-                            size: 30,
-                            color: Theme.of(context).colorScheme.surface),
+                        icon: Icon(
+                          Icons.close,
+                          size: 30,
+                          color: Theme.of(context).colorScheme.surface,
+                        ),
                         tooltip: 'Zamknij',
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
+                        onPressed:
+                            () =>
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop(),
                       ),
                     ),
                   ],
@@ -876,7 +896,6 @@ String _stripStyleAndImage(String html) {
         _uploadedVideoFilename = null;
       });
       _refreshIfPreview(immediate: true);
-
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -895,22 +914,26 @@ String _stripStyleAndImage(String html) {
       final ext = _videoName!.split('.').last.toLowerCase();
       final http_parser.MediaType mt = switch (ext) {
         'webm' => http_parser.MediaType('video', 'webm'),
-        'ogg'  => http_parser.MediaType('video', 'ogg'),
-        _      => http_parser.MediaType('video', 'mp4'),
+        'ogg' => http_parser.MediaType('video', 'ogg'),
+        _ => http_parser.MediaType('video', 'mp4'),
       };
 
-      final req = http.MultipartRequest('POST', uri)
-        ..headers['Authorization'] = 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-        ..headers['X-API-Key']     = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-        ..headers['Accept']        = 'application/json'
-        ..fields['kwalifikacja']   = _sanitizedTable()
-        ..fields['egzamin']        = _sanitizedTable()
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          _videoBytes!,
-          filename: _videoName!,
-          contentType: mt,
-        ));
+      final req =
+          http.MultipartRequest('POST', uri)
+            ..headers['Authorization'] =
+                'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+            ..headers['X-API-Key'] = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+            ..headers['Accept'] = 'application/json'
+            ..fields['kwalifikacja'] = _sanitizedTable()
+            ..fields['egzamin'] = _sanitizedTable()
+            ..files.add(
+              http.MultipartFile.fromBytes(
+                'file',
+                _videoBytes!,
+                filename: _videoName!,
+                contentType: mt,
+              ),
+            );
 
       final res = await http.Response.fromStream(await req.send());
       if (res.statusCode != 200) {
@@ -925,11 +948,11 @@ String _stripStyleAndImage(String html) {
       setState(() {
         _uploadedVideoUrl = data['url'] as String;
         _uploadedVideoFilename =
-            (data['filename'] as String?) ?? _filenameFromUrl(_uploadedVideoUrl!);
+            (data['filename'] as String?) ??
+            _filenameFromUrl(_uploadedVideoUrl!);
         _mediaKind = MediaKind.video;
       });
       _refreshIfPreview(immediate: true);
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -969,14 +992,17 @@ String _stripStyleAndImage(String html) {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (_uploadedVideoUrl != null)
-                  Text('URL: ${_uploadedVideoUrl!}', style: const TextStyle(fontSize: 12)),
+                  Text(
+                    'URL: ${_uploadedVideoUrl!}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 const SizedBox(height: 8),
                 AspectRatio(
                   aspectRatio: 16 / 9,
                   child: _InlineVideoPlayer(
-                    url: _uploadedVideoUrl,                             // może być null
-                    filePath: kIsWeb ? null : localPathOrBlob,           // mobile/desktop
-                    blobUrl: kIsWeb ? localPathOrBlob : null,            // web
+                    url: _uploadedVideoUrl, // może być null
+                    filePath: kIsWeb ? null : localPathOrBlob, // mobile/desktop
+                    blobUrl: kIsWeb ? localPathOrBlob : null, // web
                     height: h,
                   ),
                 ),
@@ -1014,7 +1040,6 @@ String _stripStyleAndImage(String html) {
       _disposeLocalTempVideo();
     });
     _refreshIfPreview(immediate: true);
-
   }
 
   // ====== Zapis pytania ======
@@ -1027,7 +1052,9 @@ String _stripStyleAndImage(String html) {
 
     if (pyt.isEmpty || a.isEmpty || b.isEmpty || c.isEmpty || d.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Uzupełnij treść i wszystkie odpowiedzi.')),
+        const SnackBar(
+          content: Text('Uzupełnij treść i wszystkie odpowiedzi.'),
+        ),
       );
       return;
     }
@@ -1040,26 +1067,32 @@ String _stripStyleAndImage(String html) {
       try {
         setState(() => _isUploading = true);
 
-        final uri = Uri.parse('https://interpage.pl/egzaminy/upload_image_next.php');
+        final uri = Uri.parse(
+          'https://interpage.pl/egzaminy/upload_image_next.php',
+        );
         String ext = (_imageName ?? 'jpg').split('.').last.toLowerCase();
         if (ext.isEmpty) ext = 'jpg';
-        final mediaType =
-            http_parser.MediaType('image', ext == 'jpg' ? 'jpeg' : ext);
+        final mediaType = http_parser.MediaType(
+          'image',
+          ext == 'jpg' ? 'jpeg' : ext,
+        );
 
-        final req = http.MultipartRequest('POST', uri)
-          ..headers['Authorization'] =
-              'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-          ..headers['X-API-Key'] =
-              'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-          ..headers['Accept'] = 'application/json'
-          ..fields['kwalifikacja'] = _sanitizedTable()
-          ..fields['egzamin'] = _sanitizedTable()
-          ..files.add(http.MultipartFile.fromBytes(
-            'file',
-            _imageBytes!,
-            filename: _imageName ?? 'upload.$ext',
-            contentType: mediaType,
-          ));
+        final req =
+            http.MultipartRequest('POST', uri)
+              ..headers['Authorization'] =
+                  'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+              ..headers['X-API-Key'] = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+              ..headers['Accept'] = 'application/json'
+              ..fields['kwalifikacja'] = _sanitizedTable()
+              ..fields['egzamin'] = _sanitizedTable()
+              ..files.add(
+                http.MultipartFile.fromBytes(
+                  'file',
+                  _imageBytes!,
+                  filename: _imageName ?? 'upload.$ext',
+                  contentType: mediaType,
+                ),
+              );
 
         final res = await http.Response.fromStream(await req.send());
         if (res.statusCode != 200) {
@@ -1072,20 +1105,20 @@ String _stripStyleAndImage(String html) {
 
         _uploadedImageUrl = data['url'] as String;
         _uploadedImageFilename =
-            (data['filename'] as String?) ?? _filenameFromUrl(_uploadedImageUrl!);
+            (data['filename'] as String?) ??
+            _filenameFromUrl(_uploadedImageUrl!);
       } catch (e) {
         if (!mounted) return;
         setState(() => _isUploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd uploadu obrazka: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Błąd uploadu obrazka: $e')));
         return;
       } finally {
         if (mounted) setState(() => _isUploading = false);
       }
     }
 
-    // auto-upload wideo jeśli wybrane
     if (_mediaKind == MediaKind.video &&
         _uploadedVideoUrl == null &&
         _videoBytes != null &&
@@ -1139,25 +1172,30 @@ String _stripStyleAndImage(String html) {
       }
 
       final isEdit = editingId != null;
-      final int? savedId = (body['id'] is int)
-          ? body['id'] as int
-          : int.tryParse('${body['id']}');
+      final int? savedId =
+          (body['id'] is int)
+              ? body['id'] as int
+              : int.tryParse('${body['id']}');
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(isEdit
-            ? '✅ Pytanie zaktualizowane (ID ${savedId ?? editingId})'
-            : '✅ Pytanie dodane (ID ${savedId ?? '—'})'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isEdit
+                ? '✅ Pytanie zaktualizowane (ID ${savedId ?? editingId})'
+                : '✅ Pytanie dodane (ID ${savedId ?? '—'})',
+          ),
+        ),
+      );
 
       setState(() => _showPreview = false);
       _startNewQuestion();
       await _loadAll();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Błąd zapisu: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Błąd zapisu: $e')));
     }
   }
 
@@ -1199,157 +1237,228 @@ String _stripStyleAndImage(String html) {
     }
   }
 
-// --- DODAJ NA POZIOMIE KLASY (poza _html) ---
-bool _busyResetAll = false;
-final String _apiToken = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+  // --- DODAJ NA POZIOMIE KLASY (poza _html) ---
+  bool _busyResetAll = false;
+  final String _apiToken = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
-Future<void> _resetTrudnoscAll() async {
-  final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Resetować trudności wszystkich pytań?'),
-          content: const Text('Ta operacja wyczyści statystyki trudności dla całej kwalifikacji.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Anuluj')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Resetuj')),
+  Future<void> _resetTrudnoscAll() async {
+    final ok =
+        await showDialog<bool>(
+          context: context,
+          builder:
+              (ctx) => AlertDialog(
+                title: const Text('Resetować trudności wszystkich pytań?'),
+                content: const Text(
+                  'Ta operacja wyczyści statystyki trudności dla całej kwalifikacji.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Anuluj'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Resetuj'),
+                  ),
+                ],
+              ),
+        ) ??
+        false;
+    if (!ok) return;
+
+    setState(() => _busyResetAll = true);
+    try {
+      final res = await http.post(
+        Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+          'Authorization': 'Bearer $_apiToken',
+        },
+        body: {'kwalifikacja': _sanitizedTable()},
+      );
+      if (res.statusCode != 200) {
+        throw 'HTTP ${res.statusCode}: ${res.body}';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Zresetowano trudności dla wszystkich pytań'),
+          ),
+        );
+      }
+
+      await _loadAll();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Błąd resetu: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busyResetAll = false);
+    }
+  }
+
+  Future<void> _resetTrudnoscOne(int id) async {
+    final ok =
+        await showDialog<bool>(
+          context: context,
+          builder:
+              (ctx) => AlertDialog(
+                title: Text('Resetować trudność pytania ID $id?'),
+                content: const Text(
+                  'Wyzeruje statystyki dla tego jednego pytania.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Anuluj'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Resetuj'),
+                  ),
+                ],
+              ),
+        ) ??
+        false;
+    if (!ok) return;
+
+    try {
+      final res = await http.post(
+        Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+          'Authorization': 'Bearer $_apiToken',
+        },
+        body: {'kwalifikacja': _sanitizedTable(), 'pytanie_id': '$id'},
+      );
+      if (res.statusCode != 200) {
+        throw 'HTTP ${res.statusCode}: ${res.body}';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✅ Zresetowano trudność pytania ID $id')),
+        );
+      }
+
+      await _loadAll();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Błąd resetu pytania $id: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildRightToolbar(BuildContext context) {
+    final found = _filteredQuestions.length;
+    final total = questions.length;
+
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Row(
+          children: [
+            Icon(
+              Icons.filter_alt,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Wyniki: $found / $total',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            if (searchText.isNotEmpty)
+              TextButton.icon(
+                onPressed: () {
+                  _textSearchCtrl.clear();
+                  _applyTextFilter('');
+                },
+                icon: const Icon(Icons.clear),
+                label: const Text('Wyczyść filtr'),
+              ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: _busyResetAll ? null : _resetTrudnoscAll,
+              icon:
+                  _busyResetAll
+                      ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : const Icon(Icons.refresh),
+              label: const Text('Resetuj trudności (wszystkie)'),
+            ),
           ],
         ),
-      ) ?? false;
-  if (!ok) return;
-
-  setState(() => _busyResetAll = true);
-  try {
-    final res = await http.post(
-      Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-        'Authorization': 'Bearer $_apiToken',
-      },
-      body: {'kwalifikacja': _sanitizedTable()},
-    );
-    if (res.statusCode != 200) {
-      throw 'HTTP ${res.statusCode}: ${res.body}';
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Zresetowano trudności dla wszystkich pytań')),
-    );
-    await _loadAll();
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('❌ Błąd resetu: $e')),
-    );
-  } finally {
-    if (mounted) setState(() => _busyResetAll = false);
-  }
-}
-
-Future<void> _resetTrudnoscOne(int id) async {
-  final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('Resetować trudność pytania ID $id?'),
-          content: const Text('Wyzeruje statystyki dla tego jednego pytania.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Anuluj')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Resetuj')),
-          ],
-        ),
-      ) ?? false;
-  if (!ok) return;
-
-  try {
-    final res = await http.post(
-      Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-        'Authorization': 'Bearer $_apiToken',
-      },
-      body: {'kwalifikacja': _sanitizedTable(), 'pytanie_id': '$id'},
-    );
-    if (res.statusCode != 200) {
-      throw 'HTTP ${res.statusCode}: ${res.body}';
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('✅ Zresetowano trudność pytania ID $id')),
-    );
-    await _loadAll();
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('❌ Błąd resetu pytania $id: $e')),
-    );
-  }
-}
-
-Widget _buildRightToolbar(BuildContext context) {
-  final found = _filteredQuestions.length;
-  final total = questions.length;
-
-  return Material(
-    color: Theme.of(context).colorScheme.surface,
-    elevation: 1,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      child: Row(
-        children: [
-          Icon(Icons.filter_alt, size: 20, color: Theme.of(context).colorScheme.onSurface),
-          const SizedBox(width: 8),
-          Text(
-            'Wyniki: $found / $total',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const Spacer(),
-          if (searchText.isNotEmpty)
-            TextButton.icon(
-              onPressed: () {
-                _textSearchCtrl.clear();
-                _applyTextFilter('');
-              },
-              icon: const Icon(Icons.clear),
-              label: const Text('Wyczyść filtr'),
-            ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: _busyResetAll ? null : _resetTrudnoscAll,
-            icon: _busyResetAll
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.refresh),
-            label: const Text('Resetuj trudności (wszystkie)'),
-          ),
-        ],
       ),
-    ),
-  );
-}
+    );
+  }
 
   // ====== Render HTML (z obsługą <img> i <video>) ======
   Html _html(String html) {
-    html = html.replaceAll('<img', '<br><img');
-
     return Html(
       data: html,
       style: {
-        "body": Style(color: Theme.of(context).colorScheme.onSurface),
-        "b": Style(color: Theme.of(context).colorScheme.onSurface),
-        "span": Style(
-          color: html.contains("style='color:green;'")
-              ? Colors.green
-              : Theme.of(context).colorScheme.onSurface,
+        'div.questionHeader': Style(
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: FontSize(18),
+          verticalAlign: VerticalAlign.middle,
+        ),
+        'div.question': Style(
+          color: Theme.of(context).colorScheme.onPrimary,
+          fontSize: FontSize(16),
+          verticalAlign: VerticalAlign.middle,
+        ),
+
+        'div.answer': Style(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontSize: FontSize(14),
+          verticalAlign: VerticalAlign.middle,
+        ),
+        'div.description.correct': Style(
+          color: Colors.green,
+          fontSize: FontSize(14),
+          fontStyle: FontStyle.italic,
+          //margin: Margins(top: Margin(8), bottom: Margin(4)),
+        ),
+        'div.description.incorrect': Style(
+          color: Colors.red,
+          fontSize: FontSize(14),
+          fontStyle: FontStyle.italic,
+          //margin: Margins(bottom: Margin(8)),
+        ),
+        'b': Style(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.bold,
+          verticalAlign: VerticalAlign.middle,
+        ),
+        'div.media': Style(
+          margin: Margins.symmetric(vertical: 12),
+          textAlign: TextAlign.center,
         ),
       },
       extensions: [
-        // IMG z uchwytem zmiany wysokości
         TagExtension(
           tagsToExtend: {'img'},
           builder: (ctx) {
             final src = ctx.attributes['src'];
-
             double? forcedHeight;
             final styleAttr = ctx.attributes['style'] ?? '';
-            final m = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false)
-                .firstMatch(styleAttr);
+            final m = RegExp(
+              r'height\s*:\s*(\d+)\s*px',
+              caseSensitive: false,
+            ).firstMatch(styleAttr);
             if (m != null) {
               forcedHeight = double.tryParse(m.group(1)!);
             } else {
@@ -1359,11 +1468,9 @@ Widget _buildRightToolbar(BuildContext context) {
             if (_showPreview && _imageHeightPx != null) {
               forcedHeight = _imageHeightPx!.toDouble();
             }
-
-            Widget _wrapInteractive(Widget child) {
+            Widget wrapInteractive(Widget child) {
               const minH = 80;
               const maxH = 2000;
-
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 child: Center(
@@ -1371,10 +1478,12 @@ Widget _buildRightToolbar(BuildContext context) {
                     onPointerSignal: (signal) {
                       if (!_showPreview) return;
                       if (signal is PointerScrollEvent) {
-                        int cur = _imageHeightPx ?? (forcedHeight?.round() ?? 320);
-                        final next = (cur - signal.scrollDelta.dy)
-                            .clamp(minH, maxH)
-                            .round();
+                        int cur =
+                            _imageHeightPx ?? (forcedHeight?.round() ?? 320);
+                        final next =
+                            (cur - signal.scrollDelta.dy)
+                                .clamp(minH, maxH)
+                                .round();
                         setState(() {
                           _imageHeightPx = next;
                           _imageHeightCtrl.text = next.toString();
@@ -1389,10 +1498,12 @@ Widget _buildRightToolbar(BuildContext context) {
                           onPanUpdate: (details) {
                             if (!_showPreview) return;
                             int cur =
-                                _imageHeightPx ?? (forcedHeight?.round() ?? 320);
-                            final next = (cur + details.delta.dy)
-                                .clamp(minH, maxH)
-                                .round();
+                                _imageHeightPx ??
+                                (forcedHeight?.round() ?? 320);
+                            final next =
+                                (cur + details.delta.dy)
+                                    .clamp(minH, maxH)
+                                    .round();
                             setState(() {
                               _imageHeightPx = next;
                               _imageHeightCtrl.text = next.toString();
@@ -1407,20 +1518,32 @@ Widget _buildRightToolbar(BuildContext context) {
                               cursor: SystemMouseCursors.resizeUpDown,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.35),
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surface.withValues(alpha: 0.35),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.unfold_more,
-                                        size: 16, color: Colors.white),
+                                    Icon(
+                                      Icons.unfold_more,
+                                      size: 16,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       '${_imageHeightPx ?? forcedHeight?.round() ?? 320}px',
-                                      style:
-                                          const TextStyle(color: Colors.white),
+                                      style: TextStyle(
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimary,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1437,42 +1560,53 @@ Widget _buildRightToolbar(BuildContext context) {
             if (src == null || src.isEmpty) {
               return Text(
                 '⚠️ Brak obrazka',
-                style: TextStyle(color: Theme.of(context).colorScheme.surface),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
               );
             }
-
             if (src.startsWith('data:image/')) {
               try {
                 final base64Part = src.split(',').last;
                 final bytes = base64Decode(base64Part);
-                return _wrapInteractive(
-                  Image.memory(bytes, height: forcedHeight, fit: BoxFit.contain),
+                return wrapInteractive(
+                  Image.memory(
+                    bytes,
+                    height: forcedHeight,
+                    fit: BoxFit.contain,
+                  ),
                 );
               } catch (_) {
-                return const Text('❌ Nie udało się wyświetlić obrazka (data URI).');
+                return const Text(
+                  '❌ Nie udało się wyświetlić obrazka (data URI).',
+                );
               }
             }
-
-            return _wrapInteractive(
+            return wrapInteractive(
               Tooltip(
-                message: _showPreview
-                    ? 'Przeciągnij / przewiń, aby zmienić wysokość'
-                    : 'Kliknij, aby powiększyć',
+                message:
+                    _showPreview
+                        ? 'Przeciągnij / przewiń, aby zmienić wysokość'
+                        : 'Kliknij, aby powiększyć',
                 child: MouseRegion(
-                  cursor: _showPreview
-                      ? SystemMouseCursors.resizeUpDown
-                      : SystemMouseCursors.click,
+                  cursor:
+                      _showPreview
+                          ? SystemMouseCursors.resizeUpDown
+                          : SystemMouseCursors.click,
                   child: GestureDetector(
-                    onTap: _showPreview ? null : () => _showImageDialog(context, src),
+                    onTap:
+                        _showPreview
+                            ? null
+                            : () => _showImageDialog(context, src),
                     child: Image.network(
                       src,
                       height: forcedHeight,
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Text(
-                        '❌ Nie udało się załadować obrazka',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.surface),
-                      ),
+                      errorBuilder:
+                          (context, error, stackTrace) => Text(
+                            '❌ Nie udało się załadować obrazka',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
                     ),
                   ),
                 ),
@@ -1480,17 +1614,16 @@ Widget _buildRightToolbar(BuildContext context) {
             );
           },
         ),
-
-        // VIDEO z kontrolkami (Chewie) + lokalne źródło
         TagExtension(
           tagsToExtend: {'video'},
           builder: (ctx) {
             final src = ctx.attributes['src'] ?? ctx.attributes['data-src'];
-
             double? forcedHeight;
             final styleAttr = ctx.attributes['style'] ?? '';
-            final m = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false)
-                .firstMatch(styleAttr);
+            final m = RegExp(
+              r'height\s*:\s*(\d+)\s*px',
+              caseSensitive: false,
+            ).firstMatch(styleAttr);
             if (m != null) {
               forcedHeight = double.tryParse(m.group(1)!);
             } else {
@@ -1500,54 +1633,59 @@ Widget _buildRightToolbar(BuildContext context) {
             if (_showPreview && _imageHeightPx != null) {
               forcedHeight = _imageHeightPx!.toDouble();
             }
-
             if (src != null && src.isNotEmpty) {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Align(
-                  alignment: Alignment.center, // wyśrodkuj w kolumnie HTML-a
+                  alignment: Alignment.center,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 720), // ładna szerokość
+                    constraints: const BoxConstraints(maxWidth: 720),
                     child: Focus(
                       canRequestFocus: false,
                       descendantsAreFocusable: false,
                       skipTraversal: true,
                       child: _InlineVideoPlayer(url: src, height: forcedHeight),
                     ),
-
                   ),
                 ),
               );
             }
-
-            if (_showPreview && _mediaKind == MediaKind.video && _videoBytes != null) {
+            if (_showPreview &&
+                _mediaKind == MediaKind.video &&
+                _videoBytes != null) {
               return FutureBuilder<String?>(
                 future: _ensureLocalTempVideo(),
                 builder: (context, snap) {
                   if (snap.connectionState != ConnectionState.done) {
                     return const SizedBox(
                       height: 160,
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     );
                   }
                   final p = snap.data;
                   if (p == null) {
                     return Text(
                       '❌ Brak lokalnego źródła wideo.',
-                      style: TextStyle(color: Theme.of(context).colorScheme.surface),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     );
                   }
-                  final Widget playerCore = kIsWeb
-                    ? _InlineVideoPlayer(blobUrl: p, height: forcedHeight)
-                    : _InlineVideoPlayer(filePath: p, height: forcedHeight);
-
-                final Widget player = Focus(
-                  canRequestFocus: false,
-                  descendantsAreFocusable: false,
-                  skipTraversal: true,
-                  child: playerCore,
-                );
-
+                  final Widget playerCore =
+                      kIsWeb
+                          ? _InlineVideoPlayer(blobUrl: p, height: forcedHeight)
+                          : _InlineVideoPlayer(
+                            filePath: p,
+                            height: forcedHeight,
+                          );
+                  final Widget player = Focus(
+                    canRequestFocus: false,
+                    descendantsAreFocusable: false,
+                    skipTraversal: true,
+                    child: playerCore,
+                  );
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Align(
@@ -1558,13 +1696,13 @@ Widget _buildRightToolbar(BuildContext context) {
                       ),
                     ),
                   );
-
                 },
               );
             }
-
-            return Text('⚠️ Brak źródła wideo',
-                style: TextStyle(color: Theme.of(context).colorScheme.surface));
+            return Text(
+              '⚠️ Brak źródła wideo',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            );
           },
         ),
       ],
@@ -1586,19 +1724,23 @@ Widget _buildRightToolbar(BuildContext context) {
             return GestureDetector(
               onTap: () => Navigator.of(context, rootNavigator: true).pop(),
               child: Scaffold(
-                backgroundColor: Colors.black.withValues(alpha: 0.9),
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.9),
                 body: Stack(
                   children: [
                     Center(
                       child: GestureDetector(
                         onTap: () {},
                         child: Listener(
-                          onPointerDown: (_) => setState(() => isPressed = true),
+                          onPointerDown:
+                              (_) => setState(() => isPressed = true),
                           onPointerUp: (_) => setState(() => isPressed = false),
                           child: MouseRegion(
-                            cursor: isPressed
-                                ? SystemMouseCursors.grabbing
-                                : SystemMouseCursors.grab,
+                            cursor:
+                                isPressed
+                                    ? SystemMouseCursors.grabbing
+                                    : SystemMouseCursors.grab,
                             child: InteractiveViewer(
                               panEnabled: true,
                               minScale: 0.5,
@@ -1607,12 +1749,16 @@ Widget _buildRightToolbar(BuildContext context) {
                                 imageUrl,
                                 width: screen.width * 0.8,
                                 fit: BoxFit.contain,
-                                errorBuilder: (context, error, stack) => Text(
-                                  '❌ Nie udało się załadować obrazka',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.surface,
-                                  ),
-                                ),
+                                errorBuilder:
+                                    (context, error, stack) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.surface,
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -1629,8 +1775,12 @@ Widget _buildRightToolbar(BuildContext context) {
                           color: Theme.of(context).colorScheme.surface,
                         ),
                         tooltip: 'Zamknij',
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
+                        onPressed:
+                            () =>
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop(),
                       ),
                     ),
                   ],
@@ -1646,8 +1796,7 @@ Widget _buildRightToolbar(BuildContext context) {
   // ====== UI helpers ======
   Widget _buildBadge(dynamic q) {
     final trudnosc = q['trudnosc'];
-    final iloscOdp =
-        int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
+    final iloscOdp = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
     if (trudnosc == null || iloscOdp < 5) return const SizedBox.shrink();
 
     final diff =
@@ -1663,8 +1812,8 @@ Widget _buildRightToolbar(BuildContext context) {
       ),
       child: Text(
         isTrudne ? 'TRUDNE' : 'ŁATWE',
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onPrimary,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -1698,17 +1847,18 @@ Widget _buildRightToolbar(BuildContext context) {
   @override
   Widget build(BuildContext context) {
     final leftPanel = _buildLeftPanel(context);
-    final rightList = isLoading
-    ? const Center(child: CircularProgressIndicator())
-    : (_showPreview
-        ? _buildLivePreview()
-        : Column(
-            children: [
-              _buildRightToolbar(context),
-              const Divider(height: 1),
-              Expanded(child: _buildList()),
-            ],
-          ));
+    final rightList =
+        isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : (_showPreview
+                ? _buildLivePreview()
+                : Column(
+                  children: [
+                    _buildRightToolbar(context),
+                    const Divider(height: 1),
+                    Expanded(child: _buildList()),
+                  ],
+                ));
 
     return Scaffold(
       appBar: AppBar(
@@ -1736,11 +1886,11 @@ Widget _buildRightToolbar(BuildContext context) {
   Widget _buildLeftPanel(BuildContext context) {
     final labelStyle = TextStyle(
       fontWeight: FontWeight.w600,
-      color: Theme.of(context).colorScheme.onSurface,
+      color: Theme.of(context).colorScheme.onPrimary,
     );
 
     return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: Theme.of(context).colorScheme.surface,
       child: Scrollbar(
         controller: _leftPanelScroll,
         thumbVisibility: true,
@@ -1754,10 +1904,24 @@ Widget _buildRightToolbar(BuildContext context) {
               const SizedBox(height: 8),
               TextField(
                 controller: _textSearchCtrl,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Szukaj w treści/odpowiedziach/ID',
-                  prefixIcon: Icon(Icons.search),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
                   border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.secondary,
+                      width: 2.0,
+                    ),
+                  ),
                   isDense: true,
                 ),
                 onChanged: _applyTextFilter,
@@ -1772,7 +1936,11 @@ Widget _buildRightToolbar(BuildContext context) {
                     editingId == null
                         ? '➕ Dodaj nowe pytanie${_nextId != null ? ' (ID $_nextId)' : ''}'
                         : '✏️ Edytujesz ID $editingId',
-                    style: labelStyle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
                   ),
                   const Spacer(),
                   TextButton.icon(
@@ -1786,10 +1954,13 @@ Widget _buildRightToolbar(BuildContext context) {
 
               // ======= MULTIMEDIA =======
               Container(
-                 width: double.infinity,
+                width: double.infinity,
+                margin: EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Theme.of(context).dividerColor),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -1801,6 +1972,11 @@ Widget _buildRightToolbar(BuildContext context) {
                       spacing: 12,
                       children: [
                         ChoiceChip(
+                          selectedColor: Theme.of(context).colorScheme.primary,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            width: 1,
+                          ),
                           label: const Text('Brak'),
                           selected: _mediaKind == MediaKind.none,
                           onSelected: (_) {
@@ -1811,8 +1987,13 @@ Widget _buildRightToolbar(BuildContext context) {
                           },
                         ),
                         ChoiceChip(
+                          selectedColor: Theme.of(context).colorScheme.primary,
                           label: const Text('Obrazek'),
                           selected: _mediaKind == MediaKind.image,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            width: 1,
+                          ),
                           onSelected: (_) {
                             setState(() {
                               _mediaKind = MediaKind.image;
@@ -1825,8 +2006,13 @@ Widget _buildRightToolbar(BuildContext context) {
                           },
                         ),
                         ChoiceChip(
+                          selectedColor: Theme.of(context).colorScheme.primary,
                           label: const Text('Film'),
                           selected: _mediaKind == MediaKind.video,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            width: 1,
+                          ),
                           onSelected: (_) {
                             setState(() {
                               _mediaKind = MediaKind.video;
@@ -1881,11 +2067,11 @@ Widget _buildRightToolbar(BuildContext context) {
                         runSpacing: 8, // odstęp pionowy, jeśli się złamie linia
                         children: [
                           if (_uploadedImageUrl != null || _imageBytes != null)
-                          TextButton.icon(
-                            onPressed: _removeMedia,
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Usuń'),
-                          ),
+                            TextButton.icon(
+                              onPressed: _removeMedia,
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Usuń'),
+                            ),
                           if (_uploadedImageUrl != null || _imageBytes != null)
                             OutlinedButton.icon(
                               onPressed: _previewImage,
@@ -1893,9 +2079,8 @@ Widget _buildRightToolbar(BuildContext context) {
                               label: const Text('Podgląd'),
                             ),
                         ],
-                      )
-                    ]
-                    else if (_mediaKind == MediaKind.video) ...[
+                      ),
+                    ] else if (_mediaKind == MediaKind.video) ...[
                       Row(
                         children: [
                           ElevatedButton.icon(
@@ -1932,11 +2117,11 @@ Widget _buildRightToolbar(BuildContext context) {
                         runSpacing: 8, // odstęp pionowy, jeśli się złamie linia
                         children: [
                           if (_uploadedVideoUrl != null || _videoBytes != null)
-                          TextButton.icon(
-                            onPressed: _removeMedia,
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Usuń'),
-                          ), 
+                            TextButton.icon(
+                              onPressed: _removeMedia,
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Usuń'),
+                            ),
                           if (_uploadedVideoUrl != null || _videoBytes != null)
                             OutlinedButton.icon(
                               onPressed: _previewVideo,
@@ -1944,9 +2129,8 @@ Widget _buildRightToolbar(BuildContext context) {
                               label: const Text('Podgląd'),
                             ),
                         ],
-                      )
-                    ]
-                    else
+                      ),
+                    ] else
                       const Text('Nie dodajesz multimediów do pytania.'),
                   ],
                 ),
@@ -1956,9 +2140,20 @@ Widget _buildRightToolbar(BuildContext context) {
               TextField(
                 controller: _contentCtrl,
                 onChanged: (_) => _refreshTextPreview(),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Treść pytania',
                   border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.secondary,
+                      width: 2.0,
+                    ),
+                  ),
                 ),
                 maxLines: 8,
                 minLines: 8,
@@ -1968,9 +2163,20 @@ Widget _buildRightToolbar(BuildContext context) {
               TextField(
                 controller: _opisPoprawneCtrl,
                 onChanged: (_) => _refreshTextPreview(),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Opis (dla poprawnej odpowiedzi) - opcjonalnie',
                   border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.secondary,
+                      width: 2.0,
+                    ),
+                  ),
                 ),
                 maxLines: 4,
                 minLines: 3,
@@ -1979,9 +2185,20 @@ Widget _buildRightToolbar(BuildContext context) {
               TextField(
                 controller: _opisNiepoprawneCtrl,
                 onChanged: (_) => _refreshTextPreview(),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Opis (dla niepoprawnej odpowiedzi) - opcjonalnie',
                   border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.secondary,
+                      width: 2.0,
+                    ),
+                  ),
                 ),
                 maxLines: 4,
                 minLines: 3,
@@ -1994,9 +2211,20 @@ Widget _buildRightToolbar(BuildContext context) {
                   TextField(
                     controller: _odp1Ctrl,
                     onChanged: (_) => _refreshTextPreview(),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Odpowiedź A',
                       border: OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.secondary,
+                          width: 2.0,
+                        ),
+                      ),
                       isDense: true,
                     ),
                   ),
@@ -2004,9 +2232,20 @@ Widget _buildRightToolbar(BuildContext context) {
                   TextField(
                     controller: _odp2Ctrl,
                     onChanged: (_) => _refreshTextPreview(),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Odpowiedź B',
                       border: OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.secondary,
+                          width: 2.0,
+                        ),
+                      ),
                       isDense: true,
                     ),
                   ),
@@ -2014,9 +2253,20 @@ Widget _buildRightToolbar(BuildContext context) {
                   TextField(
                     controller: _odp3Ctrl,
                     onChanged: (_) => _refreshTextPreview(),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Odpowiedź C',
                       border: OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.secondary,
+                          width: 2.0,
+                        ),
+                      ),
                       isDense: true,
                     ),
                   ),
@@ -2024,9 +2274,20 @@ Widget _buildRightToolbar(BuildContext context) {
                   TextField(
                     controller: _odp4Ctrl,
                     onChanged: (_) => _refreshTextPreview(),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Odpowiedź D',
                       border: OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.secondary,
+                          width: 2.0,
+                        ),
+                      ),
                       isDense: true,
                     ),
                   ),
@@ -2048,24 +2309,29 @@ Widget _buildRightToolbar(BuildContext context) {
                       DropdownMenuItem(value: 'C', child: Text('C')),
                       DropdownMenuItem(value: 'D', child: Text('D')),
                     ],
+                    focusColor: Theme.of(context).colorScheme.primary,
+                    dropdownColor: Theme.of(context).colorScheme.surface,
+                    underline: Container(
+                      height: 1,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end, // wyrównanie do prawej
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      OutlinedButton.icon(
+                      ElevatedButton.icon(
                         onPressed: () => setState(() => _showPreview = true),
                         icon: const Icon(Icons.visibility),
                         label: const Text('Zobacz podgląd'),
                       ),
-                      const SizedBox(width: 8), // odstęp między przyciskami
+                      const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: _saveQuestion,
                         icon: const Icon(Icons.save),
                         label: const Text('Zapisz'),
                       ),
                     ],
-                  )
-
+                  ),
                 ],
               ),
             ],
@@ -2076,40 +2342,37 @@ Widget _buildRightToolbar(BuildContext context) {
   }
 
   Widget _heightFieldRow() {
-    if (_uploadedImageUrl != null || _imageBytes != null){
+    if (_uploadedImageUrl != null || _imageBytes != null) {
       return Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _imageHeightCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Wysokość [px]',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                keyboardType: TextInputType.number,
-                onChanged: (v) {
-                  final n = int.tryParse(v.trim());
-                  setState(() {
-                    _imageHeightPx = (n == null || n <= 0) ? null : n;
-                  });
-                  _refreshIfPreview(immediate: true); // ważne: natychmiast
-                },
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _imageHeightCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Wysokość [px]',
+                border: OutlineInputBorder(),
+                isDense: true,
               ),
+              keyboardType: TextInputType.number,
+              onChanged: (v) {
+                final n = int.tryParse(v.trim());
+                setState(() {
+                  _imageHeightPx = (n == null || n <= 0) ? null : n;
+                });
+                _refreshIfPreview(immediate: true); // ważne: natychmiast
+              },
             ),
-            const SizedBox(width: 8),
-          ],
-        );
-    }
-    else{
+          ),
+          const SizedBox(width: 8),
+        ],
+      );
+    } else {
       return Row();
     }
-    
   }
 
   Widget _buildList() {
     final items = _filteredQuestions;
-
     return ListView.builder(
       controller: _listController,
       padding: const EdgeInsets.all(16),
@@ -2117,6 +2380,39 @@ Widget _buildRightToolbar(BuildContext context) {
       itemBuilder: (context, index) {
         final q = items[index] as Map<String, dynamic>;
         final id = int.tryParse(q['id']?.toString() ?? '');
+        // Question HTML (including media)
+        final questionHtml =
+            '<div class="questionHeader"><b>Pytanie ${index + 1}${id != null ? ' (ID $id)' : ''}:</b></div><br><div class="question">${q['pytanie']}</div>';
+        // Answers as individual ElevatedButtons
+        final answers =
+            ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+              final litera = e.value;
+              final odp = q['odp${e.key + 1}']?.toString() ?? '';
+              final body = _escapeLtGt(
+                odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
+              );
+              final html = '<div class="answer"><b>$litera.</b> $body</div>';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                child: ElevatedButton(
+                  onPressed: null, // Disabled to prevent accidental clicks
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8), // Rounded corners
+                    ),
+                    elevation: 2,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
+                  ),
+                  child: _html(html), // Answer with component-specific coloring
+                ),
+              );
+            }).toList();
+
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8),
           child: Padding(
@@ -2128,74 +2424,84 @@ Widget _buildRightToolbar(BuildContext context) {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: _html(
-                        "<b>Pytanie ${index + 1}${id != null ? ' (ID $id)' : ''}:</b><br>${q['pytanie']}",
-                      ),
-                    ),
+                      child: _html(_kStyleTag + questionHtml),
+                    ), // Question only
                     _buildBadge(q),
                   ],
                 ),
                 const SizedBox(height: 10),
-
-                ...['A', 'B', 'C', 'D'].map((litera) {
-                  final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color.fromARGB(255, 240, 240, 240),
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onSurface,
-                      ),
-                      onPressed: null,
-                      child: _html(odp ?? ""),
-                    ),
-                  );
-                }),
-
+                // Answers as buttons
+                ...answers,
                 const SizedBox(height: 8),
-
                 Row(
-  children: [
-    TextButton.icon(
-      onPressed: () => _openForEdit(q),
-      icon: const Icon(Icons.edit),
-      label: const Text('Edytuj'),
-    ),
-    const SizedBox(width: 8),
-    TextButton.icon(
-      onPressed: id == null ? null : () => _resetTrudnoscOne(id!),
-      icon: const Icon(Icons.restart_alt),
-      label: const Text('Restartuj trudność'),
-    ),
-    const SizedBox(width: 8),
-    TextButton.icon(
-      onPressed: id == null ? null : () async {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (dialogCtx) => AlertDialog(
-            title: const Text('Usuń pytanie'),
-            content: Text('Na pewno chcesz usunąć pytanie ID $id?'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Anuluj')),
-              FilledButton(onPressed: () => Navigator.pop(dialogCtx, true), child: const Text('Usuń')),
-            ],
-          ),
-        ) ?? false;
-        if (!mounted) return;
-        if (ok) {
-          await _deleteQuestion(id!);
-        }
-      },
-      icon: const Icon(Icons.delete_outline),
-      label: const Text('Usuń'),
-    ),
-    
-    
-  ],
-),
-
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => _openForEdit(q),
+                      icon: Icon(
+                        Icons.edit,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      label: const Text('Edytuj'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed:
+                          id == null ? null : () => _resetTrudnoscOne(id),
+                      icon: Icon(
+                        Icons.restart_alt,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      label: const Text('Restartuj trudność'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed:
+                          id == null
+                              ? null
+                              : () async {
+                                final ok =
+                                    await showDialog<bool>(
+                                      context: context,
+                                      builder:
+                                          (dialogCtx) => AlertDialog(
+                                            title: const Text('Usuń pytanie'),
+                                            content: Text(
+                                              'Na pewno chcesz usunąć pytanie ID $id?',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed:
+                                                    () => Navigator.pop(
+                                                      dialogCtx,
+                                                      false,
+                                                    ),
+                                                child: const Text('Anuluj'),
+                                              ),
+                                              FilledButton(
+                                                onPressed:
+                                                    () => Navigator.pop(
+                                                      dialogCtx,
+                                                      true,
+                                                    ),
+                                                child: const Text('Usuń'),
+                                              ),
+                                            ],
+                                          ),
+                                    ) ??
+                                    false;
+                                if (!mounted) return;
+                                if (ok) {
+                                  await _deleteQuestion(id);
+                                }
+                              },
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      label: const Text('Usuń'),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -2204,97 +2510,118 @@ Widget _buildRightToolbar(BuildContext context) {
     );
   }
 
-  Widget _buildLivePreview() {
-  final escapedBody = _escapeLtGt(_contentCtrl.text.trim());
-  final textHtml = _kStyleTag + escapedBody; // tylko treść pytania (bez mediów)
+  // ====== HTML podgląd ======
+  String _buildPreviewHtmlQuestionOnly() {
+    final escapedBody = _escapeLtGt(_contentCtrl.text.trim());
+    String mediaPart = '';
 
-  // zbuduj sam fragment mediów do osobnego Html
-  String mediaHtml = '';
-  if (_mediaKind == MediaKind.image) {
-    String? imgSrc;
-    if ((_uploadedImageUrl ?? '').isNotEmpty) {
-      imgSrc = _uploadedImageUrl!;
-    } else if (_imageCtrl.text.trim().isNotEmpty) {
-      imgSrc = _imageCtrl.text.trim();
-    } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
-      final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
-      final mime = (ext == 'jpg') ? 'jpeg' : ext;
-      imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
+    if (_mediaKind == MediaKind.image) {
+      String? imgSrc;
+      if ((_uploadedImageUrl ?? '').isNotEmpty) {
+        imgSrc = _uploadedImageUrl!;
+      } else if (_imageCtrl.text.trim().isNotEmpty) {
+        imgSrc = _imageCtrl.text.trim();
+      } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
+        final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
+        final mime = (ext == 'jpg') ? 'jpeg' : ext;
+        imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
+      }
+      final h = _imageHeightPx;
+      mediaPart =
+          (imgSrc == null)
+              ? ''
+              : '<div class="media"><img alt="" src="$imgSrc"${h != null ? ' style="height: ${h}px;"' : ''}/></div>';
+    } else if (_mediaKind == MediaKind.video) {
+      final h = _imageHeightPx;
+      if (_uploadedVideoUrl != null) {
+        mediaPart =
+            '<div class="media"><video src="${_uploadedVideoUrl!}"${h != null ? ' style="height: ${h}px;"' : ''} controls preload="metadata"></video></div>';
+      } else if (_videoBytes != null && _videoBytes!.isNotEmpty) {
+        mediaPart =
+            '<div class="media"><video${h != null ? ' style="height: ${h}px;"' : ''} controls preload="metadata"></video></div>';
+      }
     }
-    final h = _imageHeightPx;
-    if (imgSrc != null) {
-      mediaHtml = '<img alt="" src="$imgSrc"${h != null ? ' style="height: ${h}px;"' : ''}/>';
-    }
-  } else if (_mediaKind == MediaKind.video) {
-    final h = _imageHeightPx;
-    if (_uploadedVideoUrl != null) {
-      mediaHtml =
-          '<video src="${_uploadedVideoUrl!}"${h != null ? ' style=""' : ''} controls preload="metadata"></video>';
-    } else if (_videoBytes != null && _videoBytes!.isNotEmpty) {
-      mediaHtml =
-          '<video${h != null ? ' style="height: ${h}px;"' : ''} controls preload="metadata"></video>';
-    }
-    if (mediaHtml.isNotEmpty) mediaHtml = '<br>' + mediaHtml;
+
+    return '$_kStyleTag<div class="question">$escapedBody</div>$mediaPart';
   }
 
-  // KLUCZE: tekst odświeża się zawsze, media tylko gdy zmieni się sygnatura
-  final mediaKey = ValueKey(_currentMediaSignature());
+  Widget _buildLivePreview() {
+    final questionHtml = _buildPreviewHtmlQuestionOnly();
+    final answers =
+        ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+          final label = e.value;
+          final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
+          final body = _escapeLtGt(textCtrl.text.trim());
+          final html = '<div class="answer"><b>$label.</b> $body</div>';
 
-  return Stack(
-    children: [
-      ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text('Podgląd pytania', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // --- Tekst pytania ---
-                  _html(textHtml),
-                  // --- Media (oddzielny subtree) ---
-                  if (mediaHtml.isNotEmpty)
-                    KeyedSubtree(key: mediaKey, child: _html(mediaHtml)),
-                ],
+          return Container(
+            margin: const EdgeInsets.only(top: 6),
+            child: ElevatedButton(
+              onPressed: null,
+              style: ElevatedButton.styleFrom(
+                alignment: Alignment.center,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+              ),
+              child: _html(html),
+            ),
+          );
+        }).toList();
+
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              'Podgląd pytania',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _html(questionHtml),
+                    ...answers,
+                    if (_opisPoprawneCtrl.text.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _html(
+                          '<div class="description correct">${_escapeLtGt(_opisPoprawneCtrl.text.trim())}</div>',
+                        ),
+                      ),
+                    if (_opisNiepoprawneCtrl.text.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: _html(
+                          '<div class="description incorrect">${_escapeLtGt(_opisNiepoprawneCtrl.text.trim())}</div>',
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          ...List.generate(4, (i) {
-            final labels = ['A', 'B', 'C', 'D'];
-            final texts = [_odp1Ctrl.text, _odp2Ctrl.text, _odp3Ctrl.text, _odp4Ctrl.text];
-            final label = labels[i];
-            final body = _escapeLtGt(texts[i]);
-            final html = '<b>$label.</b> $body';
-            return Container(
-              margin: const EdgeInsets.only(top: 6),
-              child: ElevatedButton(
-                onPressed: null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(255, 240, 240, 240),
-                  foregroundColor: Theme.of(context).colorScheme.onSurface,
-                ),
-                child: _html(html),
-              ),
-            );
-          }),
-        ],
-      ),
-      Positioned(
-        top: 8,
-        right: 8,
-        child: IconButton(
-          tooltip: 'Zamknij podgląd',
-          icon: const Icon(Icons.close),
-          onPressed: () => setState(() => _showPreview = false),
+          ],
         ),
-      ),
-    ],
-  );
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            tooltip: 'Zamknij podgląd',
+            icon: const Icon(Icons.close),
+            onPressed: () => setState(() => _showPreview = false),
+          ),
+        ),
+      ],
+    );
+  }
 }
-
-}
-

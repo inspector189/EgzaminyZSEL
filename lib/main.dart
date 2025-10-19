@@ -48,8 +48,14 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Egzaminy',
-      theme: AppThemes.lightTheme(themeProvider.accentColor),
-      darkTheme: AppThemes.darkTheme(themeProvider.accentColor),
+      theme: AppThemes.lightTheme(
+        themeProvider.primaryColor,
+        themeProvider.secondaryColor,
+      ),
+      darkTheme: AppThemes.darkTheme(
+        themeProvider.primaryColor,
+        themeProvider.secondaryColor,
+      ),
       themeMode: themeProvider.themeMode,
       home: const MyHomePage(title: 'Egzaminy'),
     );

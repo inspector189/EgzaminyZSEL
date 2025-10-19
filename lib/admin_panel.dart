@@ -809,7 +809,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   }
 }
 class QuestionStatsPage extends StatefulWidget {
-  const QuestionStatsPage({Key? key}) : super(key: key);
+  const QuestionStatsPage({super.key});
 
   @override
   _QuestionStatsPageState createState() => _QuestionStatsPageState();

@@ -1,43 +1,45 @@
 import 'package:flutter/material.dart';
 
 class AppThemes {
-  static ThemeData lightTheme(Color accent) => ThemeData(
+  static ThemeData lightTheme(Color primaryColor, Color secondaryColor) => ThemeData(
     brightness: Brightness.light,
     colorScheme: ColorScheme.light(
-      primary: accent,
+      primary: primaryColor,
       onPrimary: Colors.white,
       surface: Colors.white,
       onSurface: Colors.black,
-      secondary: accent,
+      secondary: secondaryColor,
       onSecondary: Colors.white,
       error: Colors.red,
       onError: Colors.white,
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: accent,
+      backgroundColor: primaryColor,
       foregroundColor: Colors.white,
       elevation: 0,
     ),
+    dividerColor: const Color(0xFF333333),
     scaffoldBackgroundColor: Colors.white,
   );
 
-  static ThemeData darkTheme(Color accent) => ThemeData(
+  static ThemeData darkTheme(Color primaryColor, Color secondaryColor) => ThemeData(
     brightness: Brightness.dark,
     colorScheme: ColorScheme.dark(
-      primary: accent,
+      primary: primaryColor,
       onPrimary: Colors.white,
       surface: const Color(0xFF222222),
-      onSurface: Colors.white,
-      secondary: accent,
+      onSurface: const Color(0xFFCCCCCC),
+      secondary: secondaryColor,
       onSecondary: Colors.white,
       error: Colors.redAccent,
       onError: Colors.white,
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: accent,
+      backgroundColor: primaryColor,
       foregroundColor: Colors.white,
       elevation: 0,
     ),
+    dividerColor: const Color(0xFFBBBBBB),
     scaffoldBackgroundColor: const Color(0xFF121212),
   );
 }

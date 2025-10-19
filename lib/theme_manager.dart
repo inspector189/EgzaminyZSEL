@@ -3,11 +3,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
-  Color _accentColor = Colors.blue;
+  Color _primaryColor = Colors.blue;
+  Color _secondaryColor = Colors.blueAccent;
 
   ThemeMode get themeMode => _themeMode;
   bool get isDarkMode => _themeMode == ThemeMode.dark;
-  Color get accentColor => _accentColor;
+  Color get primaryColor => _primaryColor;
+  Color get secondaryColor => _secondaryColor;
 
   ThemeProvider() {
     _loadTheme();
@@ -44,8 +46,9 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setAccentColor(Color color) {
-    _accentColor = color;
+  void setAccentColor(Color primaryColor, Color secondaryColor) {
+    _primaryColor = primaryColor;
+    _secondaryColor = secondaryColor;
     notifyListeners();
   }
 }
