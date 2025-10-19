@@ -13,13 +13,63 @@ class EgzaminPodgladView extends StatelessWidget {
 
   Html _html(BuildContext context, String html) {
     html = html.replaceAll('<img', '<br><img');
+    html = html.replaceAll('<video', '<br><video');
 
     return Html(
       data: html,
       style: {
-        "body": Style(color: Theme.of(context).colorScheme.onSurface),
-        "b": Style(color: Theme.of(context).colorScheme.onSurface),
-        "span": Style(
+        'div.questionHeader': Style(
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: FontSize(18),
+          verticalAlign: VerticalAlign.middle,
+        ),
+        'div.question': Style(
+          color: Theme.of(context).colorScheme.onPrimary,
+          fontSize: FontSize(16),
+          verticalAlign: VerticalAlign.middle,
+        ),
+        'div.answer': Style(
+          color: Theme.of(context).colorScheme.onPrimary,
+          fontSize: FontSize(14),
+          verticalAlign: VerticalAlign.middle,
+          textShadow: <Shadow>[
+            Shadow(
+              offset: Offset(3.0, 3.0),
+              blurRadius: 2.0,
+              color: Colors.black,
+            ),
+            Shadow(
+              offset: Offset(1.0, 1.0),
+              blurRadius: 2.0,
+              color: Colors.black,
+            ),
+          ],
+        ),
+        'div.description.correct': Style(
+          color: Colors.green,
+          fontSize: FontSize(14),
+          fontStyle: FontStyle.italic,
+        ),
+        'div.description.incorrect': Style(
+          color: Colors.red,
+          fontSize: FontSize(14),
+          fontStyle: FontStyle.italic,
+        ),
+        'div.description.unselected': Style(
+          color: Colors.amberAccent,
+          fontSize: FontSize(14),
+          fontStyle: FontStyle.italic,
+        ),
+        'b': Style(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.bold,
+          verticalAlign: VerticalAlign.middle,
+        ),
+        'div.media': Style(
+          margin: Margins.symmetric(vertical: 12),
+          textAlign: TextAlign.center,
+        ),
+        'span': Style(
           color:
               html.contains("style='color:green;'")
                   ? Colors.green
@@ -31,42 +81,48 @@ class EgzaminPodgladView extends StatelessWidget {
           tagsToExtend: {'img'},
           builder: (extensionContext) {
             final src = extensionContext.attributes['src'];
-            if (src != null) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                child: Builder(
-                  builder:
-                      (context) => Center(
-                        child: Tooltip(
-                          message: 'Kliknij, aby powiększyć',
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: GestureDetector(
-                              onTap: () => _showImageDialog(context, src),
-                              child: Image.network(
-                                src,
-                                fit: BoxFit.contain,
-                                errorBuilder:
-                                    (context, error, stackTrace) => Text(
-                                      '❌ Nie udało się załadować obrazka',
-                                      style: TextStyle(
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface,
-                                      ),
-                                    ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                ),
+            double? forcedHeight;
+            final styleAttr = extensionContext.attributes['style'] ?? '';
+            final m = RegExp(
+              r'height\s*:\s*(\d+)\s*px',
+              caseSensitive: false,
+            ).firstMatch(styleAttr);
+            if (m != null) {
+              forcedHeight = double.tryParse(m.group(1)!);
+            } else {
+              final hAttr = extensionContext.attributes['height'];
+              if (hAttr != null) forcedHeight = double.tryParse(hAttr);
+            }
+
+            if (src == null || src.isEmpty) {
+              return Text(
+                '⚠️ Brak obrazka',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
               );
             }
-            return Text(
-              '⚠️ Brak obrazka',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: GestureDetector(
+                    onTap: () => _showImageDialog(context, src),
+                    child: Image.network(
+                      src,
+                      height: forcedHeight,
+                      fit: BoxFit.contain,
+                      errorBuilder:
+                          (context, error, stackTrace) => Text(
+                            '❌ Nie udało się załadować obrazka',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                    ),
+                  ),
+                ),
+              ),
             );
           },
         ),
@@ -169,6 +225,9 @@ class EgzaminPodgladView extends StatelessWidget {
           final selected = selectedAnswers[index];
           final isCorrect = selected == q['poprawna'];
 
+          final questionHtml =
+              '<div class="questionHeader"><b>Pytanie ${index + 1}${q['id'] != null ? ' (ID ${q['id']})' : ''}:</b></div><br><div class="question">${q['pytanie']}</div>';
+
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 8),
             child: Padding(
@@ -176,23 +235,25 @@ class EgzaminPodgladView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _html(
-                    context,
-                    "<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}",
-                  ),
+                  _html(context, questionHtml),
                   const SizedBox(height: 10),
                   ...['A', 'B', 'C', 'D'].map((litera) {
                     final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
                     final isCorrectAnswer = litera == q['poprawna'];
                     final isSelected = selected == litera;
+                    final isWrong = isSelected && !isCorrect;
 
                     Color? buttonColor;
                     if (isCorrectAnswer) {
-                      buttonColor = Colors.green;
-                    } else if (isSelected && !isCorrect) {
-                      buttonColor = Colors.red;
+                      buttonColor = Colors.green.withValues();
+                    } else if (isWrong) {
+                      buttonColor = Colors.red.withValues();
+                    } else if (isSelected) {
+                      buttonColor = Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.8);
                     } else {
-                      buttonColor = null;
+                      buttonColor = Theme.of(context).colorScheme.surface;
                     }
 
                     return Container(
@@ -201,10 +262,21 @@ class EgzaminPodgladView extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: buttonColor,
                           foregroundColor:
-                              Theme.of(context).colorScheme.onSurface,
+                              Theme.of(context).colorScheme.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 2,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
                         ),
                         onPressed: () {},
-                        child: _html(context, odp ?? ""),
+                        child: _html(
+                          context,
+                          '<div class="answer">${odp ?? ""}</div>',
+                        ),
                       ),
                     );
                   }),
@@ -213,13 +285,13 @@ class EgzaminPodgladView extends StatelessWidget {
                     _html(
                       context,
                       isCorrect
-                          ? "<b>✅ Odpowiedź $selected jest poprawna.<br>${q['opisPoprawne']}</b>"
-                          : "<b>❌ Odpowiedź $selected jest niepoprawna.<br>${q['opisNiepoprawne']}<br><br><span style='color:green;'>✅ Odpowiedź poprawna to: ${q['poprawna']}</span></b>",
+                          ? '<div class="description correct">✅ Odpowiedź $selected jest poprawna.<br>${q['opisPoprawne']}</div>'
+                          : '<div class="description incorrect">❌ Odpowiedź $selected jest niepoprawna.<br>${q['opisNiepoprawne']}<br><br><span style="color:green;">✅ Odpowiedź poprawna to: ${q['poprawna']}</span></div>',
                     ),
                   if (selected == null)
                     _html(
                       context,
-                      "<b>⚠️ Nie wybrano odpowiedzi.<br><span style='color:green;'>✅ Odpowiedź poprawna to: ${q['poprawna']}</span></b>",
+                      '<div class="description unselected">⚠️ Nie wybrano odpowiedzi.<br><span style="color:green;">✅ Odpowiedź poprawna to: ${q['poprawna']}</span></div>',
                     ),
                 ],
               ),
