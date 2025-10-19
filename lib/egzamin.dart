@@ -5,10 +5,142 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'wyniki.dart';
+
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
+
 //import 'package:html/parser.dart' as html_parser;
+// -- SEARCH (tylko dla TrybEgzaminu.wszystkie) --
+class _InlineVideoPlayer extends StatefulWidget {
+  const _InlineVideoPlayer({required this.url, this.height, Key? key})
+      : super(key: key);
+
+  final String url;
+  final double? height;
+
+  @override
+  State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
+}
+
+class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
+    with AutomaticKeepAliveClientMixin {
+  ChewieController? _chewie;
+  bool _initError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      _chewie = await _VideoPool().getChewie(widget.url);
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) setState(() => _initError = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    // UWAGA: nie niszczymy kontrolerów globalnie, tylko oddajemy referencję
+    _VideoPool().release(widget.url);
+    super.dispose();
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    if (_initError) {
+      return Text('❌ Nie udało się zainicjalizować wideo.',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface));
+    }
+    if (_chewie == null) {
+      return const SizedBox(
+        height: 160,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    final vp = _chewie!.videoPlayerController;
+    final aspect = vp.value.isInitialized && vp.value.aspectRatio != 0
+        ? vp.value.aspectRatio
+        : 16 / 9;
+
+    Widget player = Chewie(controller: _chewie!);
+
+    if (widget.height != null) {
+      final h = widget.height!;
+      player = SizedBox(
+        height: h,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(width: h * aspect, height: h, child: player),
+        ),
+      );
+    } else {
+      player = AspectRatio(aspectRatio: aspect, child: player);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: player,
+    );
+  }
+}
+
+
+class _VideoPool {
+  static final _VideoPool _i = _VideoPool._();
+  _VideoPool._();
+  factory _VideoPool() => _i;
+
+  final Map<String, VideoPlayerController> _vp = {};
+  final Map<String, ChewieController> _chewie = {};
+  final Map<String, int> _refs = {};
+
+  Future<ChewieController> getChewie(String url) async {
+    // Video
+    if (!_vp.containsKey(url)) {
+      final v = VideoPlayerController.networkUrl(Uri.parse(url));
+      await v.initialize();
+      _vp[url] = v;
+    }
+    // Chewie
+    if (!_chewie.containsKey(url)) {
+      _chewie[url] = ChewieController(
+        videoPlayerController: _vp[url]!,
+        autoInitialize: true,
+        autoPlay: false,
+        looping: false,
+        showControls: true,
+        allowMuting: true,
+        allowFullScreen: true,
+        allowPlaybackSpeedChanging: true,
+      );
+    }
+    _refs[url] = (_refs[url] ?? 0) + 1;
+    return _chewie[url]!;
+  }
+
+  void release(String url) {
+    final r = (_refs[url] ?? 0) - 1;
+    if (r > 0) {
+      _refs[url] = r;
+      return;
+    }
+    _refs.remove(url);
+    _chewie.remove(url)?.dispose();
+    _vp.remove(url)?.dispose();
+  }
+}
 
 enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
-
 class EgzaminView extends StatefulWidget {
   final TrybEgzaminu tryb;
   final String kwalifikacja;
@@ -27,6 +159,36 @@ class EgzaminView extends StatefulWidget {
 }
 
 class _EgzaminViewState extends State<EgzaminView> {
+  @override
+  void dispose() {
+    _textSearchCtrl.dispose();
+    super.dispose();
+  }
+
+  final TextEditingController _textSearchCtrl = TextEditingController();
+  String searchText = '';
+  String get _kvalSan => widget.kwalifikacja.replaceAll(' ', '').toLowerCase();
+
+  List<dynamic> get _filteredQuestions {
+  if (widget.tryb != TrybEgzaminu.wszystkie) return questions;
+  final q = searchText.trim().toLowerCase();
+  if (q.isEmpty) return questions;
+
+  return questions.where((e) {
+    final txt = (e['pytanie']?.toString() ?? '').toLowerCase();
+    final a = (e['odp1']?.toString() ?? '').toLowerCase();
+    final b = (e['odp2']?.toString() ?? '').toLowerCase();
+    final c = (e['odp3']?.toString() ?? '').toLowerCase();
+    final d = (e['odp4']?.toString() ?? '').toLowerCase();
+    final idStr = (e['id']?.toString() ?? '').toLowerCase();
+    return txt.contains(q) ||
+           a.contains(q)   ||
+           b.contains(q)   ||
+           c.contains(q)   ||
+           d.contains(q)   ||
+           idStr.contains(q);
+  }).toList();
+}
   bool _isButtonDisabled = false;
   List<dynamic> questions = [];
   int current = 0;
@@ -143,7 +305,7 @@ class _EgzaminViewState extends State<EgzaminView> {
 
             switch (widget.tryb) {
               case TrybEgzaminu.jednoPytanie:
-                selected = [allQuestions..shuffle()].first;
+                selected = [ ... (List.from(allQuestions)..shuffle()) ].take(1).toList();
                 break;
               case TrybEgzaminu.czterdziesciPytan:
                 selected = List.from(allQuestions)..shuffle();
@@ -155,12 +317,11 @@ class _EgzaminViewState extends State<EgzaminView> {
             }
 
             final trudnosci = await fetchTrudnosciZdalnie();
-            final kwalifikacja = widget.kwalifikacja.toLowerCase();
-
             for (var q in selected) {
-              final key = '${q['id']}_$kwalifikacja';
+              final key = '${q['id']}_$_kvalSan';
               q['trudnosc'] = trudnosci[key] ?? 0.0;
             }
+
 
             if (mounted) {
               setState(() {
@@ -175,19 +336,17 @@ class _EgzaminViewState extends State<EgzaminView> {
                 }
               });
 
-              final trudnosciMap = await fetchAllTrudnosci(
-                widget.kwalifikacja.replaceAll(' ', ''),
-              );
+              final trudnosciMap = await fetchAllTrudnosci(_kvalSan); // ← znormalizowana
 
               for (var q in questions) {
-                final id = int.tryParse(q['id'].toString());
+                final id = int.tryParse('${q['id']}');
                 if (id != null && trudnosciMap.containsKey(id)) {
-                  q['trudnosc'] = trudnosciMap[id]?['trudnosc'] ?? 0.0;
-                  q['ilosc_odpowiedzi'] =
-                      trudnosciMap[id]?['ilosc_odpowiedzi'] ?? 0;
+                  q['trudnosc'] = trudnosciMap[id]?['trudnosc'] ?? (q['trudnosc'] ?? 0.0);
+                  q['ilosc_odpowiedzi'] = trudnosciMap[id]?['ilosc_odpowiedzi'] ?? 0;
                 }
               }
-              setState(() {}); // <- odświeża widok z uzupełnionymi danymi
+              setState(() {}); // odśwież
+
             }
           }
         } else {
@@ -246,41 +405,45 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Future<Map<int, Map<String, dynamic>>> fetchAllTrudnosci(
-    String kwalifikacja,
-  ) async {
-    final url = Uri.parse(
-      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
-    );
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final List<dynamic> jsonList = json.decode(response.body);
-        final Map<int, Map<String, dynamic>> result = {};
+  String kwalifikacjaSan, // ← przekaż już znormalizowaną nazwę
+) async {
+  final url = Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php');
 
-        for (final item in jsonList) {
-          final int? id = int.tryParse(item['pytanie_id'].toString());
-          if (id != null) {
-            result[id] = {
-              'trudnosc': item['trudnosc'] ?? 0.0,
-              'ilosc_odpowiedzi': item['ilosc_odpowiedzi'] ?? 0,
-            };
-          }
-        }
+  try {
+    final response = await http.get(url);
+    if (response.statusCode != 200) return {};
 
-        return result;
-      } else {
-        if (kDebugMode) {
-          debugPrint('❌ Kod błędu HTTP: ${response.statusCode}');
-        }
-        return {};
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Błąd fetchAllTrudnosci: $e');
-      }
-      return {};
+    final List<dynamic> jsonList = json.decode(response.body);
+    final Map<int, Map<String, dynamic>> result = {};
+
+    for (final item in jsonList) {
+      final String itemKwal = (item['kwalifikacja'] ?? '')
+          .toString()
+          .replaceAll(' ', '')
+          .toLowerCase();
+
+      if (itemKwal != kwalifikacjaSan) continue; // ← KLUCZOWE filtrowanie
+
+      final int? id = int.tryParse('${item['pytanie_id']}');
+      if (id == null) continue;
+
+      final double trud = (item['trudnosc'] is num)
+          ? (item['trudnosc'] as num).toDouble()
+          : double.tryParse('${item['trudnosc']}') ?? 0.0;
+
+      final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
+
+      result[id] = {
+        'trudnosc': trud,
+        'ilosc_odpowiedzi': ilosc,
+      };
     }
+    return result;
+  } catch (_) {
+    return {};
   }
+}
+
 
   Future<void> zapiszTrudnoscDoBazy(
     int pytanieId,
@@ -566,6 +729,7 @@ class _EgzaminViewState extends State<EgzaminView> {
 
   Html _html(String html) {
     html = html.replaceAll('<img', '<br><img');
+    html = html.replaceAll('<video', '<br><video'); // <- DODANE
 
     return Html(
       data: html,
@@ -579,50 +743,126 @@ class _EgzaminViewState extends State<EgzaminView> {
                   : Theme.of(context).colorScheme.onSurface,
         ),
       },
-      extensions: [
+            extensions: [
+        // --- istniejący TagExtension dla IMG (zostawiasz bez zmian) ---
         TagExtension(
-          tagsToExtend: {'img'},
-          builder: (extensionContext) {
-            final src = extensionContext.attributes['src'];
-            if (src != null) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                child: Builder(
-                  builder:
-                      (context) => Center(
-                        child: Tooltip(
-                          message: 'Kliknij, aby powiększyć',
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: GestureDetector(
-                              onTap: () => _showImageDialog(context, src),
-                              child: Image.network(
-                                src,
-                                fit: BoxFit.contain,
-                                errorBuilder:
-                                    (context, error, stackTrace) => Text(
-                                      '❌ Nie udało się załadować obrazka',
-                                      style: TextStyle(
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.surface,
-                                      ),
-                                    ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                ),
-              );
-            }
-            return Text(
-              '⚠️ Brak obrazka',
-              style: TextStyle(color: Theme.of(context).colorScheme.surface),
-            );
-          },
+  tagsToExtend: {'img'},
+  builder: (ctx) {
+    final src = ctx.attributes['src'];
+    if (src == null || src.isEmpty) {
+      return Text('⚠️ Brak obrazka',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurface));
+    }
+
+    // --- Parsowanie wymiarów z atrybutów i stylu ---
+    double? w;
+    double? h;
+
+    double? _parsePx(String? v) {
+      if (v == null) return null;
+      final s = v.trim();
+      if (s.endsWith('px')) return double.tryParse(s.replaceAll('px','').trim());
+      return double.tryParse(s);
+    }
+
+    double? _parsePercent(String? v, double base) {
+      if (v == null) return null;
+      final m = RegExp(r'^(\d+(?:\.\d+)?)\s*%$').firstMatch(v.trim());
+      if (m == null) return null;
+      final p = double.tryParse(m.group(1)!);
+      return p == null ? null : base * (p / 100.0);
+    }
+
+    final styleAttr = ctx.attributes['style'] ?? '';
+    final styleW = RegExp(r'width\s*:\s*([^;]+)', caseSensitive: false)
+        .firstMatch(styleAttr)
+        ?.group(1)
+        ?.trim();
+    final styleH = RegExp(r'height\s*:\s*([^;]+)', caseSensitive: false)
+        .firstMatch(styleAttr)
+        ?.group(1)
+        ?.trim();
+
+    final attrW = ctx.attributes['width']?.trim();
+    final attrH = ctx.attributes['height']?.trim();
+
+    final screenW = MediaQuery.of(context).size.width;
+
+    // Priorytet: style -> atrybuty. Obsłuż % i px.
+    w = _parsePx(styleW) ?? _parsePx(attrW) ?? _parsePercent(styleW, screenW) ?? _parsePercent(attrW, screenW);
+    h = _parsePx(styleH) ?? _parsePx(attrH); // wysokość w % bywa kłopotliwa → zwykle pomijamy
+
+    // Maksymalna responsywna szerokość, żeby obrazek nie “uciekał” poza ekran
+    final maxW = screenW * 0.9;
+
+    Widget img = Image.network(
+      src,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => Text(
+        '❌ Nie udało się załadować obrazka',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+      ),
+    );
+
+    // Zastosuj rozmiary, jeśli są
+    if (w != null || h != null) {
+      img = SizedBox(width: w, height: h, child: FittedBox(fit: BoxFit.contain, child: img));
+    }
+
+    // Owiń w ograniczenie szerokości i powiększanie po tapnięciu
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxW),
+          child: GestureDetector(
+            onTap: () => _showImageDialog(context, src),
+            child: img,
+          ),
         ),
+      ),
+    );
+  },
+),
+
+        // --- NOWY TagExtension dla VIDEO ---
+        TagExtension(
+  tagsToExtend: {'video'},
+  builder: (ctx) {
+    final src = ctx.attributes['src'] ?? ctx.attributes['data-src'];
+
+    double? forcedHeight;
+    final styleAttr = ctx.attributes['style'] ?? '';
+    final m = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false)
+        .firstMatch(styleAttr);
+    if (m != null) {
+      forcedHeight = double.tryParse(m.group(1)!);
+    } else {
+      final hAttr = ctx.attributes['height'];
+      if (hAttr != null) forcedHeight = double.tryParse(hAttr);
+    }
+
+    if (src == null || src.isEmpty) {
+      return Text('⚠️ Brak źródła wideo',
+          style: TextStyle(color: Theme.of(context).colorScheme.surface));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Align(
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: _InlineVideoPlayer(
+            key: GlobalObjectKey('video:$src'), // ★ stabilny klucz
+            url: src,
+            height: forcedHeight,
+          ),
+        ),
+      ),
+    );
+  },
+),
       ],
     );
   }
@@ -791,66 +1031,152 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Widget _buildScrollableList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: questions.length,
-      addAutomaticKeepAlives: false,
-      itemBuilder: (context, index) {
-        final q = questions[index];
-        final selected = selectedAnswers[index];
+  final isAll = widget.tryb == TrybEgzaminu.wszystkie;
+  final items = isAll ? _filteredQuestions : questions;
 
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: _html(
-                        "<b>Pytanie ${index + 1}:</b><br>${q['pytanie']}",
-                      ),
+  return CustomScrollView(
+    slivers: [
+      if (isAll)
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _PinnedSearchHeader(
+            height: 98, // możesz dopasować wysokość
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _textSearchCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Szukaj w treści / odpowiedziach / ID',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                      isDense: true,
                     ),
-                    _buildBadge(q),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ...['A', 'B', 'C', 'D'].map((litera) {
-                  final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
-
-                  Color? buttonColor;
-                  if (selected == litera) {
-                    buttonColor = const Color.fromARGB(255, 150, 150, 150);
-                  }
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: buttonColor,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onPrimary,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          selectedAnswers[index] = litera;
-                        });
-                      },
-                      child: _html(odp ?? ""),
+                    onChanged: (v) => setState(() => searchText = v),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Znalezione: ${items.length} / ${questions.length}',
+                    style: TextStyle(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.8),
                     ),
-                  );
-                }),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
-        );
-      },
+        ),
+
+      // odstęp wokół listy kart
+      const SliverPadding(padding: EdgeInsets.only(top: 8)),
+
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        sliver: SliverList.builder(
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final q = items[index] as Map<String, dynamic>;
+
+            // mapujemy na oryginalny indeks w 'questions',
+            // aby zachować zaznaczenia po filtrze:
+            final originalIndex = questions.indexOf(q);
+            final selected = selectedAnswers[originalIndex];
+
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // nagłówek pytania
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: _html(
+                            "<b>Pytanie ${originalIndex + 1}"
+                            "${q['id'] != null ? ' (ID ${q['id']})' : ''}:</b><br>${q['pytanie']}",
+                          ),
+                        ),
+                        _buildBadge(q),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // odpowiedzi
+                    ...['A', 'B', 'C', 'D'].map((litera) {
+                      final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
+
+                      Color? buttonColor;
+                      if (selected == litera) {
+                        buttonColor = const Color.fromARGB(255, 150, 150, 150);
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: buttonColor,
+                            foregroundColor: Theme.of(context)
+                                .colorScheme
+                                .onPrimary,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              selectedAnswers[originalIndex] = litera;
+                            });
+                          },
+                          child: _html(odp ?? ""),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ],
+  );
+}
+
+
+}
+
+class _PinnedSearchHeader extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _PinnedSearchHeader({required this.child, this.height = 98});
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      elevation: overlapsContent ? 2 : 0, // delikatny cień gdy treść pod spodem
+      child: child,
     );
   }
+
+  @override
+  bool shouldRebuild(covariant _PinnedSearchHeader oldDelegate) {
+    return oldDelegate.height != height || oldDelegate.child != child;
+  }
 }
+
 
 class _InteractiveImage extends StatefulWidget {
   final String imageUrl;

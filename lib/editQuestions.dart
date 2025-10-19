@@ -68,6 +68,8 @@ class EditQuestionsPage extends StatefulWidget {
   State<EditQuestionsPage> createState() => _EditQuestionsPageState();
 }
 class _InlineVideoPlayer extends StatefulWidget {
+
+  
   const _InlineVideoPlayer({this.url, this.filePath, this.blobUrl, this.height, super.key})
       : assert(url != null || filePath != null || blobUrl != null,
             'Podaj url, filePath albo blobUrl (co najmniej jedno)');
@@ -125,7 +127,7 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
     super.dispose();
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     if (_initError || _vp == null) {
       return Text('❌ Nie udało się zainicjalizować wideo.',
@@ -137,6 +139,7 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
 
     final h = widget.height;
     final aspect = _vp!.value.aspectRatio == 0 ? 16 / 9 : _vp!.value.aspectRatio;
+
     Widget player = Chewie(controller: _chewie!);
     if (h != null) {
       player = SizedBox(
@@ -149,8 +152,21 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
     } else {
       player = AspectRatio(aspectRatio: aspect, child: player);
     }
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: player);
+
+    // ⬇⬇⬇ DODAJ TEN WRAPPER FOCUS ⬇⬇⬇
+    player = Focus(
+      canRequestFocus: false,
+      descendantsAreFocusable: false,
+      skipTraversal: true,
+      child: player,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: player,
+    );
   }
+
 }
 
 class _EditQuestionsPageState extends State<EditQuestionsPage> {
@@ -460,26 +476,41 @@ String _stripStyleAndImage(String html) {
   }
 
   Future<Map<int, Map<String, dynamic>>> _fetchAllTrudnosci() async {
-    final url = Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php');
-    final res = await http.get(url);
-    if (res.statusCode == 200) {
-      final List<dynamic> jsonList = json.decode(res.body);
-      final Map<int, Map<String, dynamic>> result = {};
-      for (final item in jsonList) {
-        final int? id = int.tryParse(item['pytanie_id'].toString());
-        if (id != null) {
-          result[id] = {
-            'trudnosc': (item['trudnosc'] is num)
-                ? (item['trudnosc'] as num).toDouble()
-                : double.tryParse('${item['trudnosc']}') ?? 0.0,
-            'ilosc_odpowiedzi': item['ilosc_odpowiedzi'] ?? 0,
-          };
-        }
-      }
-      return result;
-    }
-    return {};
+  final url = Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php');
+  final res = await http.get(url);
+
+  if (res.statusCode != 200) return {};
+
+  final String kval = _sanitizedTable(); // np. "inf03"
+  final List<dynamic> jsonList = json.decode(res.body);
+  final Map<int, Map<String, dynamic>> result = {};
+
+  for (final item in jsonList) {
+    // filtr po kwalifikacji (bez spacji, małe litery – tak samo jak _sanitizedTable)
+    final String itemKval = (item['kwalifikacja'] ?? '')
+        .toString()
+        .replaceAll(' ', '')
+        .toLowerCase();
+    if (itemKval != kval) continue;
+
+    final int? id = int.tryParse('${item['pytanie_id']}');
+    if (id == null) continue;
+
+    final double trud = (item['trudnosc'] is num)
+        ? (item['trudnosc'] as num).toDouble()
+        : double.tryParse('${item['trudnosc']}') ?? 0.0;
+
+    final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
+
+    result[id] = {
+      'trudnosc': trud,
+      'ilosc_odpowiedzi': ilosc,
+    };
   }
+
+  return result;
+}
+
 
   // ====== wyszukiwarka ======
   void _applyTextFilter(String value) {
@@ -1168,6 +1199,131 @@ String _stripStyleAndImage(String html) {
     }
   }
 
+// --- DODAJ NA POZIOMIE KLASY (poza _html) ---
+bool _busyResetAll = false;
+final String _apiToken = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+
+Future<void> _resetTrudnoscAll() async {
+  final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Resetować trudności wszystkich pytań?'),
+          content: const Text('Ta operacja wyczyści statystyki trudności dla całej kwalifikacji.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Anuluj')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Resetuj')),
+          ],
+        ),
+      ) ?? false;
+  if (!ok) return;
+
+  setState(() => _busyResetAll = true);
+  try {
+    final res = await http.post(
+      Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+        'Authorization': 'Bearer $_apiToken',
+      },
+      body: {'kwalifikacja': _sanitizedTable()},
+    );
+    if (res.statusCode != 200) {
+      throw 'HTTP ${res.statusCode}: ${res.body}';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('✅ Zresetowano trudności dla wszystkich pytań')),
+    );
+    await _loadAll();
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('❌ Błąd resetu: $e')),
+    );
+  } finally {
+    if (mounted) setState(() => _busyResetAll = false);
+  }
+}
+
+Future<void> _resetTrudnoscOne(int id) async {
+  final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Resetować trudność pytania ID $id?'),
+          content: const Text('Wyzeruje statystyki dla tego jednego pytania.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Anuluj')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Resetuj')),
+          ],
+        ),
+      ) ?? false;
+  if (!ok) return;
+
+  try {
+    final res = await http.post(
+      Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+        'Authorization': 'Bearer $_apiToken',
+      },
+      body: {'kwalifikacja': _sanitizedTable(), 'pytanie_id': '$id'},
+    );
+    if (res.statusCode != 200) {
+      throw 'HTTP ${res.statusCode}: ${res.body}';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ Zresetowano trudność pytania ID $id')),
+    );
+    await _loadAll();
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('❌ Błąd resetu pytania $id: $e')),
+    );
+  }
+}
+
+Widget _buildRightToolbar(BuildContext context) {
+  final found = _filteredQuestions.length;
+  final total = questions.length;
+
+  return Material(
+    color: Theme.of(context).colorScheme.surface,
+    elevation: 1,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Row(
+        children: [
+          Icon(Icons.filter_alt, size: 20, color: Theme.of(context).colorScheme.onSurface),
+          const SizedBox(width: 8),
+          Text(
+            'Wyniki: $found / $total',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          if (searchText.isNotEmpty)
+            TextButton.icon(
+              onPressed: () {
+                _textSearchCtrl.clear();
+                _applyTextFilter('');
+              },
+              icon: const Icon(Icons.clear),
+              label: const Text('Wyczyść filtr'),
+            ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: _busyResetAll ? null : _resetTrudnoscAll,
+            icon: _busyResetAll
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh),
+            label: const Text('Resetuj trudności (wszystkie)'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
   // ====== Render HTML (z obsługą <img> i <video>) ======
   Html _html(String html) {
     html = html.replaceAll('<img', '<br><img');
@@ -1352,7 +1508,13 @@ String _stripStyleAndImage(String html) {
                   alignment: Alignment.center, // wyśrodkuj w kolumnie HTML-a
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 720), // ładna szerokość
-                    child: _InlineVideoPlayer(url: src, height: forcedHeight),
+                    child: Focus(
+                      canRequestFocus: false,
+                      descendantsAreFocusable: false,
+                      skipTraversal: true,
+                      child: _InlineVideoPlayer(url: src, height: forcedHeight),
+                    ),
+
                   ),
                 ),
               );
@@ -1375,9 +1537,16 @@ String _stripStyleAndImage(String html) {
                       style: TextStyle(color: Theme.of(context).colorScheme.surface),
                     );
                   }
-                  final Widget player = kIsWeb
-                      ? _InlineVideoPlayer(blobUrl: p, height: forcedHeight)
-                      : _InlineVideoPlayer(filePath: p, height: forcedHeight);
+                  final Widget playerCore = kIsWeb
+                    ? _InlineVideoPlayer(blobUrl: p, height: forcedHeight)
+                    : _InlineVideoPlayer(filePath: p, height: forcedHeight);
+
+                final Widget player = Focus(
+                  canRequestFocus: false,
+                  descendantsAreFocusable: false,
+                  skipTraversal: true,
+                  child: playerCore,
+                );
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1530,8 +1699,16 @@ String _stripStyleAndImage(String html) {
   Widget build(BuildContext context) {
     final leftPanel = _buildLeftPanel(context);
     final rightList = isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : (_showPreview ? _buildLivePreview() : _buildList());
+    ? const Center(child: CircularProgressIndicator())
+    : (_showPreview
+        ? _buildLivePreview()
+        : Column(
+            children: [
+              _buildRightToolbar(context),
+              const Divider(height: 1),
+              Expanded(child: _buildList()),
+            ],
+          ));
 
     return Scaffold(
       appBar: AppBar(
@@ -1980,49 +2157,45 @@ String _stripStyleAndImage(String html) {
                 const SizedBox(height: 8),
 
                 Row(
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => _openForEdit(q),
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edytuj'),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: id == null
-                          ? null
-                          : () async {
-                              final ok = await showDialog<bool>(
-                                    context: context,
-                                    builder: (dialogCtx) => AlertDialog(
-                                      title: const Text('Usuń pytanie'),
-                                      content: Text(
-                                          'Na pewno chcesz usunąć pytanie ID $id?'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(dialogCtx, false),
-                                          child: const Text('Anuluj'),
-                                        ),
-                                        FilledButton(
-                                          onPressed: () =>
-                                              Navigator.pop(dialogCtx, true),
-                                          child: const Text('Usuń'),
-                                        ),
-                                      ],
-                                    ),
-                                  ) ??
-                                  false;
+  children: [
+    TextButton.icon(
+      onPressed: () => _openForEdit(q),
+      icon: const Icon(Icons.edit),
+      label: const Text('Edytuj'),
+    ),
+    const SizedBox(width: 8),
+    TextButton.icon(
+      onPressed: id == null ? null : () => _resetTrudnoscOne(id!),
+      icon: const Icon(Icons.restart_alt),
+      label: const Text('Restartuj trudność'),
+    ),
+    const SizedBox(width: 8),
+    TextButton.icon(
+      onPressed: id == null ? null : () async {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            title: const Text('Usuń pytanie'),
+            content: Text('Na pewno chcesz usunąć pytanie ID $id?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Anuluj')),
+              FilledButton(onPressed: () => Navigator.pop(dialogCtx, true), child: const Text('Usuń')),
+            ],
+          ),
+        ) ?? false;
+        if (!mounted) return;
+        if (ok) {
+          await _deleteQuestion(id!);
+        }
+      },
+      icon: const Icon(Icons.delete_outline),
+      label: const Text('Usuń'),
+    ),
+    
+    
+  ],
+),
 
-                              if (!mounted) return;
-                              if (ok) {
-                                await _deleteQuestion(id);
-                              }
-                            },
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Usuń'),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
