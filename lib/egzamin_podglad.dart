@@ -69,12 +69,6 @@ class EgzaminPodgladView extends StatelessWidget {
           margin: Margins.symmetric(vertical: 12),
           textAlign: TextAlign.center,
         ),
-        'span': Style(
-          color:
-              html.contains("style='color:green;'")
-                  ? Colors.green
-                  : Theme.of(context).colorScheme.onSurface,
-        ),
       },
       extensions: [
         TagExtension(
@@ -286,12 +280,12 @@ class EgzaminPodgladView extends StatelessWidget {
                       context,
                       isCorrect
                           ? '<div class="description correct">✅ Odpowiedź $selected jest poprawna.<br>${q['opisPoprawne']}</div>'
-                          : '<div class="description incorrect">❌ Odpowiedź $selected jest niepoprawna.<br>${q['opisNiepoprawne']}<br><br><span style="color:green;">✅ Odpowiedź poprawna to: ${q['poprawna']}</span></div>',
+                          : '<div class="description incorrect">❌ Odpowiedź $selected jest niepoprawna.<br>${q['opisNiepoprawne']}<br><div class="description correct">✅ Odpowiedź poprawna to: ${q['poprawna']}</div></div>',
                     ),
                   if (selected == null)
                     _html(
                       context,
-                      '<div class="description unselected">⚠️ Nie wybrano odpowiedzi.<br><span style="color:green;">✅ Odpowiedź poprawna to: ${q['poprawna']}</span></div>',
+                      '<div class="description unselected">⚠️ Nie wybrano odpowiedzi.<br><div class="description correct">✅ Odpowiedź poprawna to: ${q['poprawna']}</div></div>',
                     ),
                 ],
               ),

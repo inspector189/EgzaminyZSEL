@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'wyniki.dart';
+import 'dart:math';
 
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
@@ -308,8 +309,7 @@ class _EgzaminViewState extends State<EgzaminView> {
 
             switch (widget.tryb) {
               case TrybEgzaminu.jednoPytanie:
-                selected =
-                    [...(List.from(allQuestions)..shuffle())].take(1).toList();
+                selected = List.from(allQuestions)..shuffle();
                 break;
               case TrybEgzaminu.czterdziesciPytan:
                 selected = List.from(allQuestions)..shuffle();
@@ -629,7 +629,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       ),
       body:
           widget.tryb == TrybEgzaminu.jednoPytanie
-              ? _buildSingleQuestion(questions.first)
+              ? _buildSingleQuestion(questions[current])
               : _buildScrollableList(),
       bottomNavigationBar:
           widget.tryb == TrybEgzaminu.czterdziesciPytan
@@ -1013,9 +1013,7 @@ class _EgzaminViewState extends State<EgzaminView> {
                         (odpowiedzZatwierdzona && !isSelected)
                             ? null
                             : () => checkAnswer(litera),
-                    child: _html(
-                      '<div class="answer">${odp ?? ""}</div>',
-                    ),
+                    child: _html('<div class="answer">${odp ?? ""}</div>'),
                   ),
                 );
               }),
@@ -1025,7 +1023,7 @@ class _EgzaminViewState extends State<EgzaminView> {
                   child: _html(
                     selectedAnswer == q['poprawna']
                         ? '<div class="description correct">✅ Odpowiedź $selectedAnswer jest poprawna.<br>${q['opisPoprawne']}</div>'
-                        : '<div class="description incorrect">❌ Odpowiedź $selectedAnswer jest niepoprawna.<br>${q['opisNiepoprawne']}<br><br><span style="color:green;">✅ Odpowiedź poprawna to: ${q['poprawna']}</span></div>',
+                        : '<div class="description incorrect">❌ Odpowiedź $selectedAnswer jest niepoprawna.<br>${q['opisNiepoprawne']}<br><div class="description correct">✅ Odpowiedź poprawna to: ${q['poprawna']}</div></div>',
                   ),
                 ),
               const SizedBox(height: 20),
@@ -1053,7 +1051,15 @@ class _EgzaminViewState extends State<EgzaminView> {
 
   void _losujNowePytanie() {
     setState(() {
-      questions.shuffle();
+      if (questions.length <= 1) return;
+
+      final rand = Random();
+      int newIndex = current;
+      while (newIndex == current) {
+        newIndex = rand.nextInt(questions.length);
+      }
+
+      current = newIndex;
       selectedAnswer = null;
       odpowiedzZatwierdzona = false;
     });
@@ -1137,7 +1143,8 @@ class _EgzaminViewState extends State<EgzaminView> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
                                   isSelected
-                                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
+                                      ? Theme.of(context).colorScheme.primary
+                                          .withValues(alpha: 0.8)
                                       : Theme.of(context).colorScheme.surface,
                               foregroundColor:
                                   Theme.of(context).colorScheme.primary,

@@ -74,6 +74,79 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+class _DropdownMenuItem extends StatefulWidget {
+  final IconData icon;
+  final String text;
+  final VoidCallback onTap;
+
+  const _DropdownMenuItem({
+    required this.icon,
+    required this.text,
+    required this.onTap,
+  });
+
+  @override
+  State<_DropdownMenuItem> createState() => _DropdownMenuItemState();
+}
+
+class _DropdownMenuItemState extends State<_DropdownMenuItem> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hoverColor = Theme.of(
+      context,
+    ).colorScheme.primary.withValues(alpha: 0.1);
+    final pressColor = Theme.of(
+      context,
+    ).colorScheme.primary.withValues(alpha: 0.2);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) {
+          setState(() => _isPressed = false);
+          widget.onTap();
+        },
+        onTapCancel: () => setState(() => _isPressed = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color:
+                _isPressed
+                    ? pressColor
+                    : (_isHovered ? hoverColor : Colors.transparent),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.icon,
+                size: 18,
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                widget.text,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MyHomePageState extends State<MyHomePage> {
   late final String selectedQuote;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
@@ -207,98 +280,135 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _showProfilePopup(BuildContext context) {
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
     showMenu(
       context: context,
-      position: const RelativeRect.fromLTRB(1000, 80, 0, 0),
+      position: RelativeRect.fromLTRB(overlay.size.width - 250, 60, 16, 0),
       items: [
         PopupMenuItem(
           enabled: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.grey[300],
-                    child: Text(
-                      _userName![0].toUpperCase(),
-                      style: const TextStyle(fontSize: 20, color: Colors.black),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _userName!,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
+          padding: EdgeInsets.zero,
+          child: Container(
+            width: 250,
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      child: Text(
+                        _userName![0].toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
-                        Text(
-                          _userEmail!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _userName!,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                          Text(
+                            _userEmail!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                  const SizedBox(width: 5),
-                  const Text('Dostępny', style: TextStyle(fontSize: 12)),
-                ],
-              ),
-              const Divider(),
+                  ],
+                ),
 
-              if (_isAdmin)
-                PopupMenuItem(
-                  child: const Text('Panel Administratora'),
+                const SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 14),
+                    SizedBox(width: 6, height: 20),
+                    Text(
+                      'Dostępny',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const Divider(height: 20, thickness: 1),
+
+                if (_isAdmin)
+                  _DropdownMenuItem(
+                    icon: Icons.admin_panel_settings,
+                    text: 'Panel Administratora',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AdminPanelPage(),
+                        ),
+                      );
+                    },
+                  ),
+                _DropdownMenuItem(
+                  icon: Icons.color_lens,
+                  text: 'Personalizacja',
                   onTap: () {
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const AdminPanelPage(),
+                        builder: (context) => const PersonalisationPage(),
                       ),
                     );
                   },
                 ),
-              PopupMenuItem(
-                child: const Text('Personalizacja'),
-                onTap: () {
-                  Future.delayed(Duration.zero, () {
-                    if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PersonalisationPage(),
-                        ),
-                      );
-                    }
-                  });
-                },
-              ),
-
-              PopupMenuItem(
-                child: const Text('Statystyki'),
-                onTap: () {
-                  _openStatistics(context);
-                },
-              ),
-              PopupMenuItem(onTap: _signOut, child: const Text('Wyloguj się')),
-            ],
+                _DropdownMenuItem(
+                  icon: Icons.bar_chart,
+                  text: 'Statystyki',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openStatistics(context);
+                  },
+                ),
+                _DropdownMenuItem(
+                  icon: Icons.logout,
+                  text: 'Wyloguj się',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _signOut();
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ],
-      color: Theme.of(context).colorScheme.surface,
     );
   }
 

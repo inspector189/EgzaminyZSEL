@@ -20,11 +20,13 @@ class EgzaminWynikView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final percentage = (correctAnswers / totalQuestions) * 100;
-    final bool zdane = percentage >= 75;
+    final bool zdane = percentage >= 50;
 
     final resultText = "$correctAnswers / $totalQuestions";
     final message =
-        zdane ? "Gratulacje! Zdałeś egzamin!" : "Niestety, nie udało się zdać egzaminu";
+        zdane
+            ? "Gratulacje! Zdałeś egzamin!"
+            : "Niestety, nie udało się zdać egzaminu";
 
     final color = zdane ? Colors.green : Colors.red;
 
@@ -86,11 +88,13 @@ class EgzaminWynikView extends StatelessWidget {
                       horizontal: 24,
                       vertical: 12,
                     ),
-                    backgroundColor: Colors.blue,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                   ),
-                  child: const Text(
+                  child: Text(
                     "Podgląd egzaminu",
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
                   ),
                 ),
             ],
