@@ -7,60 +7,158 @@ import 'package:flutter_html/flutter_html.dart';
 const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
 class AdminPanelPage extends StatelessWidget {
-  final bool isDarkMode;
-
-  const AdminPanelPage({super.key, this.isDarkMode = false});
+  const AdminPanelPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final adminTiles = [
+      AdminTileData(
+        icon: Icons.people,
+        label: 'Zarządzaj administratorami',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ManageUsersPage()),
+          );
+        },
+      ),
+      AdminTileData(
+        icon: Icons.bar_chart,
+        label: 'Raporty i statystyki',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => AdminStatsPage()),
+          );
+        },
+      ),
+      AdminTileData(
+        icon: Icons.troubleshoot_rounded,
+        label: 'Statystyki trudności pytań',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => QuestionStatsPage()),
+          );
+        },
+      ),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Panel Administratora'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: theme.colorScheme.primary,
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           Text(
             'Witaj w panelu administratora',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 32),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.people),
-            label: const Text('Zarządzaj administratorami'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ManageUsersPage()),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.bar_chart),
-            label: const Text('Raporty i statystyki'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => AdminStatsPage()),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.bar_chart),
-            label: const Text('Statystyki trudności pytań'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => QuestionStatsPage()),
+
+          LayoutBuilder(
+            builder: (context, constraints) {
+              int columns = 1;
+              if (constraints.maxWidth > 1000) {
+                columns = 3;
+              } else if (constraints.maxWidth > 700) {
+                columns = 2;
+              }
+
+              return Wrap(
+                spacing: 20,
+                runSpacing: 20,
+                alignment: WrapAlignment.center,
+                children:
+                    adminTiles.map((tile) {
+                      final tileWidth = constraints.maxWidth / columns - 20;
+                      return SizedBox(
+                        width: tileWidth < 300 ? tileWidth : 300,
+                        child: AdminTile(
+                          icon: tile.icon,
+                          label: tile.label,
+                          onTap: tile.onTap,
+                        ),
+                      );
+                    }).toList(),
               );
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class AdminTileData {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  AdminTileData({required this.icon, required this.label, required this.onTap});
+}
+
+class AdminTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const AdminTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 120,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 36, color: theme.colorScheme.primary),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -133,9 +231,9 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('❌ Błąd ładowania użytkowników: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Błąd ładowania użytkowników: $e')),
+        );
       }
     }
   }
@@ -808,6 +906,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     );
   }
 }
+
 class QuestionStatsPage extends StatefulWidget {
   const QuestionStatsPage({super.key});
 
@@ -838,22 +937,30 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is List) {
-          final enrichedStats = await Future.wait(data.map((item) async {
-            final trudnosc = (item['trudnosc'] is num)
-                ? (item['trudnosc'] as num).toDouble()
-                : double.tryParse(item['trudnosc'].toString()) ?? 0.0;
-            final pytanieId = item['pytanie_id'];
-            final kwalifikacja = item['kwalifikacja']?.replaceAll(' ', '') ?? 'default';
-            final questionData = await fetchQuestionDetails(pytanieId, kwalifikacja);
-            return {
-              'pytanie_id': pytanieId,
-              'kwalifikacja': item['kwalifikacja'],
-              'ilosc_odpowiedzi': item['ilosc_odpowiedzi'],
-              'ilosc_poprawnych_odpowiedzi': item['ilosc_poprawnych_odpowiedzi'],
-              'trudnosc': trudnosc,
-              ...questionData,
-            };
-          }).toList());
+          final enrichedStats = await Future.wait(
+            data.map((item) async {
+              final trudnosc =
+                  (item['trudnosc'] is num)
+                      ? (item['trudnosc'] as num).toDouble()
+                      : double.tryParse(item['trudnosc'].toString()) ?? 0.0;
+              final pytanieId = item['pytanie_id'];
+              final kwalifikacja =
+                  item['kwalifikacja']?.replaceAll(' ', '') ?? 'default';
+              final questionData = await fetchQuestionDetails(
+                pytanieId,
+                kwalifikacja,
+              );
+              return {
+                'pytanie_id': pytanieId,
+                'kwalifikacja': item['kwalifikacja'],
+                'ilosc_odpowiedzi': item['ilosc_odpowiedzi'],
+                'ilosc_poprawnych_odpowiedzi':
+                    item['ilosc_poprawnych_odpowiedzi'],
+                'trudnosc': trudnosc,
+                ...questionData,
+              };
+            }).toList(),
+          );
           setState(() {
             questionStats = enrichedStats;
             isLoading = false;
@@ -880,7 +987,10 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
     }
   }
 
-  Future<Map<String, dynamic>> fetchQuestionDetails(String? pytanieId, String kwalifikacja) async {
+  Future<Map<String, dynamic>> fetchQuestionDetails(
+    String? pytanieId,
+    String kwalifikacja,
+  ) async {
     try {
       final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
       final response = await http.get(url);
@@ -936,14 +1046,22 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
     final Map<String, List<dynamic>> grouped = {};
     for (var r in questionStats) {
       final q = (r['kwalifikacja'] ?? 'Nieznana').toString();
-      final iloscOdp = int.tryParse(r['ilosc_odpowiedzi']?.toString() ?? '0') ?? 0;
-      final trudnosc = (r['trudnosc'] is num ? r['trudnosc'] : double.tryParse(r['trudnosc'].toString()) ?? 0.0) as double;
-      if (iloscOdp >= 2 && trudnosc > 0) { // Filtruj tylko pytania z badge'ami
+      final iloscOdp =
+          int.tryParse(r['ilosc_odpowiedzi']?.toString() ?? '0') ?? 0;
+      final trudnosc =
+          (r['trudnosc'] is num
+                  ? r['trudnosc']
+                  : double.tryParse(r['trudnosc'].toString()) ?? 0.0)
+              as double;
+      if (iloscOdp >= 2 && trudnosc > 0) {
+        // Filtruj tylko pytania z badge'ami
         grouped.putIfAbsent(q, () => []);
         grouped[q]!.add(r);
       }
     }
-    return Map.fromEntries(grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
+    return Map.fromEntries(
+      grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
   }
 
   Html _html(BuildContext context, String html) {
@@ -954,9 +1072,10 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
         "body": Style(color: Theme.of(context).colorScheme.onSurface),
         "b": Style(color: Theme.of(context).colorScheme.onSurface),
         "span": Style(
-          color: html.contains("style='color:green;'")
-              ? Colors.green
-              : Theme.of(context).colorScheme.onSurface,
+          color:
+              html.contains("style='color:green;'")
+                  ? Colors.green
+                  : Theme.of(context).colorScheme.onSurface,
         ),
       },
       extensions: [
@@ -975,12 +1094,13 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
                       child: Image.network(
                         src,
                         fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Text(
-                          '❌ Nie udało się załadować obrazka',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
+                        errorBuilder:
+                            (context, error, stackTrace) => Text(
+                              '❌ Nie udało się załadować obrazka',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
                       ),
                     ),
                   ),
@@ -1019,12 +1139,14 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
                       child: GestureDetector(
                         onTap: () {},
                         child: Listener(
-                          onPointerDown: (_) => setState(() => isPressed = true),
+                          onPointerDown:
+                              (_) => setState(() => isPressed = true),
                           onPointerUp: (_) => setState(() => isPressed = false),
                           child: MouseRegion(
-                            cursor: isPressed
-                                ? SystemMouseCursors.grabbing
-                                : SystemMouseCursors.grab,
+                            cursor:
+                                isPressed
+                                    ? SystemMouseCursors.grabbing
+                                    : SystemMouseCursors.grab,
                             child: InteractiveViewer(
                               panEnabled: true,
                               minScale: 0.5,
@@ -1033,12 +1155,16 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
                                 imageUrl,
                                 width: screenSize.width * 0.8,
                                 fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => Text(
-                                  '❌ Nie udało się załadować obrazka',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                  ),
-                                ),
+                                errorBuilder:
+                                    (context, error, stackTrace) => Text(
+                                      '❌ Nie udało się załadować obrazka',
+                                      style: TextStyle(
+                                        color:
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -1055,8 +1181,12 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
                           color: Theme.of(context).colorScheme.onSurface,
                         ),
                         tooltip: 'Zamknij',
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
+                        onPressed:
+                            () =>
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop(),
                       ),
                     ),
                   ],
@@ -1071,10 +1201,12 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
 
   Widget _buildDifficultyBadge(dynamic stat) {
     final trudnoscRaw = stat['trudnosc'];
-    final iloscOdp = int.tryParse(stat['ilosc_odpowiedzi']?.toString() ?? '0') ?? 0;
+    final iloscOdp =
+        int.tryParse(stat['ilosc_odpowiedzi']?.toString() ?? '0') ?? 0;
     if (trudnoscRaw == null || iloscOdp < 2) return const SizedBox.shrink();
 
-    final trudnosc = (trudnoscRaw is num ? trudnoscRaw : trudnoscRaw.toInt()) as int;
+    final trudnosc =
+        (trudnoscRaw is num ? trudnoscRaw : trudnoscRaw.toInt()) as int;
     final isTrudne = trudnosc > 50;
 
     return Container(
@@ -1085,7 +1217,11 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
       ),
       child: Text(
         '${isTrudne ? 'TRUDNE' : 'ŁATWE'} ($trudnosc%)',
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -1096,7 +1232,11 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
     final totalAnswers = q['ilosc_odpowiedzi'] ?? '0';
     final correctAnswers = q['ilosc_poprawnych_odpowiedzi'] ?? '0';
     final difficulty = q['trudnosc']?.toStringAsFixed(1) ?? '0';
-    final successRate = totalAnswers != '0' ? ((int.parse(correctAnswers) / int.parse(totalAnswers)) * 100).toStringAsFixed(1) : '0';
+    final successRate =
+        totalAnswers != '0'
+            ? ((int.parse(correctAnswers) / int.parse(totalAnswers)) * 100)
+                .toStringAsFixed(1)
+            : '0';
     final pytanie = q['pytanie'] ?? 'Brak treści pytania';
     final odp1 = q['odp1'] ?? 'Brak odpowiedzi 1';
     final odp2 = q['odp2'] ?? 'Brak odpowiedzi 2';
@@ -1114,9 +1254,7 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: _html(context, "<b>Pytanie #$questionId</b>"),
-                ),
+                Expanded(child: _html(context, "<b>Pytanie #$questionId</b>")),
                 _buildDifficultyBadge(q),
               ],
             ),
@@ -1124,12 +1262,9 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
             _html(context, "<b>Pytanie:</b><br>$pytanie"),
             const SizedBox(height: 10),
             ...['A', 'B', 'C', 'D'].map((litera) {
-              final odp = {
-                'A': odp1,
-                'B': odp2,
-                'C': odp3,
-                'D': odp4,
-              }[litera] ?? 'Brak odpowiedzi';
+              final odp =
+                  {'A': odp1, 'B': odp2, 'C': odp3, 'D': odp4}[litera] ??
+                  'Brak odpowiedzi';
               final isCorrectAnswer = litera == poprawna;
 
               return Container(
@@ -1150,12 +1285,17 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
               "<b>✅ Odpowiedź poprawna to: <span style='color:green;'>$poprawna</span></b>",
             ),
             const SizedBox(height: 4),
-            Text('Kwalifikacja: $qualification', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            Text(
+              'Kwalifikacja: $qualification',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
             const SizedBox(height: 4),
             Row(
               children: [
                 Expanded(child: Text('Odpowiedzi: $totalAnswers')),
-                Expanded(child: Text('Poprawne: $correctAnswers ($successRate%)')),
+                Expanded(
+                  child: Text('Poprawne: $correctAnswers ($successRate%)'),
+                ),
               ],
             ),
           ],
@@ -1178,64 +1318,85 @@ class _QuestionStatsPageState extends State<QuestionStatsPage> {
           ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : errorMessage != null
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : errorMessage != null
               ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, size: 64, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text(errorMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: fetchQuestionStats,
-                          child: const Text('Spróbuj ponownie'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: fetchQuestionStats,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: grouped.length,
-                    itemBuilder: (context, index) {
-                      final entry = grouped.entries.elementAt(index);
-                      final kwal = entry.key;
-                      final questions = entry.value;
-                      // Sortowanie od najtrudniejszych do najłatwiejszych
-                      questions.sort((a, b) {
-                        final trudnoscA = (a['trudnosc'] is num ? a['trudnosc'] : double.tryParse(a['trudnosc'].toString()) ?? 0.0) as double;
-                        final trudnoscB = (b['trudnosc'] is num ? b['trudnosc'] : double.tryParse(b['trudnosc'].toString()) ?? 0.0) as double;
-                        return trudnoscB.compareTo(trudnoscA); // Od najtrudniejszych
-                      });
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: ExpansionTile(
-                          title: Row(
-                            children: [
-                              Icon(Icons.school, color: Colors.blue),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '$kwal (${questions.length} pytań)',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                          children: questions.map<Widget>(_buildQuestionCard).toList(),
-                        ),
-                      );
-                    },
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: fetchQuestionStats,
+                        child: const Text('Spróbuj ponownie'),
+                      ),
+                    ],
                   ),
                 ),
+              )
+              : RefreshIndicator(
+                onRefresh: fetchQuestionStats,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: grouped.length,
+                  itemBuilder: (context, index) {
+                    final entry = grouped.entries.elementAt(index);
+                    final kwal = entry.key;
+                    final questions = entry.value;
+                    // Sortowanie od najtrudniejszych do najłatwiejszych
+                    questions.sort((a, b) {
+                      final trudnoscA =
+                          (a['trudnosc'] is num
+                                  ? a['trudnosc']
+                                  : double.tryParse(a['trudnosc'].toString()) ??
+                                      0.0)
+                              as double;
+                      final trudnoscB =
+                          (b['trudnosc'] is num
+                                  ? b['trudnosc']
+                                  : double.tryParse(b['trudnosc'].toString()) ??
+                                      0.0)
+                              as double;
+                      return trudnoscB.compareTo(
+                        trudnoscA,
+                      ); // Od najtrudniejszych
+                    });
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: ExpansionTile(
+                        title: Row(
+                          children: [
+                            Icon(Icons.school, color: Colors.blue),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$kwal (${questions.length} pytań)',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        children:
+                            questions.map<Widget>(_buildQuestionCard).toList(),
+                      ),
+                    );
+                  },
+                ),
+              ),
     );
   }
 }

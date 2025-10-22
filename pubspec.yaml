@@ -40,6 +40,7 @@ dependencies:
   http: ^1.5.0
   oauth2_client: ^4.2.0
   http_parser: ^4.0.2
+  shimmer: ^3.0.0
   #openid_client: ^0.4.9
   #aad_oauth: ^1.0.1
   shared_preferences: ^2.5.3

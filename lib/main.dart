@@ -10,6 +10,7 @@ import 'qualification_page.dart';
 import 'statistics.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:math';
+import 'package:shimmer/shimmer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -58,6 +59,8 @@ class _MyAppState extends State<MyApp> {
       ),
       themeMode: themeProvider.themeMode,
       home: const MyHomePage(title: 'Egzaminy'),
+      themeAnimationDuration: const Duration(milliseconds: 100),
+      themeAnimationCurve: Curves.elasticInOut,
     );
   }
 }
@@ -597,6 +600,10 @@ class _MyHomePageState extends State<MyHomePage> {
                       title: const Text('Przełącz motyw'),
                       onTap: () {
                         Navigator.pop(context);
+                        Provider.of<ThemeProvider>(
+                          context,
+                          listen: false,
+                        ).toggleTheme();
                       },
                     ),
                   ],
@@ -621,6 +628,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   IconButton(
                     icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
                     tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
+                    color: Theme.of(context).colorScheme.onPrimary,
                     onPressed: () async {
                       if (_isLoggedIn) {
                         _showProfilePopup(context);
@@ -638,7 +646,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       }
                     },
                   ),
-                  /*IconButton(
+                  IconButton(
                     icon: Icon(
                       Theme.of(context).brightness == Brightness.dark
                           ? Icons.wb_sunny
@@ -646,8 +654,13 @@ class _MyHomePageState extends State<MyHomePage> {
                       color: Theme.of(context).colorScheme.onPrimary,
                     ),
                     tooltip: 'Przełącz motyw',
-                    
-                  ),*/
+                    onPressed: () {
+                      Provider.of<ThemeProvider>(
+                        context,
+                        listen: false,
+                      ).toggleTheme();
+                    },
+                  ),
                 ]
                 : null,
       ),
@@ -715,10 +728,10 @@ class HomeContent extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               '💬 $selectedQuote',
-              style: const TextStyle(
+              style: TextStyle(
                 fontStyle: FontStyle.italic,
                 fontSize: 16,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -887,7 +900,7 @@ Future<int?> fetchQuestionCount(String kwalifikacja) async {
   return null;
 }
 
-class QuestionTile extends StatefulWidget {
+class QuestionTile extends StatelessWidget {
   final IconData icon;
   final String code;
   final String label;
@@ -901,45 +914,41 @@ class QuestionTile extends StatefulWidget {
     required this.onTap,
   });
 
-  @override
-  State<QuestionTile> createState() => _QuestionTileState();
-}
-
-class _QuestionTileState extends State<QuestionTile> {
-  int? questionCount;
-
-  @override
-  void initState() {
-    super.initState();
-    fetchQuestionCount(widget.code).then((value) {
-      if (mounted) {
-        setState(() {
-          questionCount = value;
-        });
+  Future<int?> fetchQuestionCount(String kwalifikacja) async {
+    try {
+      final sanitized = kwalifikacja.replaceAll('.', '').toLowerCase();
+      final url = Uri.parse('https://interpage.pl/egzaminy/$sanitized.php');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data.length;
       }
-    });
+    } catch (e) {
+      debugPrint('❌ Błąd podczas pobierania danych: $e');
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    double itemWidth = screenWidth < 600 ? screenWidth - 40 : 300;
+    final itemWidth = screenWidth < 600 ? screenWidth - 40 : 300.0;
 
     return InkWell(
-      onTap: () => widget.onTap(widget.code),
+      onTap: () => onTap(code),
       borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Container(
         width: itemWidth,
         height: 200,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 12,
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 10,
               offset: const Offset(0, 6),
             ),
           ],
@@ -947,42 +956,123 @@ class _QuestionTileState extends State<QuestionTile> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              widget.icon,
-              size: 36,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            Icon(icon, size: 36, color: theme.colorScheme.primary),
             const SizedBox(height: 12),
             Text(
-              widget.code,
+              code,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              widget.label,
+              label,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 6),
-            Text(
-              questionCount != null ? '$questionCount pytań' : '⏳ Ładowanie...',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
+            const SizedBox(height: 10),
+
+            FutureBuilder<int?>(
+              future: QuestionCountCache.instance.getCount(code),
+              builder: (context, snapshot) {
+                final theme = Theme.of(context);
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Shimmer.fromColors(
+                    baseColor: theme.colorScheme.primary,
+                    highlightColor: theme.colorScheme.surface,
+                    period: const Duration(milliseconds: 1500),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(
+                              theme.colorScheme.primary.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Ładowanie...',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (snapshot.hasError) {
+                  return Text(
+                    '❌ Błąd',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.error,
+                    ),
+                  );
+                } else if (snapshot.hasData) {
+                  return Text(
+                    '${snapshot.data} pytań',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  );
+                } else {
+                  return Text(
+                    '❌ Brak danych',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  );
+                }
+              },
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class QuestionCountCache {
+  QuestionCountCache._();
+  static final QuestionCountCache instance = QuestionCountCache._();
+
+  final Map<String, Future<int?>> _cache = {};
+
+  Future<int?> getCount(String code) {
+    if (_cache.containsKey(code)) return _cache[code]!;
+
+    final future = _fetchQuestionCount(code);
+    _cache[code] = future;
+    return future;
+  }
+
+  Future<int?> _fetchQuestionCount(String kwalifikacja) async {
+    try {
+      final sanitized = kwalifikacja.replaceAll('.', '').toLowerCase();
+      final url = Uri.parse('https://interpage.pl/egzaminy/$sanitized.php');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data.length;
+      }
+    } catch (e) {
+      debugPrint('❌ Błąd podczas pobierania danych: $e');
+    }
+    return null;
+  }
+
+  void clear() => _cache.clear();
 }
