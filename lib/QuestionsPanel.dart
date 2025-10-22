@@ -169,15 +169,57 @@ Future<void> fetchQuestionStats() async {
 
   Html _html(BuildContext context, String html) {
     html = html.replaceAll('<img', '<br><img');
+    html = html.replaceAll('<video', '<br><video');
+
     return Html(
       data: html,
       style: {
-        "body": Style(color: Theme.of(context).colorScheme.onSurface),
-        "b": Style(color: Theme.of(context).colorScheme.onSurface),
-        "span": Style(
-          color: html.contains("style='color:green;'")
-              ? Colors.green
-              : Theme.of(context).colorScheme.onSurface,
+        'div.questionHeader': Style(
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: FontSize(18),
+          verticalAlign: VerticalAlign.middle,
+        ),
+        'div.question': Style(
+          color: Theme.of(context).colorScheme.onPrimary,
+          fontSize: FontSize(16),
+          verticalAlign: VerticalAlign.middle,
+        ),
+        'div.answer': Style(
+          color: Theme.of(context).colorScheme.onPrimary,
+          fontSize: FontSize(14),
+          verticalAlign: VerticalAlign.middle,
+          textShadow: <Shadow>[
+            Shadow(
+              offset: Offset(3.0, 3.0),
+              blurRadius: 2.0,
+              color: Colors.black,
+            ),
+            Shadow(
+              offset: Offset(1.0, 1.0),
+              blurRadius: 2.0,
+              color: Colors.black,
+            ),
+          ],
+        ),
+        'div.description.correct': Style(
+          color: Colors.green,
+          fontSize: FontSize(14),
+          fontStyle: FontStyle.italic,
+        ),
+        'div.description.incorrect': Style(
+          color: Colors.red,
+          fontSize: FontSize(14),
+          fontStyle: FontStyle.italic,
+        ),
+        'div.description.unselected': Style(
+          color: Colors.amberAccent,
+          fontSize: FontSize(14),
+          fontStyle: FontStyle.italic,
+        ),
+        'b': Style(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.bold,
+          verticalAlign: VerticalAlign.middle,
         ),
       },
       extensions: [
@@ -336,13 +378,13 @@ Future<void> fetchQuestionStats() async {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: _html(context, "<b>Pytanie #$questionId</b>"),
+                  child: _html(context, "<div class='questionHeader'>Pytanie #$questionId</div>"),
                 ),
                 _buildDifficultyBadge(q),
               ],
             ),
             const SizedBox(height: 10),
-            _html(context, "<b>Pytanie:</b><br>$pytanie"),
+            _html(context, "<div class='question'>Pytanie:</div><br>$pytanie"),
             const SizedBox(height: 10),
             ...['A', 'B', 'C', 'D'].map((litera) {
               final odp = {
@@ -368,7 +410,7 @@ Future<void> fetchQuestionStats() async {
             const SizedBox(height: 6),
             _html(
               context,
-              "<b>✅ Odpowiedź poprawna to: <span style='color:green;'>$poprawna</span></b>",
+              "<div class='description.correct'>✅ Odpowiedź $poprawna jest poprawna.</div>",
             ),
             const SizedBox(height: 4),
             Text('Kwalifikacja: $qualification', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
