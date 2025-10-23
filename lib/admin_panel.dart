@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_html/flutter_html.dart';
 import "QuestionsPanel.dart";
 
 const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
@@ -345,74 +344,289 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Zarządzaj administratorami')),
       body:
           isLoading
               ? const Center(child: CircularProgressIndicator())
-              : errorMessage.isNotEmpty
-              ? Center(
-                child: Text(
-                  'Błąd: $errorMessage\n\nSpróbuj ponownie',
-                  textAlign: TextAlign.center,
-                ),
-              )
-              : Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _emailController,
-                            decoration: const InputDecoration(
-                              labelText: 'Nowy email',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.email),
+              : Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Card(
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      color: colorScheme.surfaceContainerHighest,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _emailController,
+                                decoration: InputDecoration(
+                                  labelText:
+                                      'Adres e-mail nowego administratora',
+                                  prefixIcon: const Icon(Icons.email_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                                onSubmitted: (value) {
+                                  addUser(value.trim());
+                                },
+                              ),
                             ),
-                            keyboardType: TextInputType.emailAddress,
-                          ),
+                            const SizedBox(width: 12),
+                            FilledButton.icon(
+                              onPressed:
+                                  () => addUser(_emailController.text.trim()),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Dodaj'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed:
-                              () => addUser(_emailController.text.trim()),
-                          icon: const Icon(Icons.add),
-                          label: const Text('Dodaj'),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child:
+                          users.isEmpty
+                              ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.admin_panel_settings_outlined,
+                                      size: 48,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Brak adminów do zarządzania.',
+                                      style: TextStyle(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              : ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: users.length,
+                                itemBuilder: (context, index) {
+                                  final user = users[index];
+                                  return ModernAdminRow(
+                                    email: user['email'],
+                                    onDelete:
+                                        () => _confirmDeleteAdmin(
+                                          context,
+                                          int.parse(user['id'].toString()),
+                                          user['email'],
+                                        ),
+                                  );
+                                },
+                              ),
+                    ),
+                  ],
+                ),
+              ),
+    );
+  }
+
+  Future<void> _confirmDeleteAdmin(
+    BuildContext context,
+    int id,
+    String email,
+  ) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final bool? confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        final screen = MediaQuery.of(context).size;
+        final isDesktop = screen.width > 600;
+
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 1000 : double.infinity,
+              minWidth: isDesktop ? 500 : 280,
+            ),
+            child: Material(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(28),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 48,
+                      color: colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Usunąć administratora?',
+                      style: theme.textTheme.titleLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      email,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Tego działania nie można cofnąć.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Anuluj'),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton.icon(
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Usuń'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colorScheme.errorContainer,
+                            foregroundColor: colorScheme.onErrorContainer,
+                          ),
+                          onPressed: () => Navigator.pop(context, true),
                         ),
                       ],
                     ),
-                  ),
-                  Expanded(
-                    child:
-                        users.isEmpty
-                            ? const Center(
-                              child: Text('Brak adminów do zarządzania.'),
-                            )
-                            : ListView.builder(
-                              itemCount: users.length,
-                              itemBuilder: (context, index) {
-                                final user = users[index];
-                                return ListTile(
-                                  leading: const Icon(Icons.email),
-                                  title: Text(user['email']),
-                                  trailing: IconButton(
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed:
-                                        () => deleteUser(
-                                          int.parse(user['id'].toString()),
-                                        ),
-                                  ),
-                                );
-                              },
-                            ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      deleteUser(id);
+    }
+  }
+}
+
+class ModernAdminRow extends StatelessWidget {
+  final String email;
+  final VoidCallback onDelete;
+
+  const ModernAdminRow({
+    required this.email,
+    required this.onDelete,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {},
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered)) {
+            return colorScheme.primary.withValues(alpha: 0.05);
+          }
+          if (states.contains(WidgetState.pressed)) {
+            return colorScheme.primary.withValues(alpha: 0.1);
+          }
+          return Colors.transparent;
+        }),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: colorScheme.primaryContainer,
+                radius: 18,
+                child: const Icon(Icons.person_outline, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      email,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      'Administrator systemu',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Usuń administratora',
+                onPressed: onDelete,
+                style: IconButton.styleFrom(
+                  backgroundColor: colorScheme.errorContainer,
+                  foregroundColor: colorScheme.onErrorContainer,
+                ),
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

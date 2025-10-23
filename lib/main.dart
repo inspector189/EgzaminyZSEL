@@ -74,70 +74,48 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _DropdownMenuItem extends StatefulWidget {
+class DropdownMenuItem extends StatelessWidget {
   final IconData icon;
   final String text;
   final VoidCallback onTap;
 
-  const _DropdownMenuItem({
+  const DropdownMenuItem({
     required this.icon,
     required this.text,
     required this.onTap,
+    super.key,
   });
 
   @override
-  State<_DropdownMenuItem> createState() => _DropdownMenuItemState();
-}
-
-class _DropdownMenuItemState extends State<_DropdownMenuItem> {
-  bool _isHovered = false;
-  bool _isPressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    final hoverColor = Theme.of(
-      context,
-    ).colorScheme.primary.withValues(alpha: 0.1);
-    final pressColor = Theme.of(
-      context,
-    ).colorScheme.primary.withValues(alpha: 0.2);
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) {
-          setState(() => _isPressed = false);
-          widget.onTap();
-        },
-        onTapCancel: () => setState(() => _isPressed = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          curve: Curves.easeInOut,
+    final Color hoverColor = colorScheme.primary.withValues(alpha: 0.1);
+    final Color pressedColor = colorScheme.primary.withValues(alpha: 0.2);
+    final Color normalColor = Colors.transparent;
+
+    return Material(
+      color: normalColor,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+
+        overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+          if (states.contains(WidgetState.pressed)) return pressedColor;
+          if (states.contains(WidgetState.hovered)) return hoverColor;
+          return normalColor;
+        }),
+
+        child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          decoration: BoxDecoration(
-            color:
-                _isPressed
-                    ? pressColor
-                    : (_isHovered ? hoverColor : Colors.transparent),
-            borderRadius: BorderRadius.circular(12),
-          ),
           child: Row(
             children: [
-              Icon(
-                widget.icon,
-                size: 18,
-                color: Theme.of(context).colorScheme.secondary,
-              ),
+              Icon(icon, size: 18, color: colorScheme.secondary),
               const SizedBox(width: 10),
               Text(
-                widget.text,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+                text,
+                style: TextStyle(fontSize: 14, color: colorScheme.primary),
               ),
             ],
           ),
@@ -280,21 +258,18 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _showProfilePopup(BuildContext context) {
-    final RenderBox overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(overlay.size.width - 250, 60, 16, 0),
+      position: RelativeRect.fromLTRB(1000, 60, 16, 0),
+      menuPadding: EdgeInsets.only(top: 15, bottom: 5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       items: [
         PopupMenuItem(
           enabled: false,
-          padding: EdgeInsets.zero,
           child: Container(
             width: 250,
-            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -347,7 +322,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
                 Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: 14),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: const Color.fromARGB(255, 126, 233, 3),
+                      size: 15,
+                    ),
                     SizedBox(width: 6, height: 20),
                     Text(
                       'Dostępny',
@@ -359,10 +338,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   ],
                 ),
 
-                const Divider(height: 20, thickness: 1),
-
+                Divider(
+                  height: 20,
+                  thickness: 1,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
                 if (_isAdmin)
-                  _DropdownMenuItem(
+                  DropdownMenuItem(
                     icon: Icons.admin_panel_settings,
                     text: 'Panel Administratora',
                     onTap: () {
@@ -375,7 +357,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       );
                     },
                   ),
-                _DropdownMenuItem(
+                DropdownMenuItem(
                   icon: Icons.color_lens,
                   text: 'Personalizacja',
                   onTap: () {
@@ -388,7 +370,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                   },
                 ),
-                _DropdownMenuItem(
+                DropdownMenuItem(
                   icon: Icons.bar_chart,
                   text: 'Statystyki',
                   onTap: () {
@@ -396,7 +378,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     _openStatistics(context);
                   },
                 ),
-                _DropdownMenuItem(
+                DropdownMenuItem(
                   icon: Icons.logout,
                   text: 'Wyloguj się',
                   onTap: () {
@@ -438,7 +420,7 @@ class _MyHomePageState extends State<MyHomePage> {
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: InkWell(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(16),
             onTap: () {
               _navigatorKey.currentState?.popUntil((route) => route.isFirst);
             },
@@ -449,15 +431,15 @@ class _MyHomePageState extends State<MyHomePage> {
                 vertical: 12,
               ),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(16),
                 color: Colors.transparent,
               ),
               child: Center(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14.0,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondary,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -499,9 +481,9 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Center(
             child: Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14.0,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSecondary,
+                fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -546,9 +528,12 @@ class _MyHomePageState extends State<MyHomePage> {
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primary,
                       ),
-                      child: const Text(
+                      child: Text(
                         'Menu',
-                        style: TextStyle(color: Colors.white, fontSize: 24),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          fontSize: 24,
+                        ),
                       ),
                     ),
                     _drawerItem(context, 'Strona Główna'),
