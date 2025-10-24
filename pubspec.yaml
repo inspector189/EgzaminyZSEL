@@ -30,19 +30,20 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   universal_html: ^2.2.4
-  video_player: ^2.9.1
-  chewie: ^1.7.5
-  file_selector: ^1.0.3
+  video_player: ^2.10.0
+  chewie: ^1.13.0
+  file_selector: ^1.0.4
   flutter:
     sdk: flutter
   html: ^0.15.6
   flutter_html: ^3.0.0
   http: ^1.5.0
   oauth2_client: ^4.2.0
-  http_parser: ^4.0.2
+  http_parser: ^4.1.2
   shimmer: ^3.0.0
   #openid_client: ^0.4.9
   #aad_oauth: ^1.0.1
+  #msal_auth: ^3.3.0
   shared_preferences: ^2.5.3
   url_launcher: ^6.3.2
   flutter_secure_storage: ^10.0.0-beta.4
@@ -62,7 +63,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
