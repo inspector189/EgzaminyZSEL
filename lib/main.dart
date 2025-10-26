@@ -1,31 +1,38 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'theme_manager.dart';
-import 'personalisation_page.dart';
-import 'app_themes.dart';
-import 'dart:io';
-import 'logowanie.dart';
-import 'qualification_page.dart';
-import 'statistics.dart';
-import 'package:flutter/foundation.dart';
-import 'dart:math';
 import 'package:shimmer/shimmer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'ouath2_service.dart';
+
 import 'admin_panel.dart';
+import 'app_themes.dart';
+import 'logowanie.dart';
+import 'ouath2_service.dart';
+import 'personalisation_page.dart';
+import 'qualification_page.dart';
+import 'statistics.dart';
+import 'theme_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
-    ByteData data = await rootBundle.load('assets/cert/interpage.cer');
-    SecurityContext.defaultContext.setTrustedCertificatesBytes(
-      data.buffer.asUint8List(),
-    );
+    try {
+      final ByteData data = await rootBundle.load('assets/cert/interpage.cer');
+      SecurityContext.defaultContext.setTrustedCertificatesBytes(
+        data.buffer.asUint8List(),
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Błąd ładownaia certyfikatu: $e');
+      }
+    }
   }
-
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
@@ -60,7 +67,7 @@ class _MyAppState extends State<MyApp> {
       themeMode: themeProvider.themeMode,
       home: const MyHomePage(title: 'Egzaminy'),
       themeAnimationDuration: const Duration(milliseconds: 100),
-      themeAnimationCurve: Curves.elasticInOut,
+      themeAnimationCurve: Curves.easeInOut,
     );
   }
 }
@@ -74,12 +81,12 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class DropdownMenuItem extends StatelessWidget {
+class ProfileMenuItem extends StatelessWidget {
   final IconData icon;
   final String text;
   final VoidCallback onTap;
 
-  const DropdownMenuItem({
+  const ProfileMenuItem({
     required this.icon,
     required this.text,
     required this.onTap,
@@ -128,10 +135,13 @@ class DropdownMenuItem extends StatelessWidget {
 class _MyHomePageState extends State<MyHomePage> {
   late final String selectedQuote;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
   bool _isLoggedIn = false;
   String? _userName;
   String? _userEmail;
   bool _isAdmin = false;
+
+  bool _isVerifyingEmail = false;
 
   @override
   void initState() {
@@ -167,17 +177,18 @@ class _MyHomePageState extends State<MyHomePage> {
     final prefs = await SharedPreferences.getInstance();
     final userName = prefs.getString('userName');
     final userEmail = prefs.getString('userEmail');
+
+    final bool isLoggedIn = userName != null && userEmail != null;
+
     if (kDebugMode) {
       debugPrint(
         'ℹ️ Sprawdzanie statusu logowania: userName=$userName, userEmail=$userEmail',
       );
     }
     setState(() {
-      _isLoggedIn = userName != null && userEmail != null;
-      if (_isLoggedIn) {
-        _userName = userName;
-        _userEmail = userEmail;
-      }
+      _isLoggedIn = isLoggedIn;
+      _userName = isLoggedIn ? userName : null;
+      _userEmail = isLoggedIn ? userEmail : null;
     });
 
     if (_isLoggedIn && _userEmail != null) {
@@ -192,48 +203,56 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _verifyEmail(String email) async {
+    if (_isVerifyingEmail) return;
+    _isVerifyingEmail = true;
+
     try {
       final url = Uri.parse('https://interpage.pl/egzaminy/verify-email.php');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}),
-      );
+      final response = await HttpService.postJson(url, {'email': email});
 
-      if (response.statusCode == 200) {
+      if (response != null && response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          _isAdmin = data['isValid'] == true;
-        });
+        final bool admin = data['isValid'] == true;
+
+        if (mounted) {
+          setState(() {
+            _isAdmin = admin;
+          });
+        }
+
         if (kDebugMode) {
-          debugPrint('✅ Weryfikacja email: _isAdmin ustawiony na $_isAdmin');
+          debugPrint('✅ Weryfikacja email: isAdmin=$_isAdmin');
         }
       } else {
-        setState(() {
-          _isAdmin = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isAdmin = false;
+          });
+        }
         if (kDebugMode) {
           debugPrint(
-            '❌ Weryfikacja email nie powiodła się: ${response.statusCode}',
+            '❌ Weryfikacja email nie powiodła się: ${response?.statusCode}',
           );
         }
       }
     } catch (e) {
-      setState(() {
-        _isAdmin = false;
-      });
-      if (kDebugMode) {
-        debugPrint('❌ Błąd podczas weryfikacji email: $e');
+      if (mounted) {
+        setState(() {
+          _isAdmin = false;
+        });
       }
+      if (kDebugMode) debugPrint('❌ Błąd weryfikacji email: $e');
+    } finally {
+      _isVerifyingEmail = false;
     }
   }
 
   void _openStatistics(BuildContext context) {
-    Future.delayed(Duration.zero, () {
+    Future.microtask(() {
       if (context.mounted) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => StatisticsPage()),
+          MaterialPageRoute(builder: (context) => const StatisticsPage()),
         );
       }
     });
@@ -258,6 +277,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _showProfilePopup(BuildContext context) {
+    if (_userName == null || _userEmail == null) {
+      return;
+    }
+
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(1000, 60, 16, 0),
@@ -322,12 +345,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.check_circle_rounded,
-                      color: const Color.fromARGB(255, 126, 233, 3),
+                      color: Color.fromARGB(255, 126, 233, 3),
                       size: 15,
                     ),
-                    SizedBox(width: 6, height: 20),
+                    const SizedBox(width: 6, height: 20),
                     Text(
                       'Dostępny',
                       style: TextStyle(
@@ -344,7 +367,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   color: Theme.of(context).colorScheme.onPrimary,
                 ),
                 if (_isAdmin)
-                  DropdownMenuItem(
+                  ProfileMenuItem(
                     icon: Icons.admin_panel_settings,
                     text: 'Panel Administratora',
                     onTap: () {
@@ -357,7 +380,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       );
                     },
                   ),
-                DropdownMenuItem(
+                ProfileMenuItem(
                   icon: Icons.color_lens,
                   text: 'Personalizacja',
                   onTap: () {
@@ -370,7 +393,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                   },
                 ),
-                DropdownMenuItem(
+                ProfileMenuItem(
                   icon: Icons.bar_chart,
                   text: 'Statystyki',
                   onTap: () {
@@ -378,7 +401,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     _openStatistics(context);
                   },
                 ),
-                DropdownMenuItem(
+                ProfileMenuItem(
                   icon: Icons.logout,
                   text: 'Wyloguj się',
                   onTap: () {
@@ -978,23 +1001,6 @@ class HomeContent extends StatelessWidget {
   }
 }
 
-Future<int?> fetchQuestionCount(String kwalifikacja) async {
-  try {
-    final sanitized = kwalifikacja.replaceAll('.', '').toLowerCase();
-    final url = Uri.parse('https://interpage.pl/egzaminy/$sanitized.php');
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data.length;
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      debugPrint('❌ Błąd podczas pobierania danych: $e');
-    }
-  }
-  return null;
-}
-
 class QuestionTile extends StatelessWidget {
   final IconData icon;
   final String code;
@@ -1008,21 +1014,6 @@ class QuestionTile extends StatelessWidget {
     required this.label,
     required this.onTap,
   });
-
-  Future<int?> fetchQuestionCount(String kwalifikacja) async {
-    try {
-      final sanitized = kwalifikacja.replaceAll('.', '').toLowerCase();
-      final url = Uri.parse('https://interpage.pl/egzaminy/$sanitized.php');
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data.length;
-      }
-    } catch (e) {
-      debugPrint('❌ Błąd podczas pobierania danych: $e');
-    }
-    return null;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1140,6 +1131,47 @@ class QuestionTile extends StatelessWidget {
   }
 }
 
+class HttpService {
+  HttpService._();
+  static final http.Client _client = http.Client();
+  static const Duration _defaultTimeout = Duration(seconds: 10);
+
+  static Future<http.Response?> postJson(
+    Uri url,
+    Object body, {
+    Map<String, String>? headers,
+  }) async {
+    try {
+      final response = await _client
+          .post(
+            url,
+            headers: headers ?? {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(_defaultTimeout);
+      return response;
+    } catch (e) {
+      if (kDebugMode) debugPrint('Json error: $e');
+      return null;
+    }
+  }
+
+  static Future<http.Response?> get(
+    Uri url, {
+    Map<String, String>? headers,
+  }) async {
+    try {
+      final response = await _client
+          .get(url, headers: headers)
+          .timeout(_defaultTimeout);
+      return response;
+    } catch (e) {
+      if (kDebugMode) debugPrint('Get error: $e');
+      return null;
+    }
+  }
+}
+
 class QuestionCountCache {
   QuestionCountCache._();
   static final QuestionCountCache instance = QuestionCountCache._();
@@ -1157,17 +1189,28 @@ class QuestionCountCache {
   Future<int?> _fetchQuestionCount(String kwalifikacja) async {
     try {
       final sanitized = kwalifikacja.replaceAll('.', '').toLowerCase();
-      final url = Uri.parse('https://interpage.pl/egzaminy/$sanitized.php');
+      final url = Uri.parse(
+        'https://interpage.pl/egzaminy/count/countQuestions.php?egzamin=$sanitized',
+      );
+      debugPrint('Requesting: $url');
+
       final response = await http.get(url);
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data.length;
+
+        if (data is Map && data.containsKey('count')) {
+          return data['count'] as int;
+        } else {
+          debugPrint('⚠️ Nieprawidłowy format: $data');
+        }
+      } else {
+        debugPrint('❌ Serwer zwrócił kod błędu ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ Błąd podczas pobierania danych: $e');
+      debugPrint('❌ Błąd podczas zbierania danych: $e');
     }
+
     return null;
   }
-
-  void clear() => _cache.clear();
 }
