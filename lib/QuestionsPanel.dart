@@ -1,155 +1,93 @@
-// question_stats_page.dart
-// Refactored QuestionStatsPage moved to a separate file with immediate data load (no initial loading indicator)
-
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
+import 'package:shimmer/shimmer.dart';
 import 'dart:convert';
-import 'package:flutter_html/flutter_html.dart';
 
 class QuestionStatsPage extends StatefulWidget {
   const QuestionStatsPage({super.key});
-
   @override
   _QuestionStatsPageState createState() => _QuestionStatsPageState();
 }
 
-class _QuestionStatsPageState extends State<QuestionStatsPage> {
+class _QuestionStatsPageState extends State<QuestionStatsPage>
+    with AutomaticKeepAliveClientMixin {
   bool isLoading = true;
   String? errorMessage;
   List<dynamic> questionStats = [];
 
+  final Map<String, List<dynamic>> loadedQuestions = {};
+  final Map<String, bool> isLoadingQual = {};
+  final Map<String, ScrollController> controllers = {};
+  final Map<String, int> visibleCounts = {};
+  final Map<String, bool> isLoadingMore = {};
+
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
-    fetchQuestionStats(); 
+    fetchQuestionStats();
   }
 
-Future<void> fetchQuestionStats() async {
-  try {
-    final response = await http.get(
-      Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php'),
+  @override
+  void dispose() {
+    for (final c in controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Map<String, dynamic> parseQuestionHtml(String html) {
+    final List<String> images = [];
+    final imgRegex = RegExp(
+      r'<img[^>]+src="([^">]+)"',
+      caseSensitive: false,
+      multiLine: true,
     );
 
-    if (response.statusCode != 200) throw Exception('Błąd serwera: ${response.statusCode}');
-    final data = json.decode(response.body);
-    if (data is! List) throw Exception('Nieprawidłowy format danych');
-
-    // 1️⃣ Zbierz listę kwalifikacji, żeby pobrać wszystkie tylko raz
-    final kwalifikacje = data
-        .map((item) => (item['kwalifikacja'] ?? '').replaceAll(' ', ''))
-        .where((k) => k.isNotEmpty)
-        .toSet()
-        .toList();
-
-    // 2️⃣ Pobierz dane dla każdej kwalifikacji równolegle
-    final Map<String, List<dynamic>> pytaniaDlaKwalifikacji = {};
-    await Future.wait(kwalifikacje.map((kwal) async {
-      final url = Uri.parse('https://interpage.pl/egzaminy/$kwal.php');
-      try {
-        final res = await http.get(url);
-        if (res.statusCode == 200) {
-          final parsed = json.decode(res.body);
-          if (parsed is List) pytaniaDlaKwalifikacji[kwal] = parsed;
-        }
-      } catch (e) {
-        debugPrint('⚠️ Błąd pobierania kwalifikacji $kwal: $e');
-      }
-    }));
-
-    // 3️⃣ Połącz trudności z pytaniami z pamięci
-    final List<Map<String, dynamic>> enriched = [];
-    for (final item in data) {
-      final pytanieId = item['pytanie_id'];
-      final kwalifikacja = (item['kwalifikacja'] ?? '').replaceAll(' ', '');
-      final pytania = pytaniaDlaKwalifikacji[kwalifikacja];
-      final question = pytania?.firstWhere(
-        (q) => q['id'].toString() == pytanieId.toString(),
-        orElse: () => null,
-      );
-
-      if (question != null) {
-        enriched.add({
-          'pytanie_id': pytanieId,
-          'kwalifikacja': item['kwalifikacja'],
-          'ilosc_odpowiedzi': item['ilosc_odpowiedzi'],
-          'ilosc_poprawnych_odpowiedzi': item['ilosc_poprawnych_odpowiedzi'],
-          'trudnosc': (item['trudnosc'] is num)
-              ? (item['trudnosc'] as num).toDouble()
-              : double.tryParse(item['trudnosc'].toString()) ?? 0.0,
-          'pytanie': question['pytanie'] ?? '',
-          'odp1': question['odp1'] ?? '',
-          'odp2': question['odp2'] ?? '',
-          'odp3': question['odp3'] ?? '',
-          'odp4': question['odp4'] ?? '',
-          'poprawna': question['poprawna'] ?? '',
-        });
-      }
+    for (final match in imgRegex.allMatches(html)) {
+      final src = match.group(1);
+      if (src != null && src.isNotEmpty) images.add(src);
     }
 
-    // 4️⃣ Zaktualizuj UI natychmiast po zbudowaniu listy
+    final text =
+        html
+            .replaceAll(RegExp(r'<img[^>]*>', caseSensitive: false), '')
+            .replaceAll(RegExp(r'<[^>]*>', caseSensitive: false), '')
+            .replaceAll('&nbsp;', ' ')
+            .replaceAll('&lt;', '<')
+            .replaceAll('&gt;', '>')
+            .trim();
+
+    return {'text': text, 'images': images};
+  }
+
+  Future<void> fetchQuestionStats() async {
     setState(() {
-      questionStats = enriched;
-      isLoading = false;
+      isLoading = true;
       errorMessage = null;
     });
-  } catch (e) {
-    debugPrint('❌ Błąd fetchQuestionStats: $e');
-    setState(() {
-      isLoading = false;
-      errorMessage = 'Błąd: $e';
-    });
-  }
-}
-  Future<Map<String, dynamic>> fetchQuestionDetails(String? pytanieId, String kwalifikacja) async {
-    try {
-      final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is List) {
-          final question = data.firstWhere(
-            (q) => q['id'].toString() == pytanieId,
-            orElse: () => null,
-          );
-          if (question != null) {
-            return {
-              'pytanie': question['pytanie'] ?? 'Brak treści pytania',
-              'odp1': question['odp1'] ?? 'Brak odpowiedzi 1',
-              'odp2': question['odp2'] ?? 'Brak odpowiedzi 2',
-              'odp3': question['odp3'] ?? 'Brak odpowiedzi 3',
-              'odp4': question['odp4'] ?? 'Brak odpowiedzi 4',
-              'poprawna': question['poprawna'] ?? 'Brak poprawnej odpowiedzi',
-            };
-          }
-        }
-      }
-      return {
-        'pytanie': 'Brak treści pytania',
-        'odp1': 'Brak odpowiedzi 1',
-        'odp2': 'Brak odpowiedzi 2',
-        'odp3': 'Brak odpowiedzi 3',
-        'odp4': 'Brak odpowiedzi 4',
-        'poprawna': 'Brak poprawnej odpowiedzi',
-      };
-    } catch (e) {
-      if (kDebugMode) debugPrint('❌ Błąd pobierania szczegółów pytania: $e');
-      return {
-        'pytanie': 'Błąd pobierania treści',
-        'odp1': 'Błąd pobierania odpowiedzi',
-        'odp2': 'Błąd pobierania odpowiedzi',
-        'odp3': 'Błąd pobierania odpowiedzi',
-        'odp4': 'Błąd pobierania odpowiedzi',
-        'poprawna': 'Błąd pobierania odpowiedzi',
-      };
-    }
-  }
 
-  void _showErrorSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+    try {
+      final response = await http.get(
+        Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php'),
       );
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+      final result = json.decode(response.body);
+      if (result is! List) throw Exception('Invalid format');
+      setState(() {
+        questionStats = result;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Błąd: $e';
+      });
     }
   }
 
@@ -157,198 +95,156 @@ Future<void> fetchQuestionStats() async {
     final Map<String, List<dynamic>> grouped = {};
     for (var r in questionStats) {
       final q = (r['kwalifikacja'] ?? 'Nieznana').toString();
-      final iloscOdp = int.tryParse(r['ilosc_odpowiedzi']?.toString() ?? '0') ?? 0;
-      final trudnosc = (r['trudnosc'] is num ? r['trudnosc'] : double.tryParse(r['trudnosc'].toString()) ?? 0.0) as double;
-      if (iloscOdp >= 2 && trudnosc > 0) { // Filtruj tylko pytania z badge'ami
-        grouped.putIfAbsent(q, () => []);
-        grouped[q]!.add(r);
-      }
+      grouped.putIfAbsent(q, () => []);
+      grouped[q]!.add(r);
     }
-    return Map.fromEntries(grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
+    return grouped;
   }
 
-  Html _html(BuildContext context, String html) {
-    html = html.replaceAll('<img', '<br><img');
-    html = html.replaceAll('<video', '<br><video');
+  Future<void> loadQualification(String kwal) async {
+    if (loadedQuestions.containsKey(kwal)) return;
+    setState(() => isLoadingQual[kwal] = true);
 
-    return Html(
-      data: html,
-      style: {
-        'div.questionHeader': Style(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: FontSize(18),
-          verticalAlign: VerticalAlign.middle,
+    try {
+      final res = await http.get(
+        Uri.parse(
+          'https://interpage.pl/egzaminy/${kwal.replaceAll(" ", "")}.php',
         ),
-        'div.question': Style(
-          color: Theme.of(context).colorScheme.onPrimary,
-          fontSize: FontSize(16),
-          verticalAlign: VerticalAlign.middle,
-        ),
-        'div.answer': Style(
-          color: Theme.of(context).colorScheme.onPrimary,
-          fontSize: FontSize(14),
-          verticalAlign: VerticalAlign.middle,
-          textShadow: <Shadow>[
-            Shadow(
-              offset: Offset(3.0, 3.0),
-              blurRadius: 2.0,
-              color: Colors.black,
-            ),
-            Shadow(
-              offset: Offset(1.0, 1.0),
-              blurRadius: 2.0,
-              color: Colors.black,
-            ),
-          ],
-        ),
-        'div.description.correct': Style(
-          color: Colors.green,
-          fontSize: FontSize(14),
-          fontStyle: FontStyle.italic,
-        ),
-        'div.description.incorrect': Style(
-          color: Colors.red,
-          fontSize: FontSize(14),
-          fontStyle: FontStyle.italic,
-        ),
-        'div.description.unselected': Style(
-          color: Colors.amberAccent,
-          fontSize: FontSize(14),
-          fontStyle: FontStyle.italic,
-        ),
-        'b': Style(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.bold,
-          verticalAlign: VerticalAlign.middle,
-        ),
-      },
-      extensions: [
-        TagExtension(
-          tagsToExtend: {'img'},
-          builder: (extensionContext) {
-            final src = extensionContext.attributes['src'];
-            if (src != null) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                child: Center(
-                  child: Tooltip(
-                    message: 'Kliknij, aby powiększyć',
-                    child: GestureDetector(
-                      onTap: () => _showImageDialog(context, src),
-                      child: Image.network(
-                        src,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Text(
-                          '❌ Nie udało się załadować obrazka',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }
-            return Text(
-              '⚠️ Brak obrazka',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+      );
+
+      if (res.statusCode == 200) {
+        final parsed = json.decode(res.body);
+        if (parsed is List) {
+          final stats =
+              questionStats
+                  .where(
+                    (item) =>
+                        (item['kwalifikacja'] ?? '').replaceAll(' ', '') ==
+                        kwal,
+                  )
+                  .toList();
+
+          final List<Map<String, dynamic>> enriched = [];
+          for (final s in stats) {
+            final q = parsed.firstWhere(
+              (p) => p['id'].toString() == s['pytanie_id'].toString(),
+              orElse: () => null,
             );
-          },
-        ),
-      ],
-    );
+            if (q != null) enriched.add({...s, ...q});
+          }
+
+          enriched.sort(
+            (a, b) => int.tryParse(
+              a['pytanie_id'].toString(),
+            )!.compareTo(int.tryParse(b['pytanie_id'].toString())!),
+          );
+
+          setState(() {
+            loadedQuestions[kwal] = enriched;
+            visibleCounts[kwal] = enriched.length < 30 ? enriched.length : 30;
+            isLoadingMore[kwal] = false;
+
+            final scroll = ScrollController();
+            scroll.addListener(() => _onScroll(kwal));
+            controllers[kwal] = scroll;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading $kwal: $e');
+    } finally {
+      setState(() => isLoadingQual[kwal] = false);
+    }
   }
 
-  void _showImageDialog(BuildContext context, String imageUrl) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Zamknij',
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (context, anim1, anim2) {
-        final screenSize = MediaQuery.of(context).size;
-        bool isPressed = false;
+  void _onScroll(String kwal) {
+    final controller = controllers[kwal];
+    if (controller == null || isLoadingMore[kwal] == true) return;
 
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return GestureDetector(
-              onTap: () => Navigator.of(context, rootNavigator: true).pop(),
-              child: Scaffold(
-                backgroundColor: Colors.black.withValues(alpha: 0.9),
-                body: Stack(
-                  children: [
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {},
-                        child: Listener(
-                          onPointerDown: (_) => setState(() => isPressed = true),
-                          onPointerUp: (_) => setState(() => isPressed = false),
-                          child: MouseRegion(
-                            cursor: isPressed
-                                ? SystemMouseCursors.grabbing
-                                : SystemMouseCursors.grab,
-                            child: InteractiveViewer(
-                              panEnabled: true,
-                              minScale: 0.5,
-                              maxScale: 4,
-                              child: Image.network(
-                                imageUrl,
-                                width: screenSize.width * 0.8,
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => Text(
-                                  '❌ Nie udało się załadować obrazka',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          size: 30,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                        tooltip: 'Zamknij',
-                        onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+    if (controller.position.pixels >=
+        controller.position.maxScrollExtent - 200) {
+      final currentCount = visibleCounts[kwal] ?? 30;
+      final total = loadedQuestions[kwal]?.length ?? 0;
+      if (currentCount >= total) return;
+
+      setState(() => isLoadingMore[kwal] = true);
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (!mounted) return;
+        setState(() {
+          visibleCounts[kwal] = (currentCount + 30).clamp(0, total);
+          isLoadingMore[kwal] = false;
+        });
+      });
+    }
   }
 
   Widget _buildDifficultyBadge(dynamic stat) {
-    final trudnoscRaw = stat['trudnosc'];
-    final iloscOdp = int.tryParse(stat['ilosc_odpowiedzi']?.toString() ?? '0') ?? 0;
-    if (trudnoscRaw == null || iloscOdp < 2) return const SizedBox.shrink();
-
-    final trudnosc = (trudnoscRaw is num ? trudnoscRaw : trudnoscRaw.toInt()) as int;
-    final isTrudne = trudnosc > 50;
-
+    final trudnosc =
+        (stat['trudnosc'] is num)
+            ? (stat['trudnosc'] as num).toDouble()
+            : double.tryParse(stat['trudnosc'].toString()) ?? 0.0;
+    final color = trudnosc > 50 ? Colors.red : Colors.green;
+    final label = trudnosc > 50 ? 'TRUDNE' : 'ŁATWE';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isTrudne ? Colors.red : Colors.green,
+        color: color,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        '${isTrudne ? 'TRUDNE' : 'ŁATWE'} ($trudnosc%)',
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+        '$label (${trudnosc.toStringAsFixed(1)}%)',
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
+    );
+  }
+
+  Widget buildZoomableImage(String url) {
+    return GestureDetector(
+      onTap: () {
+        showGeneralDialog(
+          context: context,
+          barrierDismissible: true,
+          barrierLabel: 'Close',
+          pageBuilder: (context, anim1, anim2) {
+            return Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 1.0,
+                maxScale: 5.0,
+                child: Image(image: NetworkImage(url), fit: BoxFit.contain),
+              ),
+            );
+          },
+          transitionBuilder: (context, anim1, anim2, child) {
+            return FadeTransition(opacity: anim1, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 300),
+        );
+      },
+      child: Image.network(
+        url,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Shimmer.fromColors(
+            baseColor: Colors.grey[850]!,
+            highlightColor: Colors.grey[700]!,
+            child: Container(
+              width: double.infinity,
+              height: 250,
+              color: Colors.grey[800],
+            ),
+          );
+        },
+        errorBuilder:
+            (context, error, stack) => Container(
+              color: Colors.grey[850],
+              height: 250,
+              child: const Center(
+                child: Icon(Icons.broken_image, color: Colors.grey),
+              ),
+            ),
       ),
     );
   }
@@ -356,79 +252,171 @@ Future<void> fetchQuestionStats() async {
   Widget _buildQuestionCard(dynamic q) {
     final questionId = q['pytanie_id'] ?? '-';
     final qualification = q['kwalifikacja'] ?? '-';
-    final totalAnswers = q['ilosc_odpowiedzi'] ?? '0';
-    final correctAnswers = q['ilosc_poprawnych_odpowiedzi'] ?? '0';
-    final difficulty = q['trudnosc']?.toStringAsFixed(1) ?? '0';
-    final successRate = totalAnswers != '0' ? ((int.parse(correctAnswers) / int.parse(totalAnswers)) * 100).toStringAsFixed(1) : '0';
-    final pytanie = q['pytanie'] ?? 'Brak treści pytania';
-    final odp1 = q['odp1'] ?? 'Brak odpowiedzi 1';
-    final odp2 = q['odp2'] ?? 'Brak odpowiedzi 2';
-    final odp3 = q['odp3'] ?? 'Brak odpowiedzi 3';
-    final odp4 = q['odp4'] ?? 'Brak odpowiedzi 4';
-    final poprawna = q['poprawna'] ?? 'Brak poprawnej odpowiedzi';
+    final totalAnswers = int.tryParse(q['ilosc_odpowiedzi'].toString()) ?? 0;
+    final correctAnswers =
+        int.tryParse(q['ilosc_poprawnych_odpowiedzi'].toString()) ?? 0;
+    final successRate =
+        totalAnswers > 0
+            ? ((correctAnswers / totalAnswers) * 100).toStringAsFixed(1)
+            : '0.0';
+    final pytanie = q['pytanie'] ?? '';
+    final odp1 = q['odp1'] ?? '';
+    final odp2 = q['odp2'] ?? '';
+    final odp3 = q['odp3'] ?? '';
+    final odp4 = q['odp4'] ?? '';
+    final poprawna = q['poprawna']?.toString() ?? '';
+    final List<String> images = List<String>.from(q['images'] ?? []);
+    final List<String> videos = List<String>.from(q['videos'] ?? []);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: _html(context, "<div class='questionHeader'>Pytanie #$questionId</div>"),
-                ),
-                _buildDifficultyBadge(q),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _html(context, "<div class='question'>Pytanie:</div><br>$pytanie"),
-            const SizedBox(height: 10),
-            ...['A', 'B', 'C', 'D'].map((litera) {
-              final odp = {
-                'A': odp1,
-                'B': odp2,
-                'C': odp3,
-                'D': odp4,
-              }[litera] ?? 'Brak odpowiedzi';
-              final isCorrectAnswer = litera == poprawna;
+    Widget buildVideoPlayer(String url) {
+      final controller = VideoPlayerController.networkUrl(url as Uri);
+      controller.initialize();
+      controller.setLooping(false);
+      controller.play();
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isCorrectAnswer ? Colors.green : null,
-                    foregroundColor: Theme.of(context).colorScheme.onSurface,
+      return AspectRatio(
+        aspectRatio:
+            controller.value.aspectRatio > 0
+                ? controller.value.aspectRatio
+                : 16 / 9,
+        child: VideoPlayer(controller),
+      );
+    }
+
+    return RepaintBoundary(
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 2),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Pytanie #$questionId',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                  onPressed: () {},
-                  child: _html(context, odp),
+                  _buildDifficultyBadge(q),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                pytanie,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Theme.of(context).colorScheme.onPrimary,
                 ),
-              );
-            }),
-            const SizedBox(height: 6),
-            _html(
-              context,
-              "<div class='description.correct'>✅ Odpowiedź $poprawna jest poprawna.</div>",
-            ),
-            const SizedBox(height: 4),
-            Text('Kwalifikacja: $qualification', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(child: Text('Odpowiedzi: $totalAnswers')),
-                Expanded(child: Text('Poprawne: $correctAnswers ($successRate%)')),
+              ),
+              if (images.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Column(
+                  children:
+                      images
+                          .map(
+                            (url) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: buildZoomableImage(url),
+                            ),
+                          )
+                          .toList(),
+                ),
               ],
-            ),
-          ],
+              if (videos.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Column(
+                  children:
+                      videos
+                          .map(
+                            (url) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: buildVideoPlayer(url),
+                            ),
+                          )
+                          .toList(),
+                ),
+              ],
+              const SizedBox(height: 8),
+              ...['A', 'B', 'C', 'D'].map((litera) {
+                final odp =
+                    {'A': odp1, 'B': odp2, 'C': odp3, 'D': odp4}[litera] ?? '';
+                final isCorrect = litera == poprawna;
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 6),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isCorrect ? Colors.green : null,
+                      alignment: Alignment.centerLeft,
+                    ),
+                    onPressed: () {},
+                    child: Text(
+                      odp,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 4),
+              Text(
+                '✅ Poprawna: $poprawna',
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Kwalifikacja: $qualification',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                'Odpowiedzi: $totalAnswers, Poprawne: $correctAnswers ($successRate%)',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-@override
+  Widget _buildAnimatedShimmer() {
+    return RepaintBoundary(
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[850]!,
+        highlightColor: Colors.grey[700]!,
+        period: const Duration(milliseconds: 1000),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          height: 110,
+          decoration: BoxDecoration(
+            color: Colors.grey[800],
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final grouped = groupByQualification();
 
     return Scaffold(
@@ -441,67 +429,66 @@ Future<void> fetchQuestionStats() async {
           ),
         ],
       ),
-      body: errorMessage != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text(errorMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: fetchQuestionStats,
-                      child: const Text('Spróbuj ponownie'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: fetchQuestionStats,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: grouped.length,
-                itemBuilder: (context, index) {
-                  final entry = grouped.entries.elementAt(index);
-                  final kwal = entry.key;
-                  final questions = entry.value;
-                  
-                  // Sortowanie od najtrudniejszych
-                  questions.sort((a, b) {
-                    final trudnoscA = (a['trudnosc'] is num
-                        ? a['trudnosc']
-                        : double.tryParse(a['trudnosc'].toString()) ?? 0.0) as double;
-                    final trudnoscB = (b['trudnosc'] is num
-                        ? b['trudnosc']
-                        : double.tryParse(b['trudnosc'].toString()) ?? 0.0) as double;
-                    return trudnoscB.compareTo(trudnoscA);
-                  });
-
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: ExpansionTile(
-                      title: Row(
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : errorMessage != null
+              ? Center(child: Text(errorMessage!))
+              : RefreshIndicator(
+                onRefresh: fetchQuestionStats,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: grouped.length,
+                  itemBuilder: (context, index) {
+                    final entry = grouped.entries.elementAt(index);
+                    final kwal = entry.key;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ExpansionTile(
+                        title: Text(
+                          '$kwal (${entry.value.length} pytań)',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        onExpansionChanged: (expanded) {
+                          if (expanded) loadQualification(kwal);
+                        },
                         children: [
-                          Icon(Icons.school, color: Colors.blue),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '$kwal (${questions.length} pytań)',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          if (isLoadingQual[kwal] == true)
+                            const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          else if (loadedQuestions[kwal] == null)
+                            const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Text('Kliknij, by załadować pytania...'),
+                            )
+                          else
+                            SizedBox(
+                              height: 400,
+                              child: ListView.builder(
+                                controller: controllers[kwal],
+                                addAutomaticKeepAlives: false,
+                                addRepaintBoundaries: true,
+                                itemCount:
+                                    (visibleCounts[kwal] ?? 0) +
+                                    ((isLoadingMore[kwal] ?? false) ? 3 : 0),
+                                itemBuilder: (context, i) {
+                                  final questions = loadedQuestions[kwal]!;
+                                  if (i < (visibleCounts[kwal] ?? 0)) {
+                                    return _buildQuestionCard(questions[i]);
+                                  } else {
+                                    return _buildAnimatedShimmer();
+                                  }
+                                },
+                              ),
                             ),
-                          ),
                         ],
                       ),
-                      children: questions.map<Widget>(_buildQuestionCard).toList(),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
     );
   }
 }

@@ -1099,20 +1099,32 @@ class QuestionTile extends StatelessWidget {
                   );
                 } else if (snapshot.hasError) {
                   return Text(
-                    '❌ Błąd',
+                    '❌Wystąpił błąd',
                     style: TextStyle(
                       fontSize: 12,
                       color: theme.colorScheme.error,
                     ),
                   );
                 } else if (snapshot.hasData) {
-                  return Text(
-                    '${snapshot.data} pytań',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  );
+                  if (snapshot.data! > 0) {
+                    return Text(
+                      '${snapshot.data} pytań',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.7,
+                        ),
+                      ),
+                    );
+                  } else {
+                    return Text(
+                      '⚠️ Brak pytań',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    );
+                  }
                 } else {
                   return Text(
                     '❌ Brak danych',
