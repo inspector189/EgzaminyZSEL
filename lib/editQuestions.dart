@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/gestures.dart';
+//import 'package:flutter/gestures.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:video_player/video_player.dart';
@@ -13,59 +12,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_html/html.dart' as html;
 import 'dart:async';
+import 'package:shimmer/shimmer.dart';
 
 enum MediaKind { none, image, video }
-
-class VideoPlayerWidget extends StatefulWidget {
-  final String url;
-  const VideoPlayerWidget({super.key, required this.url});
-
-  @override
-  State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
-}
-
-class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
-  late VideoPlayerController _controller;
-  bool _initialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
-      ..initialize().then((_) {
-        setState(() => _initialized = true);
-        _controller.play();
-      });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_initialized) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        VideoPlayer(_controller),
-        VideoProgressIndicator(_controller, allowScrubbing: true),
-      ],
-    );
-  }
-}
-
-class EditQuestionsPage extends StatefulWidget {
-  const EditQuestionsPage({super.key, required this.qualification});
-  final String qualification;
-
-  @override
-  State<EditQuestionsPage> createState() => _EditQuestionsPageState();
-}
 
 class _InlineVideoPlayer extends StatefulWidget {
   const _InlineVideoPlayer({this.url, this.filePath, this.blobUrl, this.height})
@@ -83,74 +32,64 @@ class _InlineVideoPlayer extends StatefulWidget {
   State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
 }
 
-class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
-  VideoPlayerController? _vp;
+class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
+    with AutomaticKeepAliveClientMixin {
   ChewieController? _chewie;
   bool _initError = false;
 
   @override
   void initState() {
     super.initState();
-    try {
-      if (widget.filePath != null) {
-        _vp = VideoPlayerController.file(File(widget.filePath!));
-      } else {
-        final src = widget.blobUrl ?? widget.url!;
-        _vp = VideoPlayerController.networkUrl(Uri.parse(src));
-      }
+    _init();
+  }
 
-      _vp!
-          .initialize()
-          .then((_) {
-            if (!mounted) return;
-            _chewie = ChewieController(
-              videoPlayerController: _vp!,
-              autoInitialize: true,
-              autoPlay: false,
-              looping: false,
-              showControls: true,
-              allowMuting: true,
-              allowFullScreen: true,
-              allowPlaybackSpeedChanging: true,
-            );
-            setState(() {});
-          })
-          .catchError((_) {
-            if (mounted) setState(() => _initError = true);
-          });
+  Future<void> _init() async {
+    try {
+      _chewie = await _VideoPool().getChewie(
+        widget.url ?? widget.blobUrl ?? widget.filePath!,
+        filePath: widget.filePath,
+        blobUrl: widget.blobUrl,
+      );
+      if (mounted) setState(() {});
     } catch (_) {
-      _initError = true;
+      if (mounted) setState(() => _initError = true);
     }
   }
 
   @override
   void dispose() {
-    _chewie?.dispose();
-    _vp?.dispose();
+    _VideoPool().release(widget.url ?? widget.blobUrl ?? widget.filePath!);
     super.dispose();
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
-    if (_initError || _vp == null) {
-      return Text(
-        '❌ Nie udało się zainicjalizować wideo.',
-        style: TextStyle(color: Theme.of(context).colorScheme.surface),
+    super.build(context);
+    if (_initError) {
+      return const Text(
+        'Failed to load video.',
+        style: TextStyle(color: Colors.red),
       );
     }
-    if (_chewie == null || !_vp!.value.isInitialized) {
+    if (_chewie == null) {
       return const SizedBox(
         height: 160,
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
 
-    final h = widget.height;
+    final vp = _chewie!.videoPlayerController;
     final aspect =
-        _vp!.value.aspectRatio == 0 ? 16 / 9 : _vp!.value.aspectRatio;
+        vp.value.isInitialized && vp.value.aspectRatio != 0
+            ? vp.value.aspectRatio
+            : 16 / 9;
 
     Widget player = Chewie(controller: _chewie!);
-    if (h != null) {
+    if (widget.height != null) {
+      final h = widget.height!;
       player = SizedBox(
         height: h,
         child: FittedBox(
@@ -162,14 +101,6 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
       player = AspectRatio(aspectRatio: aspect, child: player);
     }
 
-    // ⬇⬇⬇ DODAJ TEN WRAPPER FOCUS ⬇⬇⬇
-    player = Focus(
-      canRequestFocus: false,
-      descendantsAreFocusable: false,
-      skipTraversal: true,
-      child: player,
-    );
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: player,
@@ -177,39 +108,134 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
   }
 }
 
+class _VideoPool {
+  static final _VideoPool _i = _VideoPool._();
+  factory _VideoPool() => _i;
+  _VideoPool._();
+
+  final Map<String, VideoPlayerController> _vp = {};
+  final Map<String, ChewieController> _chewie = {};
+  final Map<String, int> _refs = {};
+
+  Future<ChewieController> getChewie(
+    String key, {
+    String? filePath,
+    String? blobUrl,
+  }) async {
+    if (!_vp.containsKey(key)) {
+      final v =
+          filePath != null
+              ? VideoPlayerController.file(File(filePath))
+              : VideoPlayerController.networkUrl(Uri.parse(blobUrl ?? key));
+      await v.initialize();
+      _vp[key] = v;
+    }
+    if (!_chewie.containsKey(key)) {
+      _chewie[key] = ChewieController(
+        videoPlayerController: _vp[key]!,
+        autoInitialize: true,
+        autoPlay: false,
+        looping: false,
+        showControls: true,
+        allowMuting: true,
+        allowFullScreen: true,
+        allowPlaybackSpeedChanging: true,
+      );
+    }
+    _refs[key] = (_refs[key] ?? 0) + 1;
+    return _chewie[key]!;
+  }
+
+  void release(String key) {
+    final r = (_refs[key] ?? 0) - 1;
+    if (r > 0) {
+      _refs[key] = r;
+      return;
+    }
+    _refs.remove(key);
+    _chewie.remove(key)?.dispose();
+    _vp.remove(key)?.dispose();
+  }
+}
+
+Widget buildZoomableImage(BuildContext context, String url) {
+  return GestureDetector(
+    onTap: () {
+      showGeneralDialog(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'Close',
+        pageBuilder:
+            (c, a1, a2) => Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 1.0,
+                maxScale: 5.0,
+                child: Image.network(url, fit: BoxFit.contain),
+              ),
+            ),
+        transitionBuilder:
+            (c, a1, a2, child) => FadeTransition(opacity: a1, child: child),
+        transitionDuration: const Duration(milliseconds: 300),
+      );
+    },
+    child: Image.network(
+      url,
+      fit: BoxFit.contain,
+      loadingBuilder:
+          (c, child, progress) =>
+              progress == null
+                  ? child
+                  : Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: Container(
+                      width: double.infinity,
+                      height: 200,
+                      color: Colors.white,
+                    ),
+                  ),
+      errorBuilder:
+          (_, _, _) => Container(
+            color: Colors.grey[300],
+            height: 200,
+            child: const Center(
+              child: Icon(Icons.broken_image, color: Colors.grey),
+            ),
+          ),
+    ),
+  );
+}
+
+class EditQuestionsPage extends StatefulWidget {
+  const EditQuestionsPage({super.key, required this.qualification});
+  final String qualification;
+
+  @override
+  State<EditQuestionsPage> createState() => _EditQuestionsPageState();
+}
+
 class _EditQuestionsPageState extends State<EditQuestionsPage> {
   String _lastPreviewSignature = '';
 
   String _currentMediaSignature() {
-    // Co wpływa na wygląd podglądu mediów:
-    // - rodzaj media (none/image/video)
-    // - źródło obrazka (URL / dataURI) lub nazwa+rozmiar w bajtach
-    // - źródło filmu (URL) lub nazwa+rozmiar w bajtach
-    // - aktualna wysokość (px)
     final kind = _mediaKind.name;
-
     final imgUrl = (_uploadedImageUrl ?? _imageCtrl.text.trim());
     final imgBytesSig =
         (_imageBytes != null && _imageBytes!.isNotEmpty)
             ? '${_imageName ?? ''}|${_imageBytes!.length}'
             : '';
-
     final vidUrl = _uploadedVideoUrl ?? '';
     final vidBytesSig =
         (_videoBytes != null && _videoBytes!.isNotEmpty)
             ? '${_videoName ?? ''}|${_videoBytes!.length}'
             : '';
-
     final height = _imageHeightPx?.toString() ?? '';
-
-    // To wystarczy, by wychwycić: zamianę typu, podmianę pliku/URL, usunięcie,
-    // i zmianę wysokości.
     return [kind, imgUrl, imgBytesSig, vidUrl, vidBytesSig, height].join('::');
   }
 
-  // ====== WEB/MOBILE helpers dla lokalnego wideo ======
-  String? _tempVideoPath; // ścieżka pliku tymczasowego (mobile/desktop)
-  String? _webBlobUrl; // blob:... (web)
+  String? _tempVideoPath;
+  String? _webBlobUrl;
   Timer? _previewDebounce;
 
   void _refreshTextPreview() {
@@ -218,14 +244,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   void _refreshIfPreview({bool immediate = false}) {
     if (!_showPreview) return;
-
     final newSig = _currentMediaSignature();
-    if (newSig == _lastPreviewSignature) {
-      // Nic się nie zmieniło w mediach — nie przeładowuj podglądu.
-      return;
-    }
+    if (newSig == _lastPreviewSignature) return;
     _lastPreviewSignature = newSig;
-
     if (immediate) {
       if (mounted) setState(() {});
       return;
@@ -233,7 +254,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     _previewDebounce?.cancel();
     _previewDebounce = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      // Utrzymaj spójność, jeśli w międzyczasie zaszła kolejna zmiana.
       if (_currentMediaSignature() != _lastPreviewSignature) return;
       setState(() {});
     });
@@ -250,7 +270,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   Future<String?> _ensureLocalTempVideo() async {
     if (_videoBytes == null || _videoBytes!.isEmpty) return null;
-
     if (kIsWeb) {
       _revokeWebBlobUrl();
       final ext = (_videoName?.split('.').last.toLowerCase() ?? 'mp4');
@@ -261,7 +280,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       };
       final blob = html.Blob([_videoBytes!], mime);
       _webBlobUrl = html.Url.createObjectUrlFromBlob(blob);
-      return _webBlobUrl; // blob:...
+      return _webBlobUrl;
     } else {
       final dir = await getTemporaryDirectory();
       final ext = (_videoName?.split('.').last.toLowerCase() ?? 'mp4')
@@ -286,91 +305,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     _revokeWebBlobUrl();
   }
 
-  // ====== stałe i pomocniki dla trybu edycji ======
-  static const _kStyleTag =
-      '<style>img, video { display: block; max-width: 100%; height: auto; }</style>';
-  static final _kStyleTagEsc = const HtmlEscape().convert(_kStyleTag);
-
-  static final _imgTagRawRe = RegExp(
-    r'<img[^>]+src="https://interpage\.pl/egzaminy/[^/]+/obrazy/image\d+\.jpg"[^>]*\/?>',
-    caseSensitive: false,
-  );
-  static final _imgTagEscRe = RegExp(
-    r'&lt;img[^&]+src=&quot;https://interpage\.pl/egzaminy/[^/]+/obrazy/image\d+\.jpg&quot;[^&]*&gt;',
-    caseSensitive: false,
-  );
-
-  static final _videoTagRawRe = RegExp(
-    r'<video[^>]+src="https://interpage\.pl/egzaminy/[^/]+/filmy/video\d+\.mp4"[^>]*>.*?<\/video>',
-    caseSensitive: false,
-    dotAll: true,
-  );
-  static final _videoTagEscRe = RegExp(
-    r'&lt;video[^&]+src=&quot;https://interpage\.pl/egzaminy/[^/]+/filmy/video\d+\.mp4&quot;[^&]*&gt;.*?&lt;\/video&gt;',
-    caseSensitive: false,
-    dotAll: true,
-  );
-
-  String _stripStyleAndImage(String html) {
-    var out = html;
-
-    // 1) usuń DOWOLNY <style>…</style> (także z atrybutami) + wersję escaped
-    out = out.replaceAll(
-      RegExp(r'<style\b[^>]*>.*?<\/style>', caseSensitive: false, dotAll: true),
-      '',
-    );
-    out = out.replaceAll(
-      RegExp(
-        r'&lt;style\b[^&]*&gt;.*?&lt;\/style&gt;',
-        caseSensitive: false,
-        dotAll: true,
-      ),
-      '',
-    );
-
-    // 2) usuń nasze media (raw i escaped)
-    out = out.replaceAll(_imgTagRawRe, '');
-    out = out.replaceAll(_imgTagEscRe, '');
-    out = out.replaceAll(_videoTagRawRe, '');
-    out = out.replaceAll(_videoTagEscRe, '');
-
-    // 3) oczyść nadmiarowe <br> / &nbsp; na krawędziach
-    out = out.replaceAll(
-      RegExp(r'(<br\s*\/?>|\s|&nbsp;)+$', caseSensitive: false),
-      '',
-    );
-    out = out.replaceAll(
-      RegExp(r'^(<br\s*\/?>|\s|&nbsp;)+', caseSensitive: false),
-      '',
-    );
-
-    // 4) skompresuj białe znaki
-    out = out.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return out;
-  }
-
-  String _unescapeLtGt(String s) =>
-      s.replaceAll('&lt;', '<').replaceAll('&gt;', '>');
-  String _escapeLtGt(String s) =>
-      s.replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-
-  String _answerToUi(String? raw) {
-    var t = (raw ?? '');
-    t = t.replaceFirst(RegExp(r'^[A-D]\.\s*'), '');
-    t = _unescapeLtGt(t);
-    return t;
-  }
-
-  String? _filenameFromUrl(String url) {
-    try {
-      final segs = Uri.parse(url).pathSegments;
-      return segs.isNotEmpty ? segs.last : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
   int? get _nextId {
     final ids =
         questions
@@ -387,11 +321,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   List<dynamic> questions = [];
   String searchText = '';
   final ScrollController _listController = ScrollController();
-
   final TextEditingController _textSearchCtrl = TextEditingController();
   final ScrollController _leftPanelScroll = ScrollController();
 
-  // ====== Formularz dodawania/edycji ======
   int? editingId;
   final TextEditingController _imageCtrl = TextEditingController();
   final TextEditingController _contentCtrl = TextEditingController();
@@ -399,24 +331,17 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   final TextEditingController _odp2Ctrl = TextEditingController();
   final TextEditingController _odp3Ctrl = TextEditingController();
   final TextEditingController _odp4Ctrl = TextEditingController();
-
   final TextEditingController _imageHeightCtrl = TextEditingController();
-  int? _imageHeightPx; // wspólna wysokość (img + video)
-
+  int? _imageHeightPx;
   final TextEditingController _opisPoprawneCtrl = TextEditingController();
   final TextEditingController _opisNiepoprawneCtrl = TextEditingController();
   String _correct = 'A';
 
-  // ====== MULTIMEDIA ======
   MediaKind _mediaKind = MediaKind.none;
-
-  // obraz
   Uint8List? _imageBytes;
   String? _imageName;
   String? _uploadedImageUrl;
   String? _uploadedImageFilename;
-
-  // wideo
   Uint8List? _videoBytes;
   String? _videoName;
   String? _uploadedVideoUrl;
@@ -425,17 +350,38 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   bool _isUploading = false;
   bool _showPreview = false;
 
-  // ====== lifecycle ======
+  late final VoidCallback _scrollListener;
+
   @override
   void initState() {
     super.initState();
     _loadAll();
+
+    _scrollListener = () {
+      if (_listController.position.pixels >=
+              _listController.position.maxScrollExtent - 300 &&
+          !_isLoadingMore &&
+          _displayCount < questions.length) {
+        setState(() {
+          _isLoadingMore = true;
+        });
+
+        if (mounted) {
+          setState(() {
+            _displayCount = (_displayCount + 20).clamp(0, questions.length);
+            _isLoadingMore = false;
+          });
+        }
+      }
+    };
+
+    _listController.addListener(_scrollListener);
   }
 
   @override
   void dispose() {
+    _listController.removeListener(_scrollListener);
     _previewDebounce?.cancel();
-
     _listController.dispose();
     _textSearchCtrl.dispose();
     _leftPanelScroll.dispose();
@@ -452,13 +398,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     super.dispose();
   }
 
-  // ====== data ======
   Future<void> _loadAll() async {
     setState(() => isLoading = true);
     try {
       final qs = await _fetchQuestions(_sanitizedTable());
       final trud = await _fetchAllTrudnosci();
-
       for (final q in qs) {
         final id = int.tryParse(q['id'].toString());
         if (id != null && trud.containsKey(id)) {
@@ -469,7 +413,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           q['ilosc_odpowiedzi'] = 0;
         }
       }
-
       setState(() {
         questions = qs;
         isLoading = false;
@@ -496,9 +439,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     if (res.statusCode == 200 && res.body.isNotEmpty) {
       final decoded = json.decode(res.body);
       if (decoded is List) return decoded;
-      throw '❌ Nieprawidłowy format danych pytań';
+      throw 'Nieprawidłowy format danych pytań';
     }
-    throw 'ℹ️ HTTP ${res.statusCode} przy pobieraniu pytań';
+    throw 'HTTP ${res.statusCode} przy pobieraniu pytań';
   }
 
   Future<Map<int, Map<String, dynamic>>> _fetchAllTrudnosci() async {
@@ -506,46 +449,33 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
     );
     final res = await http.get(url);
-
     if (res.statusCode != 200) return {};
-
-    final String kval = _sanitizedTable(); // np. "inf03"
+    final String kval = _sanitizedTable();
     final List<dynamic> jsonList = json.decode(res.body);
     final Map<int, Map<String, dynamic>> result = {};
-
     for (final item in jsonList) {
-      // filtr po kwalifikacji (bez spacji, małe litery – tak samo jak _sanitizedTable)
       final String itemKval =
           (item['kwalifikacja'] ?? '')
               .toString()
               .replaceAll(' ', '')
               .toLowerCase();
       if (itemKval != kval) continue;
-
       final int? id = int.tryParse('${item['pytanie_id']}');
       if (id == null) continue;
-
       final double trud =
           (item['trudnosc'] is num)
               ? (item['trudnosc'] as num).toDouble()
               : double.tryParse('${item['trudnosc']}') ?? 0.0;
-
       final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
-
       result[id] = {'trudnosc': trud, 'ilosc_odpowiedzi': ilosc};
     }
-
     return result;
   }
 
-  // ====== wyszukiwarka ======
   void _applyTextFilter(String value) {
-    setState(() {
-      searchText = value.trim();
-    });
+    setState(() => searchText = value.trim());
   }
 
-  // ====== nowy rekord ======
   void _startNewQuestion() {
     _showPreview = false;
     setState(() {
@@ -559,21 +489,15 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _opisPoprawneCtrl.clear();
       _opisNiepoprawneCtrl.clear();
       _correct = 'A';
-
-      // obraz
       _imageBytes = null;
       _imageName = null;
       _uploadedImageUrl = null;
       _uploadedImageFilename = null;
-
-      // video
       _videoBytes = null;
       _videoName = null;
       _uploadedVideoUrl = null;
       _uploadedVideoFilename = null;
-
       _mediaKind = MediaKind.none;
-
       _isUploading = false;
       _imageHeightPx = null;
       _imageHeightCtrl.clear();
@@ -581,15 +505,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     });
   }
 
-  // ====== edycja ======
   void _openForEdit(Map<String, dynamic> q) {
     setState(() {
       editingId = int.tryParse(q['id']?.toString() ?? '');
       final rawHtml = q['pytanie']?.toString() ?? '';
-
       final imgUrl = _extractFirstTagSrc(rawHtml, 'img');
       final vidUrl = _extractFirstTagSrc(rawHtml, 'video');
-
       if (vidUrl != null) {
         _mediaKind = MediaKind.video;
         _uploadedVideoUrl = vidUrl;
@@ -602,24 +523,18 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       } else {
         _mediaKind = MediaKind.none;
       }
-
       _imageHeightPx = _parseTagHeightPx(rawHtml);
       _imageHeightCtrl.text = _imageHeightPx?.toString() ?? '';
-
       final cleaned = _stripStyleAndImage(rawHtml);
       _contentCtrl.text = _unescapeLtGt(cleaned);
-
       _odp1Ctrl.text = _answerToUi(q['odp1']?.toString());
       _odp2Ctrl.text = _answerToUi(q['odp2']?.toString());
       _odp3Ctrl.text = _answerToUi(q['odp3']?.toString());
       _odp4Ctrl.text = _answerToUi(q['odp4']?.toString());
-
       _opisPoprawneCtrl.text = q['opisPoprawne']?.toString() ?? '';
       _opisNiepoprawneCtrl.text = q['opisNiepoprawne']?.toString() ?? '';
-
       final poprawna = (q['poprawna']?.toString().toUpperCase() ?? 'A');
       _correct = ['A', 'B', 'C', 'D'].contains(poprawna) ? poprawna : 'A';
-
       _imageBytes = null;
       _imageName = null;
       _videoBytes = null;
@@ -638,7 +553,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final tagEnd = html.indexOf('>', tagStart);
     if (tagEnd == -1) return null;
     final tag = html.substring(tagStart, tagEnd + 1);
-
     final styleRe = RegExp(
       r'''style\s*=\s*["']([^"']+)["']''',
       caseSensitive: false,
@@ -646,11 +560,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final styleMatch = styleRe.firstMatch(tag);
     if (styleMatch == null) return null;
     final style = styleMatch.group(1)!;
-
     final hRe = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false);
     final hMatch = hRe.firstMatch(style);
     if (hMatch == null) return null;
-
     final v = int.tryParse(hMatch.group(1)!);
     if (v == null || v <= 0) return null;
     return v;
@@ -671,7 +583,75 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     return html.substring(start, end);
   }
 
-  // ====== Obraz ======
+  String _stripStyleAndImage(String html) {
+    var out = html;
+    out = out.replaceAll(
+      RegExp(r'<style\b[^>]*>.*?</style>', caseSensitive: false, dotAll: true),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(
+        r'&lt;style\b[^&]*&gt;.*?&lt;/style&gt;',
+        caseSensitive: false,
+        dotAll: true,
+      ),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(
+        r'<img[^>]+src="https://interpage\.pl/egzaminy/[^/]+/obrazy/image\d+\.jpg"[^>]*\/?>',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(
+        r'&lt;img[^&]+src=&quot;https://interpage\.pl/egzaminy/[^/]+/obrazy/image\d+\.jpg&quot;[^&]*&gt;',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(
+        r'<video[^>]+src="https://interpage\.pl/egzaminy/[^/]+/filmy/video\d+\.mp4"[^>]*>.*?</video>',
+        caseSensitive: false,
+        dotAll: true,
+      ),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(
+        r'&lt;video[^&]+src=&quot;https://interpage\.pl/egzaminy/[^/]+/filmy/video\d+\.mp4&quot;[^&]*&gt;.*?&lt;/video&gt;',
+        caseSensitive: false,
+        dotAll: true,
+      ),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(r'(<br\s*\/?>|\s|&nbsp;)+$', caseSensitive: false),
+      '',
+    );
+    out = out.replaceAll(
+      RegExp(r'^(<br\s*\/?>|\s|&nbsp;)+', caseSensitive: false),
+      '',
+    );
+    out = out.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return out;
+  }
+
+  String _unescapeLtGt(String s) =>
+      s.replaceAll('&lt;', '<').replaceAll('&gt;', '>');
+  String _answerToUi(String? raw) =>
+      (raw ?? '').replaceFirst(RegExp(r'^[A-D]\.\s*'), '');
+  String? _filenameFromUrl(String url) {
+    try {
+      final segs = Uri.parse(url).pathSegments;
+      return segs.isNotEmpty ? segs.last : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _pickImage() async {
     try {
       final typeGroup = const XTypeGroup(
@@ -693,7 +673,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Nie udało się otworzyć selektora plików: $e'),
+            content: Text('Nie udało się otworzyć selektora plików: $e'),
           ),
         );
       }
@@ -714,7 +694,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         'image',
         ext == 'jpg' ? 'jpeg' : ext,
       );
-
       final req =
           http.MultipartRequest('POST', uri)
             ..headers['Authorization'] =
@@ -731,7 +710,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 contentType: mediaType,
               ),
             );
-
       final res = await http.Response.fromStream(await req.send());
       if (res.statusCode != 200) {
         throw 'Upload HTTP ${res.statusCode}: ${res.body}';
@@ -740,7 +718,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       if (data['ok'] != true || data['url'] == null) {
         throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
       }
-
       setState(() {
         _uploadedImageUrl = data['url'] as String;
         _uploadedImageFilename =
@@ -749,14 +726,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _mediaKind = MediaKind.image;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Obrazek został wgrany.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Obrazek został wgrany.')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd podczas wysyłania obrazka: $e')),
+          SnackBar(content: Text('Błąd podczas wysyłania obrazka: $e')),
         );
       }
     } finally {
@@ -774,9 +751,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _showImageDialogBytes(_imageBytes!);
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('❌ Brak obrazka do podglądu.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Brak obrazka do podglądu.')));
   }
 
   void _showImageDialogUrl(String imageUrl) {
@@ -786,13 +763,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             imageUrl,
             height: _imageHeightPx?.toDouble(),
             fit: BoxFit.contain,
-            errorBuilder:
-                (c, e, s) => Text(
-                  '❌ Nie udało się załadować obrazka',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.surface,
-                  ),
-                ),
           ),
     );
   }
@@ -817,7 +787,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       pageBuilder: (context, a1, a2) {
         final screen = MediaQuery.of(context).size;
         bool isPressed = false;
-
         return StatefulBuilder(
           builder: (context, setState) {
             return GestureDetector(
@@ -878,7 +847,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  // ====== Wideo ======
   Future<void> _pickVideo() async {
     try {
       final typeGroup = const XTypeGroup(
@@ -899,25 +867,22 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Nie udało się otworzyć pliku wideo: $e')),
+        SnackBar(content: Text('Nie udało się otworzyć pliku wideo: $e')),
       );
     }
   }
 
   Future<void> _uploadVideo() async {
     if (_videoBytes == null || _videoName == null) return;
-
     setState(() => _isUploading = true);
     try {
       final uri = Uri.parse('https://interpage.pl/egzaminy/upload_video.php');
-
       final ext = _videoName!.split('.').last.toLowerCase();
-      final http_parser.MediaType mt = switch (ext) {
+      final mt = switch (ext) {
         'webm' => http_parser.MediaType('video', 'webm'),
         'ogg' => http_parser.MediaType('video', 'ogg'),
         _ => http_parser.MediaType('video', 'mp4'),
       };
-
       final req =
           http.MultipartRequest('POST', uri)
             ..headers['Authorization'] =
@@ -934,17 +899,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 contentType: mt,
               ),
             );
-
       final res = await http.Response.fromStream(await req.send());
-      if (res.statusCode != 200) {
-        throw 'HTTP ${res.statusCode}: ${res.body}';
-      }
-
+      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
       final data = jsonDecode(res.body);
       if (data['ok'] != true || data['url'] == null) {
         throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
       }
-
       setState(() {
         _uploadedVideoUrl = data['url'] as String;
         _uploadedVideoFilename =
@@ -956,7 +916,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd podczas wysyłania filmu: $e')),
+          SnackBar(content: Text('Błąd podczas wysyłania filmu: $e')),
         );
       }
     } finally {
@@ -969,7 +929,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     if (_uploadedVideoUrl == null && _videoBytes != null) {
       localPathOrBlob = await _ensureLocalTempVideo();
     }
-
     if (_uploadedVideoUrl == null && localPathOrBlob == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -978,7 +937,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       }
       return;
     }
-
     if (!mounted) return;
     final h = _imageHeightPx?.toDouble();
     showDialog(
@@ -1000,9 +958,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 AspectRatio(
                   aspectRatio: 16 / 9,
                   child: _InlineVideoPlayer(
-                    url: _uploadedVideoUrl, // może być null
-                    filePath: kIsWeb ? null : localPathOrBlob, // mobile/desktop
-                    blobUrl: kIsWeb ? localPathOrBlob : null, // web
+                    url: _uploadedVideoUrl,
+                    filePath: kIsWeb ? null : localPathOrBlob,
+                    blobUrl: kIsWeb ? localPathOrBlob : null,
                     height: h,
                   ),
                 ),
@@ -1022,19 +980,15 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   void _removeMedia() {
     setState(() {
-      // obraz
       _imageBytes = null;
       _imageName = null;
       _uploadedImageUrl = null;
       _uploadedImageFilename = null;
       _imageCtrl.clear();
-
-      // wideo
       _videoBytes = null;
       _videoName = null;
       _uploadedVideoUrl = null;
       _uploadedVideoFilename = null;
-
       _mediaKind = MediaKind.none;
       _isUploading = false;
       _disposeLocalTempVideo();
@@ -1042,14 +996,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     _refreshIfPreview(immediate: true);
   }
 
-  // ====== Zapis pytania ======
   Future<void> _saveQuestion() async {
     final pyt = _contentCtrl.text.trim();
     final a = _odp1Ctrl.text.trim();
     final b = _odp2Ctrl.text.trim();
     final c = _odp3Ctrl.text.trim();
     final d = _odp4Ctrl.text.trim();
-
     if (pyt.isEmpty || a.isEmpty || b.isEmpty || c.isEmpty || d.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1058,67 +1010,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       );
       return;
     }
-
-    // auto-upload obrazka jeśli wybrany
     if (_mediaKind == MediaKind.image &&
         _uploadedImageUrl == null &&
         _imageBytes != null &&
         _imageBytes!.isNotEmpty) {
-      try {
-        setState(() => _isUploading = true);
-
-        final uri = Uri.parse(
-          'https://interpage.pl/egzaminy/upload_image_next.php',
-        );
-        String ext = (_imageName ?? 'jpg').split('.').last.toLowerCase();
-        if (ext.isEmpty) ext = 'jpg';
-        final mediaType = http_parser.MediaType(
-          'image',
-          ext == 'jpg' ? 'jpeg' : ext,
-        );
-
-        final req =
-            http.MultipartRequest('POST', uri)
-              ..headers['Authorization'] =
-                  'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-              ..headers['X-API-Key'] = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-              ..headers['Accept'] = 'application/json'
-              ..fields['kwalifikacja'] = _sanitizedTable()
-              ..fields['egzamin'] = _sanitizedTable()
-              ..files.add(
-                http.MultipartFile.fromBytes(
-                  'file',
-                  _imageBytes!,
-                  filename: _imageName ?? 'upload.$ext',
-                  contentType: mediaType,
-                ),
-              );
-
-        final res = await http.Response.fromStream(await req.send());
-        if (res.statusCode != 200) {
-          throw 'Upload HTTP ${res.statusCode}: ${res.body}';
-        }
-        final data = jsonDecode(res.body);
-        if (data['ok'] != true || data['url'] == null) {
-          throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
-        }
-
-        _uploadedImageUrl = data['url'] as String;
-        _uploadedImageFilename =
-            (data['filename'] as String?) ??
-            _filenameFromUrl(_uploadedImageUrl!);
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _isUploading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('❌ Błąd uploadu obrazka: $e')));
-        return;
-      } finally {
-        if (mounted) setState(() => _isUploading = false);
-      }
+      await _uploadImage();
+      if (_uploadedImageUrl == null) return;
     }
-
     if (_mediaKind == MediaKind.video &&
         _uploadedVideoUrl == null &&
         _videoBytes != null &&
@@ -1126,7 +1024,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       await _uploadVideo();
       if (_uploadedVideoUrl == null) return;
     }
-
     final payload = <String, dynamic>{
       'egzamin': _sanitizedTable(),
       'pytanie': pyt,
@@ -1139,7 +1036,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       'opisNiepoprawne': _opisNiepoprawneCtrl.text.trim(),
       if (editingId != null) 'id': editingId,
     };
-
     if (_mediaKind == MediaKind.image) {
       payload['img_filename'] =
           _uploadedImageFilename ?? _filenameFromUrl(_imageCtrl.text.trim());
@@ -1149,10 +1045,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     } else if (_mediaKind == MediaKind.video) {
       payload['video_filename'] = _uploadedVideoFilename;
       if (_imageHeightPx != null && _imageHeightPx! > 0) {
-        payload['video_height'] = _imageHeightPx; // jeśli wspierasz w PHP
+        payload['video_height'] = _imageHeightPx;
       }
     }
-
     try {
       final res = await http.post(
         Uri.parse('https://interpage.pl/egzaminy/add_question.php'),
@@ -1162,32 +1057,26 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         },
         body: jsonEncode(payload),
       );
-
-      if (res.statusCode != 200) {
-        throw 'HTTP ${res.statusCode}: ${res.body}';
-      }
+      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
       final body = jsonDecode(res.body);
       if (body is! Map || body['ok'] != true) {
         throw body['error'] ?? 'Nieznany błąd serwera';
       }
-
       final isEdit = editingId != null;
       final int? savedId =
           (body['id'] is int)
               ? body['id'] as int
               : int.tryParse('${body['id']}');
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isEdit
-                ? '✅ Pytanie zaktualizowane (ID ${savedId ?? editingId})'
-                : '✅ Pytanie dodane (ID ${savedId ?? '—'})',
+                ? 'Pytanie zaktualizowane (ID ${savedId ?? editingId})'
+                : 'Pytanie dodane (ID ${savedId ?? '—'})',
           ),
         ),
       );
-
       setState(() => _showPreview = false);
       _startNewQuestion();
       await _loadAll();
@@ -1195,7 +1084,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('❌ Błąd zapisu: $e')));
+      ).showSnackBar(SnackBar(content: Text('Błąd zapisu: $e')));
     }
   }
 
@@ -1211,33 +1100,24 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         },
         body: jsonEncode({'egzamin': _sanitizedTable(), 'id': id}),
       );
-
-      if (res.statusCode != 200) {
-        throw 'HTTP ${res.statusCode}: ${res.body}';
-      }
-
+      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
       final body = jsonDecode(res.body);
-      if (body['ok'] != true) {
-        throw body['error'] ?? 'Błąd usuwania';
-      }
-
+      if (body['ok'] != true) throw body['error'] ?? 'Błąd usuwania';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Pytanie zostało usunięte.')),
+          const SnackBar(content: Text('Pytanie zostało usunięte.')),
         );
       }
-
       await _loadAll();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd podczas usuwania pytania: $e')),
+          SnackBar(content: Text('Błąd podczas usuwania pytania: $e')),
         );
       }
     }
   }
 
-  // --- DODAJ NA POZIOMIE KLASY (poza _html) ---
   bool _busyResetAll = false;
   final String _apiToken = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
@@ -1265,7 +1145,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         ) ??
         false;
     if (!ok) return;
-
     setState(() => _busyResetAll = true);
     try {
       final res = await http.post(
@@ -1276,23 +1155,20 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         },
         body: {'kwalifikacja': _sanitizedTable()},
       );
-      if (res.statusCode != 200) {
-        throw 'HTTP ${res.statusCode}: ${res.body}';
-      }
+      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Zresetowano trudności dla wszystkich pytań'),
+            content: Text('Zresetowano trudności dla wszystkich pytań'),
           ),
         );
       }
-
       await _loadAll();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('❌ Błąd resetu: $e')));
+        ).showSnackBar(SnackBar(content: Text('Błąd resetu: $e')));
       }
     } finally {
       if (mounted) setState(() => _busyResetAll = false);
@@ -1323,7 +1199,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         ) ??
         false;
     if (!ok) return;
-
     try {
       final res = await http.post(
         Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
@@ -1333,21 +1208,18 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         },
         body: {'kwalifikacja': _sanitizedTable(), 'pytanie_id': '$id'},
       );
-      if (res.statusCode != 200) {
-        throw 'HTTP ${res.statusCode}: ${res.body}';
-      }
+      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Zresetowano trudność pytania ID $id')),
+          SnackBar(content: Text('Zresetowano trudność pytania ID $id')),
         );
       }
-
       await _loadAll();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd resetu pytania $id: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Błąd resetu pytania $id: $e')));
       }
     }
   }
@@ -1355,7 +1227,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   Widget _buildRightToolbar(BuildContext context) {
     final found = _filteredQuestions.length;
     final total = questions.length;
-
     return Material(
       color: Theme.of(context).colorScheme.surface,
       elevation: 1,
@@ -1405,405 +1276,42 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  // ====== Render HTML (z obsługą <img> i <video>) ======
-  Html _html(String html) {
-    return Html(
-      data: html,
-      style: {
-        'div.questionHeader': Style(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: FontSize(18),
-          verticalAlign: VerticalAlign.middle,
-        ),
-        'div.question': Style(
-          color: Theme.of(context).colorScheme.onPrimary,
-          fontSize: FontSize(16),
-          verticalAlign: VerticalAlign.middle,
-        ),
+  int _displayCount = 20;
+  bool _isLoadingMore = false;
 
-        'div.answer': Style(
-          color: Theme.of(context).colorScheme.onSurface,
-          fontSize: FontSize(14),
-          verticalAlign: VerticalAlign.middle,
+  Widget _renderHtml(
+    String text, {
+    List<String>? images,
+    List<String>? videos,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(text, style: const TextStyle(fontSize: 16)),
+        ...?images?.map(
+          (url) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: buildZoomableImage(context, url),
+          ),
         ),
-        'div.description.correct': Style(
-          color: Colors.green,
-          fontSize: FontSize(14),
-          fontStyle: FontStyle.italic,
-          //margin: Margins(top: Margin(8), bottom: Margin(4)),
-        ),
-        'div.description.incorrect': Style(
-          color: Colors.red,
-          fontSize: FontSize(14),
-          fontStyle: FontStyle.italic,
-          //margin: Margins(bottom: Margin(8)),
-        ),
-        'b': Style(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.bold,
-          verticalAlign: VerticalAlign.middle,
-        ),
-        'div.media': Style(
-          margin: Margins.symmetric(vertical: 12),
-          textAlign: TextAlign.center,
-        ),
-      },
-      extensions: [
-        TagExtension(
-          tagsToExtend: {'img'},
-          builder: (ctx) {
-            final src = ctx.attributes['src'];
-            double? forcedHeight;
-            final styleAttr = ctx.attributes['style'] ?? '';
-            final m = RegExp(
-              r'height\s*:\s*(\d+)\s*px',
-              caseSensitive: false,
-            ).firstMatch(styleAttr);
-            if (m != null) {
-              forcedHeight = double.tryParse(m.group(1)!);
-            } else {
-              final hAttr = ctx.attributes['height'];
-              if (hAttr != null) forcedHeight = double.tryParse(hAttr);
-            }
-            if (_showPreview && _imageHeightPx != null) {
-              forcedHeight = _imageHeightPx!.toDouble();
-            }
-            Widget wrapInteractive(Widget child) {
-              const minH = 80;
-              const maxH = 2000;
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                child: Center(
-                  child: Listener(
-                    onPointerSignal: (signal) {
-                      if (!_showPreview) return;
-                      if (signal is PointerScrollEvent) {
-                        int cur =
-                            _imageHeightPx ?? (forcedHeight?.round() ?? 320);
-                        final next =
-                            (cur - signal.scrollDelta.dy)
-                                .clamp(minH, maxH)
-                                .round();
-                        setState(() {
-                          _imageHeightPx = next;
-                          _imageHeightCtrl.text = next.toString();
-                        });
-                      }
-                    },
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onPanUpdate: (details) {
-                            if (!_showPreview) return;
-                            int cur =
-                                _imageHeightPx ??
-                                (forcedHeight?.round() ?? 320);
-                            final next =
-                                (cur + details.delta.dy)
-                                    .clamp(minH, maxH)
-                                    .round();
-                            setState(() {
-                              _imageHeightPx = next;
-                              _imageHeightCtrl.text = next.toString();
-                            });
-                          },
-                          child: child,
-                        ),
-                        if (_showPreview)
-                          Positioned(
-                            bottom: 8,
-                            child: MouseRegion(
-                              cursor: SystemMouseCursors.resizeUpDown,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surface.withValues(alpha: 0.35),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.unfold_more,
-                                      size: 16,
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${_imageHeightPx ?? forcedHeight?.round() ?? 320}px',
-                                      style: TextStyle(
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onPrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-
-            if (src == null || src.isEmpty) {
-              return Text(
-                '⚠️ Brak obrazka',
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              );
-            }
-            if (src.startsWith('data:image/')) {
-              try {
-                final base64Part = src.split(',').last;
-                final bytes = base64Decode(base64Part);
-                return wrapInteractive(
-                  Image.memory(
-                    bytes,
-                    height: forcedHeight,
-                    fit: BoxFit.contain,
-                  ),
-                );
-              } catch (_) {
-                return const Text(
-                  '❌ Nie udało się wyświetlić obrazka (data URI).',
-                );
-              }
-            }
-            return wrapInteractive(
-              Tooltip(
-                message:
-                    _showPreview
-                        ? 'Przeciągnij / przewiń, aby zmienić wysokość'
-                        : 'Kliknij, aby powiększyć',
-                child: MouseRegion(
-                  cursor:
-                      _showPreview
-                          ? SystemMouseCursors.resizeUpDown
-                          : SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap:
-                        _showPreview
-                            ? null
-                            : () => _showImageDialog(context, src),
-                    child: Image.network(
-                      src,
-                      height: forcedHeight,
-                      fit: BoxFit.contain,
-                      errorBuilder:
-                          (context, error, stackTrace) => Text(
-                            '❌ Nie udało się załadować obrazka',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-        TagExtension(
-          tagsToExtend: {'video'},
-          builder: (ctx) {
-            final src = ctx.attributes['src'] ?? ctx.attributes['data-src'];
-            double? forcedHeight;
-            final styleAttr = ctx.attributes['style'] ?? '';
-            final m = RegExp(
-              r'height\s*:\s*(\d+)\s*px',
-              caseSensitive: false,
-            ).firstMatch(styleAttr);
-            if (m != null) {
-              forcedHeight = double.tryParse(m.group(1)!);
-            } else {
-              final hAttr = ctx.attributes['height'];
-              if (hAttr != null) forcedHeight = double.tryParse(hAttr);
-            }
-            if (_showPreview && _imageHeightPx != null) {
-              forcedHeight = _imageHeightPx!.toDouble();
-            }
-            if (src != null && src.isNotEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Align(
-                  alignment: Alignment.center,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 720),
-                    child: Focus(
-                      canRequestFocus: false,
-                      descendantsAreFocusable: false,
-                      skipTraversal: true,
-                      child: _InlineVideoPlayer(url: src, height: forcedHeight),
-                    ),
-                  ),
-                ),
-              );
-            }
-            if (_showPreview &&
-                _mediaKind == MediaKind.video &&
-                _videoBytes != null) {
-              return FutureBuilder<String?>(
-                future: _ensureLocalTempVideo(),
-                builder: (context, snap) {
-                  if (snap.connectionState != ConnectionState.done) {
-                    return const SizedBox(
-                      height: 160,
-                      child: Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    );
-                  }
-                  final p = snap.data;
-                  if (p == null) {
-                    return Text(
-                      '❌ Brak lokalnego źródła wideo.',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    );
-                  }
-                  final Widget playerCore =
-                      kIsWeb
-                          ? _InlineVideoPlayer(blobUrl: p, height: forcedHeight)
-                          : _InlineVideoPlayer(
-                            filePath: p,
-                            height: forcedHeight,
-                          );
-                  final Widget player = Focus(
-                    canRequestFocus: false,
-                    descendantsAreFocusable: false,
-                    skipTraversal: true,
-                    child: playerCore,
-                  );
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 720),
-                        child: player,
-                      ),
-                    ),
-                  );
-                },
-              );
-            }
-            return Text(
-              '⚠️ Brak źródła wideo',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            );
-          },
+        ...?videos?.map(
+          (url) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: _InlineVideoPlayer(url: url),
+          ),
         ),
       ],
     );
   }
 
-  void _showImageDialog(BuildContext context, String imageUrl) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Zamknij',
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (context, a1, a2) {
-        final screen = MediaQuery.of(context).size;
-        bool isPressed = false;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return GestureDetector(
-              onTap: () => Navigator.of(context, rootNavigator: true).pop(),
-              child: Scaffold(
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.surface.withValues(alpha: 0.9),
-                body: Stack(
-                  children: [
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {},
-                        child: Listener(
-                          onPointerDown:
-                              (_) => setState(() => isPressed = true),
-                          onPointerUp: (_) => setState(() => isPressed = false),
-                          child: MouseRegion(
-                            cursor:
-                                isPressed
-                                    ? SystemMouseCursors.grabbing
-                                    : SystemMouseCursors.grab,
-                            child: InteractiveViewer(
-                              panEnabled: true,
-                              minScale: 0.5,
-                              maxScale: 4,
-                              child: Image.network(
-                                imageUrl,
-                                width: screen.width * 0.8,
-                                fit: BoxFit.contain,
-                                errorBuilder:
-                                    (context, error, stack) => Text(
-                                      '❌ Nie udało się załadować obrazka',
-                                      style: TextStyle(
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.surface,
-                                      ),
-                                    ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          size: 30,
-                          color: Theme.of(context).colorScheme.surface,
-                        ),
-                        tooltip: 'Zamknij',
-                        onPressed:
-                            () =>
-                                Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                ).pop(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ====== UI helpers ======
   Widget _buildBadge(dynamic q) {
     final trudnosc = q['trudnosc'];
     final iloscOdp = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
     if (trudnosc == null || iloscOdp < 5) return const SizedBox.shrink();
-
     final diff =
         (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0)
             .toInt();
     final isTrudne = diff > 50;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1823,18 +1331,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   List<dynamic> get _filteredQuestions {
     if (searchText.isEmpty) return questions;
     final q = searchText.toLowerCase();
-
     return questions.where((e) {
       final txt = (e['pytanie']?.toString() ?? '').toLowerCase();
       final a = (e['odp1']?.toString() ?? '').toLowerCase();
       final b = (e['odp2']?.toString() ?? '').toLowerCase();
       final c = (e['odp3']?.toString() ?? '').toLowerCase();
       final d = (e['odp4']?.toString() ?? '').toLowerCase();
-
       final idStr = (e['id']?.toString() ?? '').toLowerCase();
-      final matchId = idStr.contains(q);
-
-      return matchId ||
+      return idStr.contains(q) ||
           txt.contains(q) ||
           a.contains(q) ||
           b.contains(q) ||
@@ -1843,7 +1347,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }).toList();
   }
 
-  // ====== build ======
   @override
   Widget build(BuildContext context) {
     final leftPanel = _buildLeftPanel(context);
@@ -1859,7 +1362,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                     Expanded(child: _buildList()),
                   ],
                 ));
-
     return Scaffold(
       appBar: AppBar(
         title: Text('Edytor pytań — ${widget.qualification.toUpperCase()}'),
@@ -1888,7 +1390,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       fontWeight: FontWeight.w600,
       color: Theme.of(context).colorScheme.onPrimary,
     );
-
     return Container(
       color: Theme.of(context).colorScheme.surface,
       child: Scrollbar(
@@ -1900,7 +1401,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('🔎 Wyszukaj', style: labelStyle),
+              Text('Wyszukaj', style: labelStyle),
               const SizedBox(height: 8),
               TextField(
                 controller: _textSearchCtrl,
@@ -1929,13 +1430,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               const SizedBox(height: 16),
               Divider(color: Theme.of(context).dividerColor, height: 1),
               const SizedBox(height: 16),
-
               Row(
                 children: [
                   Text(
                     editingId == null
-                        ? '➕ Dodaj nowe pytanie${_nextId != null ? ' (ID $_nextId)' : ''}'
-                        : '✏️ Edytujesz ID $editingId',
+                        ? 'Dodaj nowe pytanie${_nextId != null ? ' (ID $_nextId)' : ''}'
+                        : 'Edytujesz ID $editingId',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1951,8 +1451,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 ],
               ),
               const SizedBox(height: 8),
-
-              // ======= MULTIMEDIA =======
               Container(
                 width: double.infinity,
                 margin: EdgeInsets.only(bottom: 12),
@@ -2027,7 +1525,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       ],
                     ),
                     const SizedBox(height: 10),
-
                     if (_mediaKind == MediaKind.image) ...[
                       Row(
                         children: [
@@ -2063,8 +1560,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       _heightFieldRow(),
                       const SizedBox(height: 8),
                       Wrap(
-                        spacing: 8, // odstęp poziomy
-                        runSpacing: 8, // odstęp pionowy, jeśli się złamie linia
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           if (_uploadedImageUrl != null || _imageBytes != null)
                             TextButton.icon(
@@ -2113,8 +1610,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                         ),
                       const SizedBox(height: 8),
                       Wrap(
-                        spacing: 8, // odstęp poziomy
-                        runSpacing: 8, // odstęp pionowy, jeśli się złamie linia
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           if (_uploadedVideoUrl != null || _videoBytes != null)
                             TextButton.icon(
@@ -2136,7 +1633,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 ),
               ),
               const SizedBox(height: 8),
-
               TextField(
                 controller: _contentCtrl,
                 onChanged: (_) => _refreshTextPreview(),
@@ -2159,7 +1655,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 minLines: 8,
               ),
               const SizedBox(height: 16),
-
               TextField(
                 controller: _opisPoprawneCtrl,
                 onChanged: (_) => _refreshTextPreview(),
@@ -2204,7 +1699,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 minLines: 3,
               ),
               const SizedBox(height: 24),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -2293,7 +1787,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   ),
                 ],
               ),
-
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -2356,10 +1849,10 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               keyboardType: TextInputType.number,
               onChanged: (v) {
                 final n = int.tryParse(v.trim());
-                setState(() {
-                  _imageHeightPx = (n == null || n <= 0) ? null : n;
-                });
-                _refreshIfPreview(immediate: true); // ważne: natychmiast
+                setState(
+                  () => _imageHeightPx = (n == null || n <= 0) ? null : n,
+                );
+                _refreshIfPreview(immediate: true);
               },
             ),
           ),
@@ -2373,193 +1866,201 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   Widget _buildList() {
     final items = _filteredQuestions;
+    final int displayCount = _displayCount.clamp(0, items.length);
+
     return ListView.builder(
       controller: _listController,
       padding: const EdgeInsets.all(16),
-      itemCount: items.length,
+      itemCount: displayCount + (_isLoadingMore ? 3 : 0),
       itemBuilder: (context, index) {
+        if (index >= displayCount) {
+          return _buildShimmerCard();
+        }
         final q = items[index] as Map<String, dynamic>;
-        final id = int.tryParse(q['id']?.toString() ?? '');
-        // Question HTML (including media)
-        final questionHtml =
-            '<div class="questionHeader"><b>Pytanie ${index + 1}${id != null ? ' (ID $id)' : ''}:</b></div><br><div class="question">${q['pytanie']}</div>';
-        // Answers as individual ElevatedButtons
-        final answers =
-            ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-              final litera = e.value;
-              final odp = q['odp${e.key + 1}']?.toString() ?? '';
-              final body = _escapeLtGt(
-                odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
-              );
-              final html = '<div class="answer"><b>$litera.</b> $body</div>';
-              return Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                child: ElevatedButton(
-                  onPressed: null, // Disabled to prevent accidental clicks
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    foregroundColor: Theme.of(context).colorScheme.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8), // Rounded corners
-                    ),
-                    elevation: 2,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                      horizontal: 16,
-                    ),
-                  ),
-                  child: _html(html), // Answer with component-specific coloring
-                ),
-              );
-            }).toList();
-
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: _html(_kStyleTag + questionHtml),
-                    ), // Question only
-                    _buildBadge(q),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                // Answers as buttons
-                ...answers,
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => _openForEdit(q),
-                      icon: Icon(
-                        Icons.edit,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      label: const Text('Edytuj'),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed:
-                          id == null ? null : () => _resetTrudnoscOne(id),
-                      icon: Icon(
-                        Icons.restart_alt,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      label: const Text('Restartuj trudność'),
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed:
-                          id == null
-                              ? null
-                              : () async {
-                                final ok =
-                                    await showDialog<bool>(
-                                      context: context,
-                                      builder:
-                                          (dialogCtx) => AlertDialog(
-                                            title: const Text('Usuń pytanie'),
-                                            content: Text(
-                                              'Na pewno chcesz usunąć pytanie ID $id?',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      dialogCtx,
-                                                      false,
-                                                    ),
-                                                child: const Text('Anuluj'),
-                                              ),
-                                              FilledButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      dialogCtx,
-                                                      true,
-                                                    ),
-                                                child: const Text('Usuń'),
-                                              ),
-                                            ],
-                                          ),
-                                    ) ??
-                                    false;
-                                if (!mounted) return;
-                                if (ok) {
-                                  await _deleteQuestion(id);
-                                }
-                              },
-                      icon: Icon(
-                        Icons.delete_outline,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      label: const Text('Usuń'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
+        return _buildQuestionCard(q);
       },
     );
   }
 
-  // ====== HTML podgląd ======
-  String _buildPreviewHtmlQuestionOnly() {
-    final escapedBody = _escapeLtGt(_contentCtrl.text.trim());
-    String mediaPart = '';
+  Widget _buildQuestionCard(Map<String, dynamic> q) {
+    final id = int.tryParse(q['id']?.toString() ?? '');
+    final answers =
+        ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+          final odp = q['odp${e.key + 1}']?.toString() ?? '';
+          final body = _unescapeLtGt(
+            odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
+          );
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ElevatedButton(
+              onPressed: null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+                alignment: Alignment.centerLeft,
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              child: _renderHtml(body),
+            ),
+          );
+        }).toList();
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Pytanie (ID: $id)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const Spacer(),
+                _buildBadge(q),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: _renderHtml(
+                    q['pytanie']?.toString() ?? '',
+                    images: (q['images'] as List?)?.cast<String>(),
+                    videos: (q['videos'] as List?)?.cast<String>(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...answers,
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => _openForEdit(q),
+                  icon: Icon(
+                    Icons.edit,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  label: const Text('Edytuj'),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: id == null ? null : () => _resetTrudnoscOne(id),
+                  icon: Icon(
+                    Icons.restart_alt,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  label: const Text('Restartuj trudność'),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed:
+                      id == null
+                          ? null
+                          : () async {
+                            final ok =
+                                await showDialog<bool>(
+                                  context: context,
+                                  builder:
+                                      (dialogCtx) => AlertDialog(
+                                        title: const Text('Usuń pytanie'),
+                                        content: Text(
+                                          'Na pewno chcesz usunąć pytanie ID $id?',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed:
+                                                () => Navigator.pop(
+                                                  dialogCtx,
+                                                  false,
+                                                ),
+                                            child: const Text('Anuluj'),
+                                          ),
+                                          FilledButton(
+                                            onPressed:
+                                                () => Navigator.pop(
+                                                  dialogCtx,
+                                                  true,
+                                                ),
+                                            child: const Text('Usuń'),
+                                          ),
+                                        ],
+                                      ),
+                                ) ??
+                                false;
+                            if (!mounted) return;
+                            if (ok) await _deleteQuestion(id);
+                          },
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  label: const Text('Usuń'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildLivePreview() {
+    Widget? mediaWidget;
     if (_mediaKind == MediaKind.image) {
       String? imgSrc;
-      if ((_uploadedImageUrl ?? '').isNotEmpty) {
+      if (_uploadedImageUrl != null && _uploadedImageUrl!.isNotEmpty) {
         imgSrc = _uploadedImageUrl!;
       } else if (_imageCtrl.text.trim().isNotEmpty) {
         imgSrc = _imageCtrl.text.trim();
       } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
         final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
-        final mime = (ext == 'jpg') ? 'jpeg' : ext;
+        final mime = ext == 'jpg' ? 'jpeg' : ext;
         imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
       }
-      final h = _imageHeightPx;
-      mediaPart =
-          (imgSrc == null)
-              ? ''
-              : '<div class="media"><img alt="" src="$imgSrc"${h != null ? ' style="height: ${h}px;"' : ''}/></div>';
-    } else if (_mediaKind == MediaKind.video) {
-      final h = _imageHeightPx;
-      if (_uploadedVideoUrl != null) {
-        mediaPart =
-            '<div class="media"><video src="${_uploadedVideoUrl!}"${h != null ? ' style="height: ${h}px;"' : ''} controls preload="metadata"></video></div>';
-      } else if (_videoBytes != null && _videoBytes!.isNotEmpty) {
-        mediaPart =
-            '<div class="media"><video${h != null ? ' style="height: ${h}px;"' : ''} controls preload="metadata"></video></div>';
+      if (imgSrc != null) {
+        mediaWidget = Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Image.network(
+            imgSrc,
+            height: _imageHeightPx?.toDouble(),
+            fit: BoxFit.contain,
+          ),
+        );
       }
+    } else if (_mediaKind == MediaKind.video && _uploadedVideoUrl != null) {
+      mediaWidget = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: _InlineVideoPlayer(
+          url: _uploadedVideoUrl!,
+          height: _imageHeightPx?.toDouble(),
+        ),
+      );
     }
-
-    return '$_kStyleTag<div class="question">$escapedBody</div>$mediaPart';
-  }
-
-  Widget _buildLivePreview() {
-    final questionHtml = _buildPreviewHtmlQuestionOnly();
     final answers =
         ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-          final label = e.value;
           final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
-          final body = _escapeLtGt(textCtrl.text.trim());
-          final html = '<div class="answer"><b>$label.</b> $body</div>';
-
           return Container(
             margin: const EdgeInsets.only(top: 6),
             child: ElevatedButton(
               onPressed: null,
               style: ElevatedButton.styleFrom(
-                alignment: Alignment.center,
+                alignment: Alignment.centerLeft,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
@@ -2569,11 +2070,10 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   horizontal: 16,
                 ),
               ),
-              child: _html(html),
+              child: _renderHtml(textCtrl.text.trim()),
             ),
           );
         }).toList();
-
     return Stack(
       children: [
         ListView(
@@ -2590,21 +2090,18 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _html(questionHtml),
+                    _renderHtml(_contentCtrl.text.trim()),
+                    if (mediaWidget != null) mediaWidget,
                     ...answers,
                     if (_opisPoprawneCtrl.text.trim().isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 12),
-                        child: _html(
-                          '<div class="description correct">${_escapeLtGt(_opisPoprawneCtrl.text.trim())}</div>',
-                        ),
+                        child: _renderHtml(_opisPoprawneCtrl.text.trim()),
                       ),
                     if (_opisNiepoprawneCtrl.text.trim().isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: _html(
-                          '<div class="description incorrect">${_escapeLtGt(_opisNiepoprawneCtrl.text.trim())}</div>',
-                        ),
+                        child: _renderHtml(_opisNiepoprawneCtrl.text.trim()),
                       ),
                   ],
                 ),
@@ -2624,4 +2121,35 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       ],
     );
   }
+}
+
+Widget _buildShimmerCard() {
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 8),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[850]!,
+        highlightColor: Colors.grey[700]!,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(height: 24, width: 180, color: Colors.white),
+            const SizedBox(height: 12),
+            Container(height: 60, color: Colors.white),
+            const SizedBox(height: 16),
+            Container(height: 200, color: Colors.white),
+            const SizedBox(height: 16),
+            ...List.generate(
+              4,
+              (_) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(height: 48, color: Colors.grey[700]),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

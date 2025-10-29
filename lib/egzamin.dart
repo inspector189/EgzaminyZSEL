@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -9,12 +8,11 @@ import 'dart:math';
 
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:html_unescape/html_unescape.dart';
 
-//import 'package:html/parser.dart' as html_parser;
-// -- SEARCH (tylko dla TrybEgzaminu.wszystkie) --
 class _InlineVideoPlayer extends StatefulWidget {
-  const _InlineVideoPlayer({required this.url, this.height, super.key});
-
+  const _InlineVideoPlayer({required this.url, this.height});
   final String url;
   final double? height;
 
@@ -44,7 +42,6 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
 
   @override
   void dispose() {
-    // UWAGA: nie niszczymy kontrolerów globalnie, tylko oddajemy referencję
     _VideoPool().release(widget.url);
     super.dispose();
   }
@@ -55,11 +52,10 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-
     if (_initError) {
-      return Text(
-        '❌ Nie udało się zainicjalizować wideo.',
-        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+      return const Text(
+        'Failed to load video.',
+        style: TextStyle(color: Colors.red),
       );
     }
     if (_chewie == null) {
@@ -76,7 +72,6 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
             : 16 / 9;
 
     Widget player = Chewie(controller: _chewie!);
-
     if (widget.height != null) {
       final h = widget.height!;
       player = SizedBox(
@@ -107,13 +102,11 @@ class _VideoPool {
   final Map<String, int> _refs = {};
 
   Future<ChewieController> getChewie(String url) async {
-    // Video
     if (!_vp.containsKey(url)) {
       final v = VideoPlayerController.networkUrl(Uri.parse(url));
       await v.initialize();
       _vp[url] = v;
     }
-    // Chewie
     if (!_chewie.containsKey(url)) {
       _chewie[url] = ChewieController(
         videoPlayerController: _vp[url]!,
@@ -144,11 +137,74 @@ class _VideoPool {
 
 enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
 
+Widget buildZoomableImage(BuildContext context, String url) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final maxWidth = constraints.maxWidth;
+      return GestureDetector(
+        onTap: () => _showZoomedImage(context, url),
+        child: Image.network(
+          url,
+          fit: BoxFit.contain,
+          height: 300,
+          width: maxWidth,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return _buildImagePlaceholder(maxWidth);
+          },
+          errorBuilder:
+              (_, _, _) => _buildImagePlaceholder(maxWidth, error: true),
+        ),
+      );
+    },
+  );
+}
+
+Widget _buildImagePlaceholder(double width, {bool error = false}) {
+  return Container(
+    width: width,
+    height: 200,
+    decoration: BoxDecoration(
+      color: error ? Colors.grey[300] : Colors.grey[200],
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child:
+        error
+            ? const Icon(Icons.broken_image, color: Colors.grey)
+            : Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(color: Colors.white),
+            ),
+  );
+}
+
+void _showZoomedImage(BuildContext context, String url) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    pageBuilder:
+        (c, a1, a2) => Center(
+          child: InteractiveViewer(
+            panEnabled: true,
+            minScale: 1.0,
+            maxScale: 5.0,
+            child: Image.network(url, fit: BoxFit.contain),
+          ),
+        ),
+    transitionBuilder:
+        (c, a1, a2, child) => FadeTransition(opacity: a1, child: child),
+    transitionDuration: const Duration(milliseconds: 300),
+  );
+}
+
 class EgzaminView extends StatefulWidget {
   final TrybEgzaminu tryb;
   final String kwalifikacja;
   final bool returnToHome;
   final String? userName;
+
   const EgzaminView({
     super.key,
     required this.tryb,
@@ -162,27 +218,35 @@ class EgzaminView extends StatefulWidget {
 }
 
 class _EgzaminViewState extends State<EgzaminView> {
+  final _unescape = HtmlUnescape();
+
+  String _clean(String? s) => _unescape.convert(s?.toString() ?? '');
+
   @override
   void dispose() {
     _textSearchCtrl.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   final TextEditingController _textSearchCtrl = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String searchText = '';
-  String get _kvalSan => widget.kwalifikacja.replaceAll(' ', '').toLowerCase();
+
+  int _visibleCount = 30;
+  bool _isLoadingMore = false;
+  int get _totalQuestions => questions.length;
 
   List<dynamic> get _filteredQuestions {
     if (widget.tryb != TrybEgzaminu.wszystkie) return questions;
     final q = searchText.trim().toLowerCase();
     if (q.isEmpty) return questions;
-
     return questions.where((e) {
-      final txt = (e['pytanie']?.toString() ?? '').toLowerCase();
-      final a = (e['odp1']?.toString() ?? '').toLowerCase();
-      final b = (e['odp2']?.toString() ?? '').toLowerCase();
-      final c = (e['odp3']?.toString() ?? '').toLowerCase();
-      final d = (e['odp4']?.toString() ?? '').toLowerCase();
+      final txt = (e['pytanie_text']?.toString() ?? '').toLowerCase();
+      final a = (e['odp1_text']?.toString() ?? '').toLowerCase();
+      final b = (e['odp2_text']?.toString() ?? '').toLowerCase();
+      final c = (e['odp3_text']?.toString() ?? '').toLowerCase();
+      final d = (e['odp4_text']?.toString() ?? '').toLowerCase();
       final idStr = (e['id']?.toString() ?? '').toLowerCase();
       return txt.contains(q) ||
           a.contains(q) ||
@@ -193,13 +257,18 @@ class _EgzaminViewState extends State<EgzaminView> {
     }).toList();
   }
 
+  List<dynamic> get _displayedQuestions {
+    final list =
+        widget.tryb == TrybEgzaminu.wszystkie ? _filteredQuestions : questions;
+    return list.take(_visibleCount).toList();
+  }
+
   bool _isButtonDisabled = false;
   List<dynamic> questions = [];
   int current = 0;
   String? selectedAnswer;
   bool isLoading = true;
   List<String?> selectedAnswers = [];
-  List<bool> zapisanoOdpowiedz = [];
   late DateTime startTime;
   bool odpowiedzZatwierdzona = false;
 
@@ -208,90 +277,22 @@ class _EgzaminViewState extends State<EgzaminView> {
     super.initState();
     fetchQuestions();
     startTime = DateTime.now();
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<Map<String, double>> fetchTrudnosciZdalnie() async {
-    final url = Uri.parse(
-      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
-    );
-    if (mounted) {
-      try {
-        final response = await http.get(
-          url,
-          headers: {
-            'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
-          },
-        );
+  void _onScroll() {
+    if (_isLoadingMore || _visibleCount >= _totalQuestions) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 300) {
+      setState(() => _isLoadingMore = true);
 
-        if (response.statusCode == 200) {
-          final List<dynamic> data = json.decode(response.body);
-          final Map<String, double> map = {};
-
-          for (var entry in data) {
-            final key =
-                '${entry['pytanie_id']}_${entry['kwalifikacja'].toString().toLowerCase()}';
-
-            final trudnosc =
-                (entry['trudnosc'] is num)
-                    ? (entry['trudnosc'] as num).toDouble()
-                    : double.tryParse(entry['trudnosc'].toString()) ?? 0.0;
-            map[key] = trudnosc;
-          }
-          return map;
-        } else {
-          if (kDebugMode) {
-            debugPrint(
-              '❌ Błąd HTTP przy pobieraniu trudności: ${response.statusCode}',
-            );
-          }
-          return {};
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('❌ Błąd połączenia: $e');
-        }
-        return {};
-      }
-    } else {
-      return {};
-    }
-  }
-
-  int calculateCorrectAnswers() {
-    int correct = 0;
-    for (int i = 0; i < questions.length; i++) {
-      if (selectedAnswers[i] == questions[i]['poprawna']) {
-        correct++;
+      if (mounted) {
+        setState(() {
+          _visibleCount = (_visibleCount + 30).clamp(0, _totalQuestions);
+          _isLoadingMore = false;
+        });
       }
     }
-    return correct;
-  }
-
-  Widget _buildBadge(dynamic q) {
-    final trudnosc = q['trudnosc'];
-    final iloscOdp = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
-
-    if (trudnosc == null || iloscOdp < 5) return const SizedBox.shrink();
-
-    final difficulty =
-        (trudnosc is num ? trudnosc : int.tryParse(trudnosc.toString()) ?? 0)
-            .toInt();
-    final isTrudne = difficulty > 50;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: isTrudne ? Colors.red : Colors.green,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        isTrudne ? 'TRUDNE' : 'ŁATWE',
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
   }
 
   Future<void> fetchQuestions() async {
@@ -299,76 +300,49 @@ class _EgzaminViewState extends State<EgzaminView> {
     final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
     try {
       final response = await http.get(url);
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final List<dynamic> allQuestions = json.decode(response.body);
+        List<dynamic> selected = [];
 
-      if (response.statusCode == 200) {
-        if (response.body.isNotEmpty) {
-          final decoded = json.decode(response.body);
-          if (decoded is List && decoded.isNotEmpty) {
-            List<dynamic> allQuestions = decoded;
-            List<dynamic> selected;
+        switch (widget.tryb) {
+          case TrybEgzaminu.jednoPytanie:
+            selected = List.from(allQuestions)..shuffle();
+            break;
+          case TrybEgzaminu.czterdziesciPytan:
+            selected = List.from(allQuestions)..shuffle();
+            selected = selected.take(40).toList();
+            break;
+          case TrybEgzaminu.wszystkie:
+            selected = allQuestions;
+            break;
+        }
 
-            switch (widget.tryb) {
-              case TrybEgzaminu.jednoPytanie:
-                selected = List.from(allQuestions)..shuffle();
-                break;
-              case TrybEgzaminu.czterdziesciPytan:
-                selected = List.from(allQuestions)..shuffle();
-                selected = selected.take(40).toList();
-                break;
-              case TrybEgzaminu.wszystkie:
-                selected = allQuestions;
-                break;
-            }
+        for (var q in selected) {
+          q['pytanie_text'] = _clean(q['pytanie']);
+          q['pytanie_images'] = (q['images'] as List?)?.cast<String>() ?? [];
+          q['pytanie_videos'] = (q['videos'] as List?)?.cast<String>() ?? [];
 
-            final trudnosci = await fetchTrudnosciZdalnie();
-            for (var q in selected) {
-              final key = '${q['id']}_$_kvalSan';
-              q['trudnosc'] = trudnosci[key] ?? 0.0;
-            }
-
-            if (mounted) {
-              setState(() {
-                questions = selected;
-                selectedAnswers = List.filled(selected.length, null);
-                zapisanoOdpowiedz = List.filled(selected.length, false);
-                isLoading = false;
-                if (kDebugMode) {
-                  debugPrint(
-                    '✅ Załadowano ${questions.length} pytań z domyślną trudnością',
-                  );
-                }
-              });
-
-              final trudnosciMap = await fetchAllTrudnosci(
-                _kvalSan,
-              ); // ← znormalizowana
-
-              for (var q in questions) {
-                final id = int.tryParse('${q['id']}');
-                if (id != null && trudnosciMap.containsKey(id)) {
-                  q['trudnosc'] =
-                      trudnosciMap[id]?['trudnosc'] ?? (q['trudnosc'] ?? 0.0);
-                  q['ilosc_odpowiedzi'] =
-                      trudnosciMap[id]?['ilosc_odpowiedzi'] ?? 0;
-                }
-              }
-              setState(() {}); // odśwież
-            }
-          }
-        } else {
-          if (kDebugMode) {
-            debugPrint('❌ Brak danych z API!');
+          for (int i = 1; i <= 4; i++) {
+            final key = 'odp$i';
+            q['${key}_text'] = _clean(q[key]);
+            q['${key}_images'] =
+                (q['${key}_images'] as List?)?.cast<String>() ?? [];
+            q['${key}_videos'] =
+                (q['${key}_videos'] as List?)?.cast<String>() ?? [];
           }
         }
-      } else {
-        if (kDebugMode) {
-          debugPrint('❌ Kod błędu HTTP: ${response.statusCode}');
+
+        if (mounted) {
+          setState(() {
+            questions = selected;
+            selectedAnswers = List.filled(selected.length, null);
+            isLoading = false;
+            _visibleCount = 30.clamp(0, selected.length);
+          });
         }
       }
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint("❌ Błąd przy pobieraniu pytań: $e");
-      }
+      if (kDebugMode) debugPrint("Fetch error: $e");
     }
   }
 
@@ -378,11 +352,10 @@ class _EgzaminViewState extends State<EgzaminView> {
     required String dataCzas,
     required int czasTrwania,
   }) async {
-    String userName =
+    final userName =
         widget.userName ??
         (await SharedPreferences.getInstance()).getString('userName') ??
         'anonymous';
-
     final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
     final response = await http.post(
       url,
@@ -398,56 +371,8 @@ class _EgzaminViewState extends State<EgzaminView> {
         'userName': userName,
       },
     );
-
-    if (response.statusCode != 200) {
-      if (kDebugMode) {
-        debugPrint('❌ Błąd przy zapisywaniu wyniku: ${response.body}');
-      }
-    } else {
-      if (kDebugMode) {
-        debugPrint('✅ Wynik zapisany dla userName: $userName');
-      }
-    }
-  }
-
-  Future<Map<int, Map<String, dynamic>>> fetchAllTrudnosci(
-    String kwalifikacjaSan, // ← przekaż już znormalizowaną nazwę
-  ) async {
-    final url = Uri.parse(
-      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
-    );
-
-    try {
-      final response = await http.get(url);
-      if (response.statusCode != 200) return {};
-
-      final List<dynamic> jsonList = json.decode(response.body);
-      final Map<int, Map<String, dynamic>> result = {};
-
-      for (final item in jsonList) {
-        final String itemKwal =
-            (item['kwalifikacja'] ?? '')
-                .toString()
-                .replaceAll(' ', '')
-                .toLowerCase();
-
-        if (itemKwal != kwalifikacjaSan) continue; // ← KLUCZOWE filtrowanie
-
-        final int? id = int.tryParse('${item['pytanie_id']}');
-        if (id == null) continue;
-
-        final double trud =
-            (item['trudnosc'] is num)
-                ? (item['trudnosc'] as num).toDouble()
-                : double.tryParse('${item['trudnosc']}') ?? 0.0;
-
-        final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
-
-        result[id] = {'trudnosc': trud, 'ilosc_odpowiedzi': ilosc};
-      }
-      return result;
-    } catch (_) {
-      return {};
+    if (response.statusCode != 200 && kDebugMode) {
+      debugPrint('Result save failed: ${response.body}');
     }
   }
 
@@ -456,164 +381,260 @@ class _EgzaminViewState extends State<EgzaminView> {
     String kwalifikacja,
     bool poprawna,
   ) async {
-    if (pytanieId <= 0) {
-      if (kDebugMode) {
-        debugPrint(
-          '❌ Pominięto zapis - wartość pytanie_id jest niepoprawna: $pytanieId',
-        );
-      }
-      return;
-    }
-
+    if (pytanieId <= 0) return;
     final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php');
-    final body = {
-      'pytanie_id': pytanieId.toString(),
-      'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
-      'poprawna': poprawna ? '1' : '0',
-    };
-
     final response = await http.post(
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
       },
-      body: body,
+      body: {
+        'pytanie_id': pytanieId.toString(),
+        'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
+        'poprawna': poprawna ? '1' : '0',
+      },
     );
-
-    if (response.statusCode == 200) {
-      try {
-        final data = json.decode(response.body);
-        if (kDebugMode) {
-          debugPrint('✅ Trudność zapisana: $data');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('❌ Błąd parsowania odpowiedzi: $e');
-        }
-      }
-    } else {
-      if (kDebugMode) {
-        debugPrint(
-          '❌ Błąd zapisu trudności: ${response.statusCode} ${response.body}',
-        );
-      }
+    if (response.statusCode != 200 && kDebugMode) {
+      debugPrint('Difficulty save failed: ${response.body}');
     }
   }
 
-  Future<double> fetchTrudnosc(int pytanieId, String kwalifikacja) async {
-    final url = Uri.parse(
-      'https://interpage.pl/egzaminy/zapis_trudnosci.php?pytanie_id=$pytanieId&kwalifikacja=$kwalifikacja',
+  Widget _buildDifficultyBadge(double? trudnosc, int? ilosc) {
+    if (trudnosc == null || ilosc == null || ilosc < 5) {
+      return const SizedBox.shrink();
+    }
+    final isHard = trudnosc > 50;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isHard ? Colors.red : Colors.green,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '${isHard ? 'TRUDNE' : 'ŁATWE'} (${trudnosc.toStringAsFixed(1)}%)',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        // Jeśli błąd bazy, zwróć 0
-        return 0.0; // Tymczasowo, bo endpoint nie działa
+  }
+
+  Widget _buildAnswerButton(
+    String litera,
+    String text,
+    List<String> images,
+    List<String> videos, {
+    required bool isSelected,
+    required bool isCorrect,
+    required bool showResult,
+    required VoidCallback onTap,
+  }) {
+    Color? disabledBg;
+
+    if (showResult) {
+      if (isCorrect) {
+        disabledBg = Colors.green;
+      } else if (isSelected && !isCorrect) {
+        disabledBg = Colors.red;
+      } else {
+        disabledBg = Theme.of(context).colorScheme.surface;
       }
-      return 0.0;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Błąd pobierania trudności: $e');
-      }
-      return 0.0;
     }
+
+    final Color? bgColor =
+        !showResult && isSelected
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
+            : null;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: bgColor,
+          disabledBackgroundColor: disabledBg,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          disabledForegroundColor: Theme.of(context).colorScheme.onSurface,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        onPressed: showResult ? null : onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(text, style: const TextStyle(fontSize: 15)),
+            ...images.map(
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: buildZoomableImage(context, url),
+              ),
+            ),
+            ...videos.map(
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: _InlineVideoPlayer(url: url),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  void checkAnswer(String answer) {
-    if (odpowiedzZatwierdzona && widget.tryb == TrybEgzaminu.jednoPytanie) {
-      return;
-    }
+  Widget _buildQuestionCard(
+    dynamic q, {
+    required int index,
+    required bool showResult,
+  }) {
+    final pytanieText = q['pytanie_text'] ?? '';
+    final pytanieImages = List<String>.from(q['pytanie_images'] ?? []);
+    final pytanieVideos = List<String>.from(q['pytanie_videos'] ?? []);
+    final poprawna = q['poprawna']?.toString() ?? '';
+    final selected = selectedAnswers[index];
 
-    setState(() {
-      selectedAnswer = answer;
-      selectedAnswers[current] = answer;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (widget.tryb == TrybEgzaminu.wszystkie)
+                  Text(
+                    'Pytanie ${index + 1}${q['id'] != null ? ' (ID ${q['id']})' : ''}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                if (widget.tryb == TrybEgzaminu.czterdziesciPytan)
+                  Text(
+                    'Pytanie ${index + 1}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                if (widget.tryb == TrybEgzaminu.jednoPytanie)
+                  Text(
+                    'Pytanie',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                _buildDifficultyBadge(
+                  q['trudnosc']?.toDouble(),
+                  int.tryParse(q['ilosc_odpowiedzi'].toString()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(pytanieText, style: const TextStyle(fontSize: 16)),
+            ...pytanieImages.map(
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: buildZoomableImage(context, url),
+              ),
+            ),
+            ...pytanieVideos.map(
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: _InlineVideoPlayer(url: url),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...['A', 'B', 'C', 'D'].map((litera) {
+              final key = 'odp${'ABCD'.indexOf(litera) + 1}';
+              final text = q['${key}_text'] ?? '';
+              final images = List<String>.from(q['${key}_images'] ?? []);
+              final videos = List<String>.from(q['${key}_videos'] ?? []);
+              final isCorrect = litera == poprawna;
+              final isSelected = selected == litera;
 
-      if (widget.tryb == TrybEgzaminu.jednoPytanie) {
-        odpowiedzZatwierdzona = true;
-
-        final pytanie = questions[current];
-        final poprawna = answer == pytanie['poprawna'];
-
-        zapiszTrudnoscDoBazy(
-          int.parse(pytanie['id']),
-          widget.kwalifikacja,
-          poprawna,
-        ).then((_) {
-          fetchTrudnosc(int.parse(pytanie['id']), widget.kwalifikacja).then((
-            trudnosc,
-          ) {
-            setState(() {
-              questions[current]['trudnosc'] = trudnosc;
-            });
-          });
-        });
-      } else if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
-        selectedAnswers[current] = answer;
-      }
-    });
-
-    // ⛔ W trybie "wszystkie" nie zapisujemy niczego
-    if (widget.tryb == TrybEgzaminu.wszystkie) return;
+              return _buildAnswerButton(
+                litera,
+                text,
+                images,
+                videos,
+                isSelected: isSelected,
+                isCorrect: isCorrect,
+                showResult: showResult,
+                onTap: () {
+                  setState(() {
+                    selectedAnswers[index] = litera;
+                    if (widget.tryb == TrybEgzaminu.jednoPytanie) {
+                      odpowiedzZatwierdzona = true;
+                      zapiszTrudnoscDoBazy(
+                        int.parse(q['id']),
+                        widget.kwalifikacja,
+                        litera == poprawna,
+                      );
+                    }
+                  });
+                },
+              );
+            }),
+            if (showResult && selected != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  selected == poprawna
+                      ? 'Correct answer $selected.'
+                      : 'Incorrect answer $selected. Correct: $poprawna.',
+                  style: TextStyle(
+                    color: selected == poprawna ? Colors.green : Colors.red,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
-  void nextQuestion() {
-    if (current < questions.length - 1) {
-      setState(() {
-        current++;
-        selectedAnswer = selectedAnswers[current];
-      });
-    }
-  }
-
-  void prevQuestion() {
-    if (current > 0) {
-      setState(() {
-        current--;
-        selectedAnswer = selectedAnswers[current];
-      });
-    }
-  }
-
-  void jumpToQuestion(String value) {
-    final number = int.tryParse(value);
-    if (number != null && number >= 1 && number <= questions.length) {
-      setState(() {
-        current = number - 1;
-        selectedAnswer = selectedAnswers[current];
-      });
-    }
+  Widget _buildShimmer() {
+    return RepaintBoundary(
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[850]!,
+        highlightColor: Colors.grey[700]!,
+        period: const Duration(milliseconds: 1000),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          height: 180,
+          decoration: BoxDecoration(
+            color: Colors.grey[800],
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text('Egzamin'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              Navigator.pop(context, {'returnToHome': widget.returnToHome});
-            },
-          ),
-        ),
+        appBar: AppBar(title: const Text('Egzamin')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (questions.isEmpty) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text('Egzamin'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              Navigator.pop(context, {'returnToHome': widget.returnToHome});
-            },
-          ),
-        ),
-        body: const Center(child: Text('Brak pytań do wyświetlenia.')),
+        appBar: AppBar(title: const Text('Egzamin')),
+        body: const Center(child: Text('Brak pytań.')),
       );
     }
 
@@ -622,460 +643,56 @@ class _EgzaminViewState extends State<EgzaminView> {
         title: const Text("Egzamin"),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context, {'returnToHome': widget.returnToHome});
-          },
+          onPressed:
+              () =>
+                  Navigator.pop(context, {'returnToHome': widget.returnToHome}),
         ),
       ),
       body:
           widget.tryb == TrybEgzaminu.jednoPytanie
               ? _buildSingleQuestion(questions[current])
-              : _buildScrollableList(),
+              : _buildLazyList(),
       bottomNavigationBar:
           widget.tryb == TrybEgzaminu.czterdziesciPytan
-              ? Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: ElevatedButton(
-                  onPressed:
-                      _isButtonDisabled
-                          ? null
-                          : () async {
-                            setState(() => _isButtonDisabled = true);
-
-                            final correct = calculateCorrectAnswers();
-                            final total = questions.length;
-                            final percent = (correct / total) * 100;
-                            final endTime = DateTime.now();
-                            final duration =
-                                endTime.difference(startTime).inSeconds;
-
-                            if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
-                              final futures = <Future>[];
-
-                              for (int i = 0; i < questions.length; i++) {
-                                final pytanie = questions[i];
-                                final pytanieId = int.tryParse(
-                                  pytanie['id'].toString(),
-                                );
-                                final odpowiedz = selectedAnswers[i];
-
-                                if (pytanieId != null && odpowiedz != null) {
-                                  final poprawna =
-                                      odpowiedz == pytanie['poprawna'];
-                                  futures.add(
-                                    zapiszTrudnoscDoBazy(
-                                      pytanieId,
-                                      widget.kwalifikacja,
-                                      poprawna,
-                                    ),
-                                  );
-                                }
-                              }
-
-                              try {
-                                await Future.wait(futures);
-                                if (kDebugMode) {
-                                  debugPrint(
-                                    '✅ Trudność pytań została zapisana!',
-                                  );
-                                }
-                              } catch (e) {
-                                if (kDebugMode) {
-                                  debugPrint(
-                                    '❌ Błąd przy zapisie trudności: $e',
-                                  );
-                                }
-                              }
-                            }
-
-                            await sendResultToServer(
-                              kwalifikacja: widget.kwalifikacja,
-                              wynik: percent,
-                              dataCzas: endTime.toIso8601String(),
-                              czasTrwania: duration,
-                            );
-
-                            setState(() => _isButtonDisabled = false);
-                            if (context.mounted) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => EgzaminWynikView(
-                                        correctAnswers: correct,
-                                        totalQuestions: total,
-                                        questions: questions,
-                                        selectedAnswers: selectedAnswers,
-                                        returnToHome: true,
-                                      ),
-                                  settings: const RouteSettings(
-                                    name: 'EgzaminWynikView',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  child: Text(
-                    _isButtonDisabled
-                        ? "Wysyłanie egzaminu ..."
-                        : "Zakończ egzamin",
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              )
+              ? _buildFinishButton()
               : null,
     );
   }
 
-  Html _html(String html) {
-    html = html.replaceAll('<img', '<br><img');
-    html = html.replaceAll('<video', '<br><video');
-
-    return Html(
-      data: html,
-      style: {
-        'div.questionHeader': Style(
-          color: Theme.of(context).colorScheme.primary,
-          fontSize: FontSize(18),
-          verticalAlign: VerticalAlign.middle,
+  Widget _buildSingleQuestion(dynamic q) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildQuestionCard(
+          q,
+          index: current,
+          showResult: odpowiedzZatwierdzona,
         ),
-        'div.question': Style(
-          color: Theme.of(context).colorScheme.onPrimary,
-          fontSize: FontSize(16),
-          verticalAlign: VerticalAlign.middle,
-        ),
-        'div.answer': Style(
-          color: Theme.of(context).colorScheme.onSurface,
-          fontSize: FontSize(14),
-          verticalAlign: VerticalAlign.middle,
-        ),
-        'div.description.correct': Style(
-          color: Colors.green,
-          fontSize: FontSize(14),
-          fontStyle: FontStyle.italic,
-        ),
-        'div.description.incorrect': Style(
-          color: Colors.red,
-          fontSize: FontSize(14),
-          fontStyle: FontStyle.italic,
-        ),
-        'b': Style(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.bold,
-          verticalAlign: VerticalAlign.middle,
-        ),
-        'div.media': Style(
-          margin: Margins.symmetric(vertical: 12),
-          textAlign: TextAlign.center,
-        ),
-      },
-      extensions: [
-        TagExtension(
-          tagsToExtend: {'img'},
-          builder: (ctx) {
-            final src = ctx.attributes['src'];
-            double? forcedHeight;
-            final styleAttr = ctx.attributes['style'] ?? '';
-            final m = RegExp(
-              r'height\s*:\s*(\d+)\s*px',
-              caseSensitive: false,
-            ).firstMatch(styleAttr);
-            if (m != null) {
-              forcedHeight = double.tryParse(m.group(1)!);
-            } else {
-              final hAttr = ctx.attributes['height'];
-              if (hAttr != null) forcedHeight = double.tryParse(hAttr);
-            }
-
-            if (src == null || src.isEmpty) {
-              return Text(
-                '⚠️ Brak obrazka',
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              );
-            }
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: GestureDetector(
-                    onTap: () => _showImageDialog(context, src),
-                    child: Image.network(
-                      src,
-                      height: forcedHeight,
-                      fit: BoxFit.contain,
-                      errorBuilder:
-                          (context, error, stackTrace) => Text(
-                            '❌ Nie udało się załadować obrazka',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-        TagExtension(
-          tagsToExtend: {'video'},
-          builder: (ctx) {
-            final src = ctx.attributes['src'] ?? ctx.attributes['data-src'];
-            double? forcedHeight;
-            final styleAttr = ctx.attributes['style'] ?? '';
-            final m = RegExp(
-              r'height\s*:\s*(\d+)\s*px',
-              caseSensitive: false,
-            ).firstMatch(styleAttr);
-            if (m != null) {
-              forcedHeight = double.tryParse(m.group(1)!);
-            } else {
-              final hAttr = ctx.attributes['height'];
-              if (hAttr != null) forcedHeight = double.tryParse(hAttr);
-            }
-
-            if (src == null || src.isEmpty) {
-              return Text(
-                '⚠️ Brak źródła wideo',
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              );
-            }
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Align(
-                alignment: Alignment.center,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: Focus(
-                    canRequestFocus: false,
-                    descendantsAreFocusable: false,
-                    skipTraversal: true,
-                    child: _InlineVideoPlayer(
-                      key: GlobalObjectKey('video:$src'),
-                      url: src,
-                      height: forcedHeight,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
+        const SizedBox(height: 20),
+        Center(
+          child: ElevatedButton.icon(
+            onPressed: _losujNowePytanie,
+            icon: const Icon(Icons.refresh),
+            label: const Text("Losuj kolejne"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
         ),
       ],
     );
   }
 
-  void _showImageDialog(BuildContext context, String imageUrl) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Zamknij',
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (context, anim1, anim2) {
-        final screenSize = MediaQuery.of(context).size;
-        bool isPressed = false;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return GestureDetector(
-              onTap: () => Navigator.of(context, rootNavigator: true).pop(),
-              child: Scaffold(
-                backgroundColor: Colors.black.withValues(alpha: 0.9),
-                body: Stack(
-                  children: [
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {},
-                        child: Listener(
-                          onPointerDown:
-                              (_) => setState(() => isPressed = true),
-                          onPointerUp: (_) => setState(() => isPressed = false),
-                          child: MouseRegion(
-                            cursor:
-                                isPressed
-                                    ? SystemMouseCursors.grabbing
-                                    : SystemMouseCursors.grab,
-                            child: InteractiveViewer(
-                              panEnabled: true,
-                              minScale: 0.5,
-                              maxScale: 4,
-                              child: Image.network(
-                                imageUrl,
-                                width: screenSize.width * 0.8,
-                                fit: BoxFit.contain,
-                                errorBuilder:
-                                    (context, error, stackTrace) => Text(
-                                      '❌ Nie udało się załadować obrazka',
-                                      style: TextStyle(
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.surface,
-                                      ),
-                                    ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          size: 30,
-                          color: Theme.of(context).colorScheme.surface,
-                        ),
-                        tooltip: 'Zamknij',
-                        onPressed:
-                            () =>
-                                Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                ).pop(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSingleQuestion(dynamic q) {
-    final questionHtml =
-        '<div class="questionHeader"><b>Pytanie 1${q['id'] != null ? ' (ID ${q['id']})' : ''}:</b></div><br><div class="question">${q['pytanie']}</div>';
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Card(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(child: _html(questionHtml)),
-                  _buildBadge(q),
-                ],
-              ),
-              const SizedBox(height: 10),
-              ...['A', 'B', 'C', 'D'].map((litera) {
-                final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
-                final isCorrect = litera == q['poprawna'];
-                final isWrong = selectedAnswer == litera && !isCorrect;
-                final isSelected = selectedAnswer == litera;
-
-                Color? buttonColor;
-                if (odpowiedzZatwierdzona) {
-                  if (isCorrect) {
-                    buttonColor = Colors.green;
-                  } else if (isWrong) {
-                    buttonColor = Colors.red;
-                  } else if (isSelected) {
-                    buttonColor = Theme.of(context).colorScheme.primary;
-                  }
-                }
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          buttonColor ?? Theme.of(context).colorScheme.surface,
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 2,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 16,
-                      ),
-                    ),
-                    onPressed:
-                        (odpowiedzZatwierdzona && !isSelected)
-                            ? null
-                            : () => checkAnswer(litera),
-                    child: _html('<div class="answer">${odp ?? ""}</div>'),
-                  ),
-                );
-              }),
-              if (odpowiedzZatwierdzona && selectedAnswer != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: _html(
-                    selectedAnswer == q['poprawna']
-                        ? '<div class="description correct">✅ Odpowiedź $selectedAnswer jest poprawna.<br>${q['opisPoprawne']}</div>'
-                        : '<div class="description incorrect">❌ Odpowiedź $selectedAnswer jest niepoprawna.<br>${q['opisNiepoprawne']}<br><div class="description correct">✅ Odpowiedź poprawna to: ${q['poprawna']}</div></div>',
-                  ),
-                ),
-              const SizedBox(height: 20),
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _losujNowePytanie,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text("Losuj kolejne"),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _losujNowePytanie() {
-    setState(() {
-      if (questions.length <= 1) return;
-
-      final rand = Random();
-      int newIndex = current;
-      while (newIndex == current) {
-        newIndex = rand.nextInt(questions.length);
-      }
-
-      current = newIndex;
-      selectedAnswer = null;
-      odpowiedzZatwierdzona = false;
-    });
-  }
-
-  Widget _buildScrollableList() {
-    final isAll = widget.tryb == TrybEgzaminu.wszystkie;
-    final items = isAll ? _filteredQuestions : questions;
+  Widget _buildLazyList() {
+    final items = _displayedQuestions;
 
     return CustomScrollView(
+      controller: _scrollController,
       slivers: [
-        if (isAll)
+        if (widget.tryb == TrybEgzaminu.wszystkie)
           SliverPersistentHeader(
             pinned: true,
-            delegate: _PinnedSearchHeader(
-              height: 98,
+            delegate: _SearchHeader(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: Column(
@@ -1084,93 +701,41 @@ class _EgzaminViewState extends State<EgzaminView> {
                     TextField(
                       controller: _textSearchCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'Szukaj w treści / odpowiedziach / ID',
+                        labelText: 'Szukaj...',
                         prefixIcon: Icon(Icons.search),
                         border: OutlineInputBorder(),
-                        isDense: true,
                       ),
-                      onChanged: (v) => setState(() => searchText = v),
+                      onChanged: (v) {
+                        setState(() {
+                          searchText = v;
+                          _visibleCount = 30.clamp(
+                            0,
+                            _filteredQuestions.length,
+                          );
+                        });
+                      },
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Znalezione: ${items.length} / ${questions.length}',
-                      style: TextStyle(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.8),
-                      ),
+                      'Znalezione: ${_filteredQuestions.length} / ${questions.length}',
                     ),
                   ],
                 ),
               ),
             ),
           ),
-        const SliverPadding(padding: EdgeInsets.only(top: 8)),
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(16),
           sliver: SliverList.builder(
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final q = items[index] as Map<String, dynamic>;
+            itemCount: items.length + (_isLoadingMore ? 3 : 0),
+            itemBuilder: (context, i) {
+              if (i >= items.length) return _buildShimmer();
+              final q = items[i];
               final originalIndex = questions.indexOf(q);
-              final selected = selectedAnswers[originalIndex];
-
-              final questionHtml =
-                  '<div class="questionHeader"><b>Pytanie ${originalIndex + 1}${q['id'] != null ? ' (ID ${q['id']})' : ''}:</b></div><br><div class="question">${q['pytanie']}</div>';
-
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(child: _html(questionHtml)),
-                          _buildBadge(q),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      ...['A', 'B', 'C', 'D'].map((litera) {
-                        final odp = q['odp${'ABCD'.indexOf(litera) + 1}'];
-                        final isSelected = selected == litera;
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  isSelected
-                                      ? Theme.of(context).colorScheme.primary
-                                          .withValues(alpha: 0.8)
-                                      : Theme.of(context).colorScheme.surface,
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 2,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                                horizontal: 16,
-                              ),
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                selectedAnswers[originalIndex] = litera;
-                              });
-                            },
-                            child: _html(
-                              '<div class="answer">${odp ?? ""}</div>',
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
+              return _buildQuestionCard(
+                q,
+                index: originalIndex,
+                showResult: false,
               );
             },
           ),
@@ -1178,19 +743,100 @@ class _EgzaminViewState extends State<EgzaminView> {
       ],
     );
   }
+
+  Widget _buildFinishButton() {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: ElevatedButton(
+        onPressed: _isButtonDisabled ? null : _finishExam,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ),
+        child: Text(
+          _isButtonDisabled ? "Wysyłanie..." : "Zakończ egzamin",
+          style: const TextStyle(fontSize: 16),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _finishExam() async {
+    setState(() => _isButtonDisabled = true);
+    final correct =
+        selectedAnswers
+            .where(
+              (a) => a == questions[selectedAnswers.indexOf(a)]['poprawna'],
+            )
+            .length;
+    final percent = (correct / questions.length) * 100;
+    final endTime = DateTime.now();
+    final duration = endTime.difference(startTime).inSeconds;
+
+    final futures = <Future>[];
+    for (int i = 0; i < questions.length; i++) {
+      final pid = int.tryParse(questions[i]['id'].toString());
+      final odp = selectedAnswers[i];
+      if (pid != null && odp != null) {
+        futures.add(
+          zapiszTrudnoscDoBazy(
+            pid,
+            widget.kwalifikacja,
+            odp == questions[i]['poprawna'],
+          ),
+        );
+      }
+    }
+
+    await sendResultToServer(
+      kwalifikacja: widget.kwalifikacja,
+      wynik: percent,
+      dataCzas: endTime.toIso8601String(),
+      czasTrwania: duration,
+    );
+
+    setState(() => _isButtonDisabled = false);
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => EgzaminWynikView(
+                correctAnswers: correct,
+                totalQuestions: questions.length,
+                questions: questions,
+                selectedAnswers: selectedAnswers,
+                returnToHome: true,
+              ),
+        ),
+      );
+    }
+  }
+
+  void _losujNowePytanie() {
+    if (questions.length <= 1) return;
+    final rand = Random();
+    int newIndex = current;
+    while (newIndex == current) {
+      newIndex = rand.nextInt(questions.length);
+    }
+    setState(() {
+      current = newIndex;
+      selectedAnswer = null;
+      odpowiedzZatwierdzona = false;
+    });
+  }
 }
 
-class _PinnedSearchHeader extends SliverPersistentHeaderDelegate {
+class _SearchHeader extends SliverPersistentHeaderDelegate {
   final Widget child;
-  final double height;
-
-  _PinnedSearchHeader({required this.child, this.height = 98});
+  _SearchHeader({required this.child});
 
   @override
-  double get minExtent => height;
-
+  double get minExtent => 98;
   @override
-  double get maxExtent => height;
+  double get maxExtent => 98;
 
   @override
   Widget build(
@@ -1200,56 +846,11 @@ class _PinnedSearchHeader extends SliverPersistentHeaderDelegate {
   ) {
     return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
-      elevation: overlapsContent ? 2 : 0, // delikatny cień gdy treść pod spodem
+      elevation: overlapsContent ? 2 : 0,
       child: child,
     );
   }
 
   @override
-  bool shouldRebuild(covariant _PinnedSearchHeader oldDelegate) {
-    return oldDelegate.height != height || oldDelegate.child != child;
-  }
-}
-
-class _InteractiveImage extends StatefulWidget {
-  final String imageUrl;
-  const _InteractiveImage({required this.imageUrl});
-
-  @override
-  State<_InteractiveImage> createState() => _InteractiveImageState();
-}
-
-class _InteractiveImageState extends State<_InteractiveImage> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-
-    return Listener(
-      onPointerDown: (_) => setState(() => _isPressed = true),
-      onPointerUp: (_) => setState(() => _isPressed = false),
-      child: MouseRegion(
-        cursor:
-            _isPressed ? SystemMouseCursors.grabbing : SystemMouseCursors.grab,
-        child: InteractiveViewer(
-          panEnabled: true,
-          minScale: 0.5,
-          maxScale: 4,
-          child: Image.network(
-            widget.imageUrl,
-            fit: BoxFit.contain,
-            width: screenSize.width * 0.9,
-            errorBuilder:
-                (context, error, stackTrace) => Text(
-                  '❌ Nie udało się załadować obrazka',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-          ),
-        ),
-      ),
-    );
-  }
+  bool shouldRebuild(covariant _SearchHeader old) => old.child != child;
 }

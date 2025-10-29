@@ -41,6 +41,7 @@ dependencies:
   oauth2_client: ^4.2.0
   http_parser: ^4.1.2
   shimmer: ^3.0.0
+  html_unescape: ^2.0.0
   #openid_client: ^0.4.9
   #aad_oauth: ^1.0.1
   #msal_auth: ^3.3.0
