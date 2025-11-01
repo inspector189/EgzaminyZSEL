@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:html_unescape/html_unescape.dart';
+import 'dart:async';
 
 class _InlineVideoPlayer extends StatefulWidget {
   const _InlineVideoPlayer({required this.url, this.height});
@@ -219,11 +220,33 @@ class EgzaminView extends StatefulWidget {
 
 class _EgzaminViewState extends State<EgzaminView> {
   final _unescape = HtmlUnescape();
-
+  Timer? _timer;
+  final int minutesToEndExam = 60;
+  late Duration _remainingTime;
   String _clean(String? s) => _unescape.convert(s?.toString() ?? '');
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final elapsed = DateTime.now().difference(startTime);
+      final remaining = Duration(minutes: minutesToEndExam) - elapsed;
+      if (remaining.isNegative) {
+        timer.cancel();
+        setState(() {
+          _remainingTime = Duration.zero;
+        });
+        _finishExam(); 
+      } else {
+        setState(() {
+          _remainingTime = remaining;
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _textSearchCtrl.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -275,8 +298,10 @@ class _EgzaminViewState extends State<EgzaminView> {
   @override
   void initState() {
     super.initState();
-    fetchQuestions();
+    _remainingTime = Duration(minutes: minutesToEndExam);
     startTime = DateTime.now();
+    _startTimer();
+    fetchQuestions();
     _scrollController.addListener(_onScroll);
   }
 
@@ -637,28 +662,54 @@ class _EgzaminViewState extends State<EgzaminView> {
         body: const Center(child: Text('Brak pytań.')),
       );
     }
+    
+  return Scaffold(
+    appBar: AppBar(
+      title: Row(
+    children: [
+      const Text("Egzamin"),
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Egzamin"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed:
-              () =>
-                  Navigator.pop(context, {'returnToHome': widget.returnToHome}),
+      Expanded(
+        child: Center(
+          child: widget.tryb == TrybEgzaminu.czterdziesciPytan
+              ? Text(
+                  _formatDuration(_remainingTime),
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: _remainingTime.inMinutes < 5
+                        ? Colors.red
+                        : Theme.of(context).colorScheme.onPrimary,
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
       ),
-      body:
-          widget.tryb == TrybEgzaminu.jednoPytanie
-              ? _buildSingleQuestion(questions[current])
-              : _buildLazyList(),
-      bottomNavigationBar:
-          widget.tryb == TrybEgzaminu.czterdziesciPytan
-              ? _buildFinishButton()
-              : null,
-    );
-  }
 
+      const SizedBox(width: 48), 
+    ],
+  ),
+
+  iconTheme: IconThemeData(color: Theme.of(context).colorScheme.onPrimary),
+  titleTextStyle: TextStyle(
+    color: Theme.of(context).colorScheme.onPrimary,
+    fontSize: 22,
+  ),
+),
+  body: widget.tryb == TrybEgzaminu.jednoPytanie
+      ? _buildSingleQuestion(questions[current])
+      : _buildLazyList(),
+  bottomNavigationBar: widget.tryb == TrybEgzaminu.czterdziesciPytan
+      ? _buildFinishButton()
+      : null,
+);
+  }
+    String _formatDuration(Duration d) {
+      final minutes = d.inMinutes;
+      final seconds = d.inSeconds.remainder(60);
+      return '${minutes.toString().padLeft(2, '0')}:'
+            '${seconds.toString().padLeft(2, '0')}';
+    }
   Widget _buildSingleQuestion(dynamic q) {
     return ListView(
       padding: const EdgeInsets.all(16),
