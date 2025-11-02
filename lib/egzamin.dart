@@ -5,12 +5,44 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'wyniki.dart';
 import 'dart:math';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'dart:async';
+
+class ExamTimer extends StatelessWidget {
+  final DateTime endTime;
+  const ExamTimer({super.key, required this.endTime});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+      stream: Stream.periodic(const Duration(seconds: 1)),
+      builder: (context, snapshot) {
+        final remaining = endTime.difference(DateTime.now());
+        final total = remaining.isNegative ? Duration.zero : remaining;
+
+        final minutes = total.inMinutes.toString().padLeft(2, '0');
+        final seconds = (total.inSeconds % 60).toString().padLeft(2, '0');
+
+        return Text(
+          '$minutes:$seconds',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color:
+                total.inMinutes < 5
+                    ? Colors.red
+                    : Theme.of(context).colorScheme.onPrimary,
+          ),
+        );
+      },
+    );
+  }
+}
 
 class _InlineVideoPlayer extends StatefulWidget {
   const _InlineVideoPlayer({required this.url, this.height});
@@ -86,9 +118,11 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
       player = AspectRatio(aspectRatio: aspect, child: player);
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: player,
+    return RepaintBoundary(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: player,
+      ),
     );
   }
 }
@@ -141,20 +175,17 @@ enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
 Widget buildZoomableImage(BuildContext context, String url) {
   return LayoutBuilder(
     builder: (context, constraints) {
-      final maxWidth = constraints.maxWidth;
+      final maxWidth = constraints.maxWidth - 300;
       return GestureDetector(
         onTap: () => _showZoomedImage(context, url),
-        child: Image.network(
-          url,
-          fit: BoxFit.contain,
-          height: 300,
-          width: maxWidth,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return _buildImagePlaceholder(maxWidth);
-          },
-          errorBuilder:
-              (_, _, _) => _buildImagePlaceholder(maxWidth, error: true),
+        child: Center(
+          child: CachedNetworkImage(
+            imageUrl: url,
+            fit: BoxFit.contain,
+            placeholder: (_, _) => _buildImagePlaceholder(maxWidth),
+            errorWidget:
+                (_, _, _) => _buildImagePlaceholder(maxWidth, error: true),
+          ),
         ),
       );
     },
@@ -164,18 +195,22 @@ Widget buildZoomableImage(BuildContext context, String url) {
 Widget _buildImagePlaceholder(double width, {bool error = false}) {
   return Container(
     width: width,
-    height: 200,
     decoration: BoxDecoration(
-      color: error ? Colors.grey[300] : Colors.grey[200],
+      color: error ? Colors.grey[850] : Colors.grey[700],
       borderRadius: BorderRadius.circular(8),
     ),
     child:
         error
             ? const Icon(Icons.broken_image, color: Colors.grey)
             : Shimmer.fromColors(
-              baseColor: Colors.grey[300]!,
-              highlightColor: Colors.grey[100]!,
-              child: Container(color: Colors.white),
+              baseColor: Colors.grey[600]!,
+              highlightColor: Colors.grey[400]!,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
   );
 }
@@ -222,7 +257,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   final _unescape = HtmlUnescape();
   Timer? _timer;
   final int minutesToEndExam = 60;
-  late Duration _remainingTime;
+  late DateTime _endTime;
   String _clean(String? s) => _unescape.convert(s?.toString() ?? '');
 
   void _startTimer() {
@@ -232,14 +267,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       final remaining = Duration(minutes: minutesToEndExam) - elapsed;
       if (remaining.isNegative) {
         timer.cancel();
-        setState(() {
-          _remainingTime = Duration.zero;
-        });
-        _finishExam(); 
-      } else {
-        setState(() {
-          _remainingTime = remaining;
-        });
+        _finishExam();
       }
     });
   }
@@ -298,25 +326,23 @@ class _EgzaminViewState extends State<EgzaminView> {
   @override
   void initState() {
     super.initState();
-    _remainingTime = Duration(minutes: minutesToEndExam);
-    startTime = DateTime.now();
-    _startTimer();
     fetchQuestions();
     _scrollController.addListener(_onScroll);
   }
 
+  Timer? _scrollDebounce;
+
   void _onScroll() {
-    if (_isLoadingMore || _visibleCount >= _totalQuestions) return;
+    if (_scrollDebounce?.isActive ?? false) return;
+    if (_visibleCount >= _totalQuestions) return;
+
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 300) {
-      setState(() => _isLoadingMore = true);
-
-      if (mounted) {
+      _scrollDebounce = Timer(const Duration(milliseconds: 200), () {
         setState(() {
           _visibleCount = (_visibleCount + 30).clamp(0, _totalQuestions);
-          _isLoadingMore = false;
         });
-      }
+      });
     }
   }
 
@@ -365,6 +391,9 @@ class _EgzaminViewState extends State<EgzaminView> {
             _visibleCount = 30.clamp(0, selected.length);
           });
         }
+        _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
+        startTime = DateTime.now();
+        _startTimer();
       }
     } catch (e) {
       if (kDebugMode) debugPrint("Fetch error: $e");
@@ -662,54 +691,45 @@ class _EgzaminViewState extends State<EgzaminView> {
         body: const Center(child: Text('Brak pytań.')),
       );
     }
-    
-  return Scaffold(
-    appBar: AppBar(
-      title: Row(
-    children: [
-      const Text("Egzamin"),
 
-      Expanded(
-        child: Center(
-          child: widget.tryb == TrybEgzaminu.czterdziesciPytan
-              ? Text(
-                  _formatDuration(_remainingTime),
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: _remainingTime.inMinutes < 5
-                        ? Colors.red
-                        : Theme.of(context).colorScheme.onPrimary,
-                  ),
-                )
-              : const SizedBox.shrink(),
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Text("Egzamin"),
+
+            Expanded(
+              child: Center(
+                child:
+                    widget.tryb == TrybEgzaminu.czterdziesciPytan
+                        ? ExamTimer(endTime: _endTime)
+                        : const SizedBox.shrink(),
+              ),
+            ),
+
+            const SizedBox(width: 48),
+          ],
+        ),
+
+        iconTheme: IconThemeData(
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
+        titleTextStyle: TextStyle(
+          color: Theme.of(context).colorScheme.onPrimary,
+          fontSize: 22,
         ),
       ),
-
-      const SizedBox(width: 48), 
-    ],
-  ),
-
-  iconTheme: IconThemeData(color: Theme.of(context).colorScheme.onPrimary),
-  titleTextStyle: TextStyle(
-    color: Theme.of(context).colorScheme.onPrimary,
-    fontSize: 22,
-  ),
-),
-  body: widget.tryb == TrybEgzaminu.jednoPytanie
-      ? _buildSingleQuestion(questions[current])
-      : _buildLazyList(),
-  bottomNavigationBar: widget.tryb == TrybEgzaminu.czterdziesciPytan
-      ? _buildFinishButton()
-      : null,
-);
+      body:
+          widget.tryb == TrybEgzaminu.jednoPytanie
+              ? _buildSingleQuestion(questions[current])
+              : _buildLazyList(),
+      bottomNavigationBar:
+          widget.tryb == TrybEgzaminu.czterdziesciPytan
+              ? _buildFinishButton()
+              : null,
+    );
   }
-    String _formatDuration(Duration d) {
-      final minutes = d.inMinutes;
-      final seconds = d.inSeconds.remainder(60);
-      return '${minutes.toString().padLeft(2, '0')}:'
-            '${seconds.toString().padLeft(2, '0')}';
-    }
+
   Widget _buildSingleQuestion(dynamic q) {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -777,18 +797,27 @@ class _EgzaminViewState extends State<EgzaminView> {
           ),
         SliverPadding(
           padding: const EdgeInsets.all(16),
-          sliver: SliverList.builder(
-            itemCount: items.length + (_isLoadingMore ? 3 : 0),
-            itemBuilder: (context, i) {
-              if (i >= items.length) return _buildShimmer();
-              final q = items[i];
-              final originalIndex = questions.indexOf(q);
-              return _buildQuestionCard(
-                q,
-                index: originalIndex,
-                showResult: false,
-              );
-            },
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                if (i >= items.length) return _buildShimmer();
+
+                final q = items[i];
+                final originalIndex = questions.indexOf(q);
+
+                return RepaintBoundary(
+                  child: _buildQuestionCard(
+                    q,
+                    index: originalIndex,
+                    showResult: false,
+                  ),
+                );
+              },
+              childCount: items.length + (_isLoadingMore ? 3 : 0),
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
+              addSemanticIndexes: false,
+            ),
           ),
         ),
       ],

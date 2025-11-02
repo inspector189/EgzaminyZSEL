@@ -45,6 +45,7 @@ dependencies:
   #openid_client: ^0.4.9
   #aad_oauth: ^1.0.1
   #msal_auth: ^3.3.0
+  cached_network_image: ^3.4.1
   shared_preferences: ^2.5.3
   url_launcher: ^6.3.2
   flutter_secure_storage: ^10.0.0-beta.4

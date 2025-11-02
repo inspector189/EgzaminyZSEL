@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 //import 'package:flutter/gestures.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -101,9 +102,11 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
       player = AspectRatio(aspectRatio: aspect, child: player);
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: player,
+    return RepaintBoundary(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: player,
+      ),
     );
   }
 }
@@ -159,51 +162,65 @@ class _VideoPool {
 }
 
 Widget buildZoomableImage(BuildContext context, String url) {
-  return GestureDetector(
-    onTap: () {
-      showGeneralDialog(
-        context: context,
-        barrierDismissible: true,
-        barrierLabel: 'Close',
-        pageBuilder:
-            (c, a1, a2) => Center(
-              child: InteractiveViewer(
-                panEnabled: true,
-                minScale: 1.0,
-                maxScale: 5.0,
-                child: Image.network(url, fit: BoxFit.contain),
-              ),
-            ),
-        transitionBuilder:
-            (c, a1, a2, child) => FadeTransition(opacity: a1, child: child),
-        transitionDuration: const Duration(milliseconds: 300),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final maxWidth = constraints.maxWidth - 300;
+      return GestureDetector(
+        onTap: () => _showZoomedImage(context, url),
+        child: Center(
+          child: CachedNetworkImage(
+            imageUrl: url,
+            fit: BoxFit.contain,
+            placeholder: (_, _) => _buildImagePlaceholder(maxWidth),
+            errorWidget:
+                (_, _, _) => _buildImagePlaceholder(maxWidth, error: true),
+          ),
+        ),
       );
     },
-    child: Image.network(
-      url,
-      fit: BoxFit.contain,
-      loadingBuilder:
-          (c, child, progress) =>
-              progress == null
-                  ? child
-                  : Shimmer.fromColors(
-                    baseColor: Colors.grey[300]!,
-                    highlightColor: Colors.grey[100]!,
-                    child: Container(
-                      width: double.infinity,
-                      height: 200,
-                      color: Colors.white,
-                    ),
-                  ),
-      errorBuilder:
-          (_, _, _) => Container(
-            color: Colors.grey[300],
-            height: 200,
-            child: const Center(
-              child: Icon(Icons.broken_image, color: Colors.grey),
-            ),
-          ),
+  );
+}
+
+Widget _buildImagePlaceholder(double width, {bool error = false}) {
+  return Container(
+    width: width,
+    decoration: BoxDecoration(
+      color: error ? Colors.grey[850] : Colors.grey[700],
+      borderRadius: BorderRadius.circular(8),
     ),
+    child:
+        error
+            ? const Icon(Icons.broken_image, color: Colors.grey)
+            : Shimmer.fromColors(
+              baseColor: Colors.grey[600]!,
+              highlightColor: Colors.grey[400]!,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+  );
+}
+
+void _showZoomedImage(BuildContext context, String url) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    pageBuilder:
+        (c, a1, a2) => Center(
+          child: InteractiveViewer(
+            panEnabled: true,
+            minScale: 1.0,
+            maxScale: 5.0,
+            child: Image.network(url, fit: BoxFit.contain),
+          ),
+        ),
+    transitionBuilder:
+        (c, a1, a2, child) => FadeTransition(opacity: a1, child: child),
+    transitionDuration: const Duration(milliseconds: 300),
   );
 }
 
