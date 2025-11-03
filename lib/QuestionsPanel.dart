@@ -73,12 +73,20 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
     try {
       final response = await http.get(
         Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php'),
+        headers: {
+          'Authorization':
+              'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^', // <-- add your token
+          'Content-Type': 'application/json',
+        },
       );
+
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
       }
+
       final result = json.decode(response.body);
       if (result is! List) throw Exception('Invalid format');
+
       setState(() {
         questionStats = result;
         isLoading = false;
@@ -168,13 +176,13 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
       if (currentCount >= total) return;
 
       setState(() => isLoadingMore[kwal] = true);
-      Future.delayed(const Duration(milliseconds: 600), () {
+      {
         if (!mounted) return;
         setState(() {
           visibleCounts[kwal] = (currentCount + 30).clamp(0, total);
           isLoadingMore[kwal] = false;
         });
-      });
+      }
     }
   }
 

@@ -396,7 +396,7 @@ class _EgzaminViewState extends State<EgzaminView> {
         _startTimer();
       }
     } catch (e) {
-      if (kDebugMode) debugPrint("Fetch error: $e");
+      if (kDebugMode) debugPrint("Pobranie nie powiodło się: $e");
     }
   }
 
@@ -426,7 +426,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       },
     );
     if (response.statusCode != 200 && kDebugMode) {
-      debugPrint('Result save failed: ${response.body}');
+      debugPrint('Zapis wyniku nie powiódł się: ${response.body}');
     }
   }
 
@@ -450,7 +450,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       },
     );
     if (response.statusCode != 200 && kDebugMode) {
-      debugPrint('Difficulty save failed: ${response.body}');
+      debugPrint('Zapis trudności nie powiódł się: ${response.body}');
     }
   }
 
@@ -642,15 +642,22 @@ class _EgzaminViewState extends State<EgzaminView> {
             if (showResult && selected != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  selected == poprawna
-                      ? 'Correct answer $selected.'
-                      : 'Incorrect answer $selected. Correct: $poprawna.',
-                  style: TextStyle(
-                    color: selected == poprawna ? Colors.green : Colors.red,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
+                child:
+                    selected == poprawna
+                        ? Text(
+                          'Wybrano poprawną odpowiedź: $selected.',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                        : Text(
+                          'Wybrano niepoprawną odpowiedź: $selected.\nPoprawna odpowiedź: $poprawna.',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
               ),
           ],
         ),

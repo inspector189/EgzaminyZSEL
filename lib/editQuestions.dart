@@ -462,32 +462,39 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   Future<Map<int, Map<String, dynamic>>> _fetchAllTrudnosci() async {
-    final url = Uri.parse(
-      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
-    );
-    final res = await http.get(url);
-    if (res.statusCode != 200) return {};
-    final String kval = _sanitizedTable();
-    final List<dynamic> jsonList = json.decode(res.body);
-    final Map<int, Map<String, dynamic>> result = {};
-    for (final item in jsonList) {
-      final String itemKval =
-          (item['kwalifikacja'] ?? '')
-              .toString()
-              .replaceAll(' ', '')
-              .toLowerCase();
-      if (itemKval != kval) continue;
-      final int? id = int.tryParse('${item['pytanie_id']}');
-      if (id == null) continue;
-      final double trud =
-          (item['trudnosc'] is num)
-              ? (item['trudnosc'] as num).toDouble()
-              : double.tryParse('${item['trudnosc']}') ?? 0.0;
-      final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
-      result[id] = {'trudnosc': trud, 'ilosc_odpowiedzi': ilosc};
-    }
-    return result;
+  final url = Uri.parse(
+    'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
+  );
+  
+  final res = await http.get(
+    url,
+    headers: {
+      'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+      'Content-Type': 'application/json',
+    },
+  );
+
+  if (res.statusCode != 200) return {};
+  final String kval = _sanitizedTable();
+  final List<dynamic> jsonList = json.decode(res.body);
+  final Map<int, Map<String, dynamic>> result = {};
+
+  for (final item in jsonList) {
+    final String itemKval =
+        (item['kwalifikacja'] ?? '').toString().replaceAll(' ', '').toLowerCase();
+    if (itemKval != kval) continue;
+    final int? id = int.tryParse('${item['pytanie_id']}');
+    if (id == null) continue;
+    final double trud = (item['trudnosc'] is num)
+        ? (item['trudnosc'] as num).toDouble()
+        : double.tryParse('${item['trudnosc']}') ?? 0.0;
+    final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
+    result[id] = {'trudnosc': trud, 'ilosc_odpowiedzi': ilosc};
   }
+
+  return result;
+}
+
 
   void _applyTextFilter(String value) {
     setState(() => searchText = value.trim());
@@ -1070,6 +1077,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         Uri.parse('https://interpage.pl/egzaminy/add_question.php'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
           'Accept': 'application/json',
         },
         body: jsonEncode(payload),
