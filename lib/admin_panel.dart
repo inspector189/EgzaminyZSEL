@@ -191,11 +191,11 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
 
   Future<void> fetchUsers() async {
     try {
-      final response = await http.get(
+      final response = await http.post(
         Uri.parse('https://interpage.pl/egzaminy/showAdmins.php'),
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_apiKey',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
         },
       );
       if (kDebugMode) {
