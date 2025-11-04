@@ -20,7 +20,7 @@ class AppThemes {
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-        dividerColor: const Color(0xFF333333),
+        dividerColor: Colors.transparent,
         scaffoldBackgroundColor: Colors.white,
       );
 
@@ -43,7 +43,7 @@ class AppThemes {
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-        dividerColor: const Color(0xFFBBBBBB),
+        dividerColor: Colors.transparent,
         scaffoldBackgroundColor: const Color(0xFF121212),
       );
 }

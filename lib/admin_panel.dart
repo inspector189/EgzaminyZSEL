@@ -131,11 +131,9 @@ class AdminTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(
-                context,
-              ).colorScheme.surface.withValues(alpha: 0.2),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
@@ -155,7 +153,7 @@ class AdminTile extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -651,6 +649,11 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   }
 
   Future<void> fetchAllStats() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
     try {
       final url = Uri.parse('https://interpage.pl/egzaminy/stats_all.php');
       final response = await http.post(
@@ -660,6 +663,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
           'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
         },
       );
+
       if (kDebugMode) {
         debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
         debugPrint('Treść odpowiedzi: ${response.body}');
@@ -671,6 +675,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
           setState(() {
             allResults = data;
             isLoading = false;
+            errorMessage = null;
           });
         } else {
           throw Exception(
@@ -695,8 +700,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
       if (user.isEmpty || user.toLowerCase() == 'anonymous') {
         user = 'Użytkownik anonimowy';
       }
-      if (!grouped.containsKey(user)) grouped[user] = [];
-      grouped[user]!.add(r);
+      grouped.putIfAbsent(user, () => []).add(r);
     }
     return grouped;
   }
@@ -705,8 +709,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     final Map<String, List<dynamic>> grouped = {};
     for (var r in allResults) {
       final q = (r['kwalifikacja'] ?? 'Nieznana').toString();
-      if (!grouped.containsKey(q)) grouped[q] = [];
-      grouped[q]!.add(r);
+      grouped.putIfAbsent(q, () => []).add(r);
     }
     return grouped;
   }
@@ -719,7 +722,13 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   }
 
   Map<String, dynamic> calculateStats(List<dynamic> results) {
-    final scores = results.map((e) => (e['wynik'] as num).toDouble()).toList();
+    if (results.isEmpty) return {'count': 0, 'avg': 0.0, 'best': 0, 'worst': 0};
+    final scores =
+        results.map<double>((e) {
+          final raw = e['wynik'];
+          if (raw is num) return raw.toDouble();
+          return double.tryParse('$raw') ?? 0.0;
+        }).toList();
     final avg = scores.reduce((a, b) => a + b) / scores.length;
     final best = scores.reduce((a, b) => a > b ? a : b);
     final worst = scores.reduce((a, b) => a < b ? a : b);
@@ -728,9 +737,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorAccent =
-        isDark ? Theme.of(context).colorScheme.primary : Colors.blue;
+    final theme = Theme.of(context);
 
     final users = groupByUser();
     final qualifications = groupByQualification();
@@ -740,19 +747,15 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
             .where(
               (e) => e.key.toLowerCase().contains(searchQuery.toLowerCase()),
             )
-            .toList();
-
-    filteredUsers.sort((a, b) {
-      if (a.key == 'Użytkownik anonimowy') return 1;
-      if (b.key == 'Użytkownik anonimowy') return -1;
-      return a.key.compareTo(b.key);
-    });
+            .toList()
+          ..sort((a, b) {
+            if (a.key == 'Użytkownik anonimowy') return 1;
+            if (b.key == 'Użytkownik anonimowy') return -1;
+            return a.key.compareTo(b.key);
+          });
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('📊 Statystyki Egzaminów'),
-        backgroundColor: colorAccent.withValues(alpha: 0.9),
-      ),
+      appBar: AppBar(title: const Text('📊 Statystyki Egzaminów')),
       body:
           isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -763,41 +766,33 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    TextField(
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.search),
-                        hintText: 'Wyszukaj użytkownika..',
-                        filled: true,
-                        fillColor: isDark ? Colors.grey[850] : Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          searchQuery = value;
-                        });
-                      },
+                    _SearchBar(
+                      onChanged: (value) => setState(() => searchQuery = value),
                     ),
-
                     const SizedBox(height: 24),
-
-                    Text(
-                      '👤 Statystyki według użytkownika',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_2,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 32,
+                        ),
+                        const SizedBox(width: 8),
+                        const _SectionTitle('Statystyki według użytkownika'),
+                      ],
                     ),
                     const SizedBox(height: 12),
-
                     if (filteredUsers.isEmpty)
-                      const Text('Brak wyników dla tego użytkownika.'),
-
+                      Center(
+                        child: Text(
+                          'Brak wyników dla tego użytkownika.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
                     ...filteredUsers.map((entry) {
                       final user = entry.key;
-                      final exams = entry.value;
+                      final exams = List<dynamic>.from(entry.value);
 
-                      // Sortowanie po dacie egzaminu (najnowszy pierwszy)
                       exams.sort((a, b) {
                         final da =
                             DateTime.tryParse(a['data_czas'] ?? '') ??
@@ -808,316 +803,436 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         return db.compareTo(da);
                       });
 
-                      // Ostatni egzamin
+                      final userStats = calculateStats(exams);
+
+                      final Map<String, List<dynamic>> examsByQual = {};
+                      for (final exam in exams) {
+                        final kwal = exam['kwalifikacja'] ?? 'Nieznana';
+                        examsByQual.putIfAbsent(kwal, () => []).add(exam);
+                      }
+                      final visibleQualifications =
+                          examsByQual.entries
+                              .where((e) => e.value.isNotEmpty)
+                              .toList();
+
+                      final isAnonymous = user == 'Użytkownik anonimowy';
+
+                      if (isAnonymous) {
+                        return _AnonymousUserCard(
+                          user: user,
+                          userStats: userStats,
+                        );
+                      }
+
                       final lastExam = exams.isNotEmpty ? exams.first : null;
                       final lastExamScore =
                           lastExam?['wynik']?.toString() ?? '-';
                       final lastExamDate =
                           lastExam?['data_czas']?.toString() ?? '-';
 
-                      final userStats = calculateStats(entry.value);
-                      final isAnonymous = user == 'Użytkownik anonimowy';
-
-                      final Map<String, List<dynamic>> examsByQual = {};
-                      for (final exam in entry.value) {
-                        final kwal = exam['kwalifikacja'] ?? 'Nieznana';
-                        examsByQual.putIfAbsent(kwal, () => []).add(exam);
-                      }
-
-                      final visibleQualifications =
-                          examsByQual.entries
-                              .where((e) => e.value.isNotEmpty)
-                              .toList();
-
-                      if (isAnonymous) {
-                        return Card(
-                          elevation: 3,
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  user,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Liczba egzaminów: ${userStats['count']}',
-                                    ),
-                                    Text(
-                                      'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}%',
-                                      style: TextStyle(color: colorAccent),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('Najlepszy: ${userStats['best']}%'),
-                                    Text('Najgorszy: ${userStats['worst']}%'),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-
-                      return Card(
-                        elevation: 3,
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ExpansionTile(
-                          tilePadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 4,
-                          ),
-                          title: Text(
-                            user,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}% • '
-                            'Egzaminów: ${userStats['count']} • '
-                            'Ostatni: $lastExamScore% ($lastExamDate)',
-                            style: TextStyle(color: colorAccent),
-                          ),
-                          childrenPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          children: [
-                            ...visibleQualifications.map((qualEntry) {
-                              final qual = qualEntry.key;
-
-                              final List<dynamic> qualExams =
-                                  List<dynamic>.from(qualEntry.value);
-
-                              // sort: najnowsze pierwsze
-                              qualExams.sort((a, b) {
-                                final da =
-                                    DateTime.tryParse(a['data_czas'] ?? '') ??
-                                    DateTime(2000);
-                                final db =
-                                    DateTime.tryParse(b['data_czas'] ?? '') ??
-                                    DateTime(2000);
-                                return db.compareTo(da);
-                              });
-
-                              // TOP 5 (lub mniej)
-                              final recent = qualExams.take(5).toList();
-
-                              final qualStats = calculateStats(qualEntry.value);
-
-                              String scoreStr(dynamic v) {
-                                if (v is num) {
-                                  return v.toStringAsFixed(v % 1 == 0 ? 0 : 2);
-                                }
-                                return v?.toString() ?? '-';
-                              }
-
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: ExpansionTile(
-                                  tilePadding: EdgeInsets.zero,
-                                  childrenPadding: const EdgeInsets.only(
-                                    left: 8,
-                                    right: 0,
-                                    bottom: 8,
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      const Text(
-                                        '📘 ',
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                      Expanded(
-                                        child: Text(
-                                          qual,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  subtitle: Padding(
-                                    padding: const EdgeInsets.only(top: 4.0),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Egzaminów: ${qualStats['count']}',
-                                        ),
-                                        Text(
-                                          'Śr. wynik: ${qualStats['avg'].toStringAsFixed(2)}%',
-                                          style: TextStyle(color: colorAccent),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  children: [
-                                    if (recent.isEmpty)
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 12.0,
-                                          vertical: 8,
-                                        ),
-                                        child: Text(
-                                          '❌ Brak egzaminów dla tej kwalifikacji.',
-                                        ),
-                                      )
-                                    else
-                                      ...recent.map((exam) {
-                                        final date =
-                                            (exam['data_czas'] ?? '-')
-                                                as String;
-                                        final wynik = scoreStr(exam['wynik']);
-                                        final czas = _fmtDuration(
-                                          (exam['czas_trwania_sec'] is int)
-                                              ? exam['czas_trwania_sec'] as int
-                                              : int.tryParse(
-                                                '${exam['czas_trwania_sec'] ?? ''}',
-                                              ),
-                                        );
-                                        final tryb =
-                                            (exam['tryb'] ?? exam['mode'] ?? '')
-                                                as String;
-
-                                        return ListTile(
-                                          contentPadding: const EdgeInsets.only(
-                                            left: 12,
-                                            right: 0,
-                                          ),
-                                          leading: const Icon(Icons.history),
-                                          title: Text(date),
-                                          subtitle: Text(
-                                            'Wynik: $wynik% • Czas: $czas${tryb.isNotEmpty ? ' • Tryb: $tryb' : ''}',
-                                          ),
-                                          dense: true,
-                                          visualDensity: const VisualDensity(
-                                            vertical: -2,
-                                          ),
-                                        );
-                                      }),
-                                    const Divider(thickness: 1, height: 8),
-                                  ],
-                                ),
-                              );
-                            }),
-                          ],
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: _UserExpansionTile(
+                          user: user,
+                          userStats: userStats,
+                          lastExamScore: lastExamScore,
+                          lastExamDate: lastExamDate,
+                          qualifications: visibleQualifications,
+                          calculateStats: calculateStats,
+                          fmtDuration: _fmtDuration,
                         ),
                       );
                     }),
-
                     const SizedBox(height: 32),
-
-                    Text(
-                      '🎓 Statystyki według kwalifikacji',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.school,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 32,
+                        ),
+                        const SizedBox(width: 8),
+                        const _SectionTitle('Statystyki według kwalifikacji'),
+                      ],
                     ),
-                    const SizedBox(height: 12),
 
+                    const SizedBox(height: 12),
                     ...qualifications.entries.map((entry) {
                       final q = entry.key.toUpperCase();
                       final qStats = calculateStats(entry.value);
-
-                      return Container(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          gradient: LinearGradient(
-                            colors:
-                                isDark
-                                    ? [
-                                      Theme.of(context).colorScheme.primary
-                                          .withValues(alpha: 0.3),
-                                      Theme.of(context).colorScheme.primary
-                                          .withValues(alpha: 0.15),
-                                    ]
-                                    : [Colors.blue.shade100, Colors.white],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          border: Border.all(
-                            color: colorAccent.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.school,
-                                    color: colorAccent,
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    q,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Egzaminów: ${qStats['count']}'),
-                                  Text(
-                                    'Śr: ${qStats['avg'].toStringAsFixed(2)}%',
-                                    style: TextStyle(color: colorAccent),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Najlepszy: ${qStats['best']}%'),
-                                  Text('Najgorszy: ${qStats['worst']}%'),
-                                ],
-                              ),
-                            ],
-                          ),
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: _QualificationCard(
+                          qualification: q,
+                          qStats: qStats,
                         ),
                       );
                     }),
                   ],
                 ),
               ),
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  final ValueChanged<String> onChanged;
+  const _SearchBar({required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final fill =
+        theme.inputDecorationTheme.fillColor ??
+        theme.colorScheme.surfaceContainerHighest;
+
+    return TextField(
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.search),
+        hintText: 'Wyszukaj użytkownika..',
+        filled: true,
+        fillColor: fill,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String text;
+  const _SectionTitle(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      text,
+      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+    );
+  }
+}
+
+class _AnonymousUserCard extends StatelessWidget {
+  final String user;
+  final Map<String, dynamic> userStats;
+
+  const _AnonymousUserCard({required this.user, required this.userStats});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 3,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              user,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Liczba egzaminów: ${userStats['count']}'),
+                Text(
+                  'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}%',
+                  style: TextStyle(color: colorScheme.primary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Najlepszy: ${userStats['best']}%'),
+                Text('Najgorszy: ${userStats['worst']}%'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UserExpansionTile extends StatelessWidget {
+  final String user;
+  final Map<String, dynamic> userStats;
+  final String lastExamScore;
+  final String lastExamDate;
+  final List<MapEntry<String, List<dynamic>>> qualifications;
+  final Map<String, dynamic> Function(List<dynamic>) calculateStats;
+  final String Function(int?) fmtDuration;
+
+  const _UserExpansionTile({
+    required this.user,
+    required this.userStats,
+    required this.lastExamScore,
+    required this.lastExamDate,
+    required this.qualifications,
+    required this.calculateStats,
+    required this.fmtDuration,
+  });
+
+  String _scoreStr(dynamic v) {
+    if (v is num) {
+      return v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+    }
+    return v?.toString() ?? '-';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 3,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        title: Text(
+          user,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text(
+          'Śr. wynik: ${userStats['avg'].toStringAsFixed(2)}% • Egzaminów: ${userStats['count']} • Ostatni: $lastExamScore% ($lastExamDate)',
+          style: TextStyle(color: colorScheme.primary),
+        ),
+        childrenPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 8,
+        ),
+        children:
+            qualifications.map((qualEntry) {
+              final qual = qualEntry.key;
+              final qualExams = List<dynamic>.from(qualEntry.value)
+                ..sort((a, b) {
+                  final da =
+                      DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
+                  final db =
+                      DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
+                  return db.compareTo(da);
+                });
+
+              final recent = qualExams.take(5).toList();
+              final qualStats = calculateStats(qualEntry.value);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _QualificationTile(
+                  qualification: qual,
+                  recentExams: recent,
+                  qualStats: qualStats,
+                  scoreFormatter: _scoreStr,
+                  fmtDuration: fmtDuration,
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
+}
+
+class _QualificationTile extends StatelessWidget {
+  final String qualification;
+  final List<dynamic> recentExams;
+  final Map<String, dynamic> qualStats;
+  final String Function(dynamic) scoreFormatter;
+  final String Function(int?) fmtDuration;
+
+  const _QualificationTile({
+    required this.qualification,
+    required this.recentExams,
+    required this.qualStats,
+    required this.scoreFormatter,
+    required this.fmtDuration,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(left: 8, right: 0, bottom: 8),
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(Icons.book, color: colorScheme.primary, size: 24),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              qualification,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 6.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Egzaminów: ${qualStats['count']}'),
+            Text(
+              'Śr. wynik: ${qualStats['avg'].toStringAsFixed(2)}%',
+              style: TextStyle(color: colorScheme.primary),
+            ),
+          ],
+        ),
+      ),
+      children: [
+        Divider(thickness: 1, height: 8, color: colorScheme.primary),
+        if (recentExams.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+            child: Text('❌ Brak egzaminów dla tej kwalifikacji.'),
+          )
+        else
+          ...recentExams.map((exam) {
+            final date = (exam['data_czas'] ?? '-') as String;
+            final wynik = scoreFormatter(exam['wynik']);
+            final czas = fmtDuration(
+              (exam['czas_trwania_sec'] is int)
+                  ? exam['czas_trwania_sec'] as int
+                  : int.tryParse('${exam['czas_trwania_sec'] ?? ''}'),
+            );
+            final tryb = (exam['tryb'] ?? exam['mode'] ?? '') as String;
+            return _ExamTile(date: date, wynik: wynik, czas: czas, tryb: tryb);
+          }),
+        Divider(thickness: 1, height: 8, color: colorScheme.primary),
+      ],
+    );
+  }
+}
+
+class _ExamTile extends StatelessWidget {
+  final String date;
+  final String wynik;
+  final String czas;
+  final String tryb;
+
+  const _ExamTile({
+    required this.date,
+    required this.wynik,
+    required this.czas,
+    required this.tryb,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListTile(
+      contentPadding: const EdgeInsets.only(left: 12, right: 0),
+      leading: Icon(
+        Icons.history,
+        color: Theme.of(context).colorScheme.primary,
+        size: 28,
+      ),
+      title: Text(date, style: theme.textTheme.bodyMedium),
+      subtitle: Text(
+        'Wynik: $wynik% • Czas: $czas${tryb.isNotEmpty ? ' • Tryb: $tryb' : ''}',
+      ),
+      dense: true,
+      visualDensity: const VisualDensity(vertical: -2),
+    );
+  }
+}
+
+class _QualificationCard extends StatelessWidget {
+  final String qualification;
+  final Map<String, dynamic> qStats;
+
+  const _QualificationCard({required this.qualification, required this.qStats});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final gradientColors = [
+      colorScheme.primary.withValues(alpha: 0.30),
+      colorScheme.primary.withValues(alpha: 0.12),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.school_outlined,
+                  color: colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    qualification,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Egzaminów: ${qStats['count']}'),
+                Text(
+                  'Śr: ${qStats['avg'].toStringAsFixed(2)}%',
+                  style: TextStyle(color: colorScheme.primary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Najlepszy: ${qStats['best']}%'),
+                Text('Najgorszy: ${qStats['worst']}%'),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
