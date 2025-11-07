@@ -641,7 +641,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   bool isLoading = true;
   String? errorMessage;
   String searchQuery = '';
-
+  DateTime? startDate;
+  DateTime? endDate;
+  
   @override
   void initState() {
     super.initState();
@@ -738,9 +740,17 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final filteredResults = allResults.where((exam) {
+      final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
+      if (examDate == null) return false;
 
-    final users = groupByUser();
-    final qualifications = groupByQualification();
+      final afterStart = startDate == null || examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
+      final beforeEnd = endDate == null || examDate.isBefore(endDate!.add(const Duration(days: 1)));
+
+      return afterStart && beforeEnd;
+    }).toList();
+    final users = _groupBy(filteredResults, (r) => (r['userID'] ?? '').toString().trim());
+    final qualifications = _groupBy(filteredResults, (r) => (r['kwalifikacja'] ?? 'Nieznana').toString());
 
     final filteredUsers =
         users.entries
@@ -781,7 +791,66 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         const _SectionTitle('Statystyki według użytkownika'),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.date_range),
+                            label: Text(
+                              startDate == null ? 'Data od' 
+                              : 'Od: ${startDate!.toLocal().toString().split(' ')[0]}',
+                            ),
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: startDate ?? DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime.now(),
+                              );
+                              if(picked != null)
+                              {
+                                setState(() => startDate = picked);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.date_range),
+                            label: Text(
+                              endDate == null ? 'Data do'
+                              : 'Do: ${endDate!.toLocal().toString().split(' ')[0]}',
+                            ),
+                            onPressed: () async{
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: endDate ?? DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime.now(),
+                              );
+                              if(picked != null)
+                              {
+                                setState(() => endDate = picked);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),                   
+                    if (startDate != null || endDate != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Zakres: ${startDate != null ? startDate!.toLocal().toString().split(' ')[0] : '—'} '
+                          '→ ${endDate != null ? endDate!.toLocal().toString().split(' ')[0] : '—'}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
                     if (filteredUsers.isEmpty)
                       Center(
                         child: Text(
@@ -791,7 +860,15 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                       ),
                     ...filteredUsers.map((entry) {
                       final user = entry.key;
-                      final exams = List<dynamic>.from(entry.value);
+                      final exams = List<dynamic>.from(entry.value).where((exam) {
+                        final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
+                        if (examDate == null) return false;
+
+                        final afterStart = startDate == null || examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
+                        final beforeEnd = endDate == null || examDate.isBefore(endDate!.add(const Duration(days: 1)));
+                        return afterStart && beforeEnd;
+                      }).toList();
+
 
                       exams.sort((a, b) {
                         final da =
@@ -802,7 +879,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                             DateTime(2000);
                         return db.compareTo(da);
                       });
-
                       final userStats = calculateStats(exams);
 
                       final Map<String, List<dynamic>> examsByQual = {};
@@ -840,6 +916,8 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                           qualifications: visibleQualifications,
                           calculateStats: calculateStats,
                           fmtDuration: _fmtDuration,
+                          startDate: startDate,
+                          endDate: endDate,
                         ),
                       );
                     }),
@@ -872,6 +950,14 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                 ),
               ),
     );
+  }
+    Map<String, List<dynamic>> _groupBy(List<dynamic> list, String Function(dynamic) keySelector) {
+    final Map<String, List<dynamic>> grouped = {};
+    for (final item in list) {
+      final key = keySelector(item).isEmpty ? 'Użytkownik anonimowy' : keySelector(item);
+      grouped.putIfAbsent(key, () => []).add(item);
+    }
+    return grouped;
   }
 }
 
@@ -977,6 +1063,9 @@ class _UserExpansionTile extends StatelessWidget {
   final Map<String, dynamic> Function(List<dynamic>) calculateStats;
   final String Function(int?) fmtDuration;
 
+  final DateTime? startDate;
+  final DateTime? endDate;
+
   const _UserExpansionTile({
     required this.user,
     required this.userStats,
@@ -985,6 +1074,8 @@ class _UserExpansionTile extends StatelessWidget {
     required this.qualifications,
     required this.calculateStats,
     required this.fmtDuration,
+    this.startDate,
+    this.endDate,
   });
 
   String _scoreStr(dynamic v) {
@@ -1030,20 +1121,21 @@ class _UserExpansionTile extends StatelessWidget {
                       DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
                   return db.compareTo(da);
                 });
+              final recent = (startDate == null && endDate == null)
+                ? qualExams.take(5).toList()
+                : qualExams;
+                final qualStats = calculateStats(qualEntry.value);
 
-              final recent = qualExams.take(5).toList();
-              final qualStats = calculateStats(qualEntry.value);
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _QualificationTile(
-                  qualification: qual,
-                  recentExams: recent,
-                  qualStats: qualStats,
-                  scoreFormatter: _scoreStr,
-                  fmtDuration: fmtDuration,
-                ),
-              );
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _QualificationTile(
+                    qualification: qual,
+                    recentExams: recent,
+                    qualStats: qualStats,
+                    scoreFormatter: _scoreStr,
+                    fmtDuration: fmtDuration,
+                  ),
+                );
             }).toList(),
       ),
     );
