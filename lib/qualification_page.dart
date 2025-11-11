@@ -19,6 +19,7 @@ class QualificationPage extends StatelessWidget {
     required VoidCallback onTap,
     IconData icon = Icons.assignment,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -27,11 +28,11 @@ class QualificationPage extends StatelessWidget {
           width: 300,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
+                color: colorScheme.onSurface.withValues(alpha: 0.1),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -39,18 +40,14 @@ class QualificationPage extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                size: 50,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+              Icon(icon, size: 50, color: colorScheme.primary),
               const SizedBox(height: 16),
               Text(
                 title,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -58,9 +55,7 @@ class QualificationPage extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -77,10 +72,11 @@ class QualificationPage extends StatelessWidget {
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final returnToHome = args?['returnToHome'] ?? false;
 
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text(qualification),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: colorScheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {

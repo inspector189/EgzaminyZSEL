@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app/app_themes.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
@@ -45,11 +46,12 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     super.build(context);
     if (_initError) {
-      return const Text(
-        'Failed to load video.',
-        style: TextStyle(color: Colors.red),
+      return Text(
+        'Nie udało się załadować wideo.',
+        style: TextStyle(color: colorScheme.error),
       );
     }
     if (_chewie == null) {
@@ -141,9 +143,10 @@ Widget buildZoomableImage(BuildContext context, String url) {
           child: CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.contain,
-            placeholder: (_, _) => _buildImagePlaceholder(maxWidth),
+            placeholder: (_, _) => _buildImagePlaceholder(context, maxWidth),
             errorWidget:
-                (_, _, _) => _buildImagePlaceholder(maxWidth, error: true),
+                (_, _, _) =>
+                    _buildImagePlaceholder(context, maxWidth, error: true),
           ),
         ),
       );
@@ -151,22 +154,27 @@ Widget buildZoomableImage(BuildContext context, String url) {
   );
 }
 
-Widget _buildImagePlaceholder(double width, {bool error = false}) {
+Widget _buildImagePlaceholder(
+  BuildContext context,
+  double width, {
+  bool error = false,
+}) {
+  final extras = Theme.of(context).extension<ExtraColors>()!;
   return Container(
     width: width,
     decoration: BoxDecoration(
-      color: error ? Colors.grey[850] : Colors.grey[700],
+      color: error ? extras.shimmerBase : extras.shimmerHighlight,
       borderRadius: BorderRadius.circular(8),
     ),
     child:
         error
-            ? const Icon(Icons.broken_image, color: Colors.grey)
+            ? Icon(Icons.broken_image, color: extras.shimmerBase)
             : Shimmer.fromColors(
-              baseColor: Colors.grey[600]!,
-              highlightColor: Colors.grey[400]!,
+              baseColor: extras.shimmerBase,
+              highlightColor: extras.shimmerHighlight,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[600],
+                  color: extras.shimmerHighlight,
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -210,6 +218,8 @@ class EgzaminPodgladView extends StatelessWidget {
     final selected = selectedAnswers[index];
     final poprawna = q['poprawna']?.toString() ?? '';
     final isCorrect = selected == poprawna;
+    final colorScheme = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
 
     final pytanieText = _unescape.convert(q['pytanie']?.toString() ?? '');
 
@@ -244,7 +254,7 @@ class EgzaminPodgladView extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: colorScheme.primary,
                   ),
                 ),
                 const SizedBox.shrink(),
@@ -282,11 +292,11 @@ class EgzaminPodgladView extends StatelessWidget {
 
               Color? bg;
               if (isCorrectAnswer) {
-                bg = Colors.green;
+                bg = extras.correct;
               } else if (isSelected && isWrong) {
-                bg = Colors.red;
+                bg = extras.incorrect;
               } else {
-                bg = Theme.of(context).colorScheme.surface;
+                bg = colorScheme.surface;
               }
 
               return Container(
@@ -295,8 +305,7 @@ class EgzaminPodgladView extends StatelessWidget {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     disabledBackgroundColor: bg,
-                    disabledForegroundColor:
-                        Theme.of(context).colorScheme.onSurface,
+                    disabledForegroundColor: colorScheme.onSurface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -337,10 +346,10 @@ class EgzaminPodgladView extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 isCorrect
-                    ? 'Correct answer $selected.'
-                    : 'Incorrect answer $selected. Correct answer: $poprawna.',
+                    ? 'Wybrano poprawną odpowiedź: $selected.'
+                    : 'Wybrano niepoprawną odpowiedź: $selected.\nPoprawna odpowiedź: $poprawna.',
                 style: TextStyle(
-                  color: isCorrect ? Colors.green : Colors.red,
+                  color: isCorrect ? extras.correct : extras.incorrect,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -364,17 +373,17 @@ class EgzaminPodgladView extends StatelessWidget {
                 ),
             ] else ...[
               const SizedBox(height: 8),
-              const Text(
-                'Warning: No answer selected.',
+              Text(
+                'Nie wybrano odpowiedzi.',
                 style: TextStyle(
-                  color: Colors.amber,
+                  color: extras.noAnswer,
                   fontStyle: FontStyle.italic,
                 ),
               ),
               Text(
-                'Correct answer: $poprawna.',
-                style: const TextStyle(
-                  color: Colors.green,
+                'Poprawna odpowiedź: $poprawna.',
+                style: TextStyle(
+                  color: extras.correct,
                   fontStyle: FontStyle.italic,
                 ),
               ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/app_themes.dart';
 import 'egzamin_podglad.dart';
 
 class EgzaminWynikView extends StatelessWidget {
@@ -19,6 +20,9 @@ class EgzaminWynikView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final extras = theme.extension<ExtraColors>()!;
     final percentage = (correctAnswers / totalQuestions) * 100;
     final bool zdane = percentage >= 50;
 
@@ -28,7 +32,7 @@ class EgzaminWynikView extends StatelessWidget {
             ? "Gratulacje! Zdałeś egzamin!"
             : "Niestety, nie udało się zdać egzaminu";
 
-    final color = zdane ? Colors.green : Colors.red;
+    final color = zdane ? extras.correct : extras.incorrect;
 
     return Scaffold(
       appBar: AppBar(
@@ -88,13 +92,11 @@ class EgzaminWynikView extends StatelessWidget {
                       horizontal: 24,
                       vertical: 12,
                     ),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    backgroundColor: colorScheme.primary,
                   ),
                   child: Text(
                     "Podgląd egzaminu",
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                    ),
+                    style: TextStyle(color: colorScheme.onPrimary),
                   ),
                 ),
             ],

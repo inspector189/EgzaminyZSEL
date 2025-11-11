@@ -2,11 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_app/app_themes.dart';
 import 'dart:convert';
 import 'wyniki.dart';
 import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
-
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:shimmer/shimmer.dart';
@@ -19,6 +19,7 @@ class ExamTimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return StreamBuilder(
       stream: Stream.periodic(const Duration(seconds: 1)),
       builder: (context, snapshot) {
@@ -34,9 +35,7 @@ class ExamTimer extends StatelessWidget {
             fontSize: 28,
             fontWeight: FontWeight.bold,
             color:
-                total.inMinutes < 5
-                    ? Colors.red
-                    : Theme.of(context).colorScheme.onPrimary,
+                total.inMinutes < 5 ? colorScheme.error : colorScheme.onPrimary,
           ),
         );
       },
@@ -84,11 +83,12 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     super.build(context);
     if (_initError) {
-      return const Text(
-        'Failed to load video.',
-        style: TextStyle(color: Colors.red),
+      return Text(
+        'Nie udało się wczytać wideo',
+        style: TextStyle(color: colorScheme.error),
       );
     }
     if (_chewie == null) {
@@ -182,9 +182,10 @@ Widget buildZoomableImage(BuildContext context, String url) {
           child: CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.contain,
-            placeholder: (_, _) => _buildImagePlaceholder(maxWidth),
+            placeholder: (_, _) => _buildImagePlaceholder(context, maxWidth),
             errorWidget:
-                (_, _, _) => _buildImagePlaceholder(maxWidth, error: true),
+                (_, _, _) =>
+                    _buildImagePlaceholder(context, maxWidth, error: true),
           ),
         ),
       );
@@ -192,22 +193,27 @@ Widget buildZoomableImage(BuildContext context, String url) {
   );
 }
 
-Widget _buildImagePlaceholder(double width, {bool error = false}) {
+Widget _buildImagePlaceholder(
+  BuildContext context,
+  double width, {
+  bool error = false,
+}) {
+  final extras = Theme.of(context).extension<ExtraColors>()!;
   return Container(
     width: width,
     decoration: BoxDecoration(
-      color: error ? Colors.grey[850] : Colors.grey[700],
+      color: error ? extras.shimmerBase : extras.shimmerHighlight,
       borderRadius: BorderRadius.circular(8),
     ),
     child:
         error
-            ? const Icon(Icons.broken_image, color: Colors.grey)
+            ? Icon(Icons.broken_image, color: extras.shimmerHighlight)
             : Shimmer.fromColors(
-              baseColor: Colors.grey[600]!,
-              highlightColor: Colors.grey[400]!,
+              baseColor: extras.shimmerBase,
+              highlightColor: extras.shimmerHighlight,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[600],
+                  color: extras.shimmerBase,
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -454,7 +460,13 @@ class _EgzaminViewState extends State<EgzaminView> {
     }
   }
 
-  Widget _buildDifficultyBadge(double? trudnosc, int? ilosc) {
+  Widget _buildDifficultyBadge(
+    BuildContext context,
+    double? trudnosc,
+    int? ilosc,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     if (trudnosc == null || ilosc == null || ilosc < 5) {
       return const SizedBox.shrink();
     }
@@ -462,13 +474,13 @@ class _EgzaminViewState extends State<EgzaminView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isHard ? Colors.red : Colors.green,
+        color: isHard ? extras.incorrect : extras.correct,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         '${isHard ? 'TRUDNE' : 'ŁATWE'} (${trudnosc.toStringAsFixed(1)}%)',
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: colorScheme.surface,
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -477,6 +489,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Widget _buildAnswerButton(
+    BuildContext context,
     String litera,
     String text,
     List<String> images,
@@ -486,21 +499,23 @@ class _EgzaminViewState extends State<EgzaminView> {
     required bool showResult,
     required VoidCallback onTap,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     Color? disabledBg;
 
     if (showResult) {
       if (isCorrect) {
-        disabledBg = Colors.green;
+        disabledBg = extras.correct;
       } else if (isSelected && !isCorrect) {
-        disabledBg = Colors.red;
+        disabledBg = extras.incorrect;
       } else {
-        disabledBg = Theme.of(context).colorScheme.surface;
+        disabledBg = colorScheme.surface;
       }
     }
 
     final Color? bgColor =
         !showResult && isSelected
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.8)
+            ? colorScheme.primary.withValues(alpha: 0.8)
             : null;
 
     return Container(
@@ -510,8 +525,8 @@ class _EgzaminViewState extends State<EgzaminView> {
         style: ElevatedButton.styleFrom(
           backgroundColor: bgColor,
           disabledBackgroundColor: disabledBg,
-          foregroundColor: Theme.of(context).colorScheme.onSurface,
-          disabledForegroundColor: Theme.of(context).colorScheme.onSurface,
+          foregroundColor: colorScheme.onSurface,
+          disabledForegroundColor: colorScheme.onSurface,
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -540,6 +555,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Widget _buildQuestionCard(
+    BuildContext context,
     dynamic q, {
     required int index,
     required bool showResult,
@@ -549,6 +565,9 @@ class _EgzaminViewState extends State<EgzaminView> {
     final pytanieVideos = List<String>.from(q['pytanie_videos'] ?? []);
     final poprawna = q['poprawna']?.toString() ?? '';
     final selected = selectedAnswers[index];
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -566,7 +585,7 @@ class _EgzaminViewState extends State<EgzaminView> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                     ),
                   ),
                 if (widget.tryb == TrybEgzaminu.czterdziesciPytan)
@@ -575,7 +594,7 @@ class _EgzaminViewState extends State<EgzaminView> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                     ),
                   ),
                 if (widget.tryb == TrybEgzaminu.jednoPytanie)
@@ -584,10 +603,11 @@ class _EgzaminViewState extends State<EgzaminView> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                     ),
                   ),
                 _buildDifficultyBadge(
+                  context,
                   q['trudnosc']?.toDouble(),
                   int.tryParse(q['ilosc_odpowiedzi'].toString()),
                 ),
@@ -617,6 +637,7 @@ class _EgzaminViewState extends State<EgzaminView> {
               final isSelected = selected == litera;
 
               return _buildAnswerButton(
+                context,
                 litera,
                 text,
                 images,
@@ -647,14 +668,14 @@ class _EgzaminViewState extends State<EgzaminView> {
                         ? Text(
                           'Wybrano poprawną odpowiedź: $selected.',
                           style: TextStyle(
-                            color: Colors.green,
+                            color: extras.correct,
                             fontStyle: FontStyle.italic,
                           ),
                         )
                         : Text(
                           'Wybrano niepoprawną odpowiedź: $selected.\nPoprawna odpowiedź: $poprawna.',
                           style: TextStyle(
-                            color: Colors.red,
+                            color: extras.incorrect,
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -665,17 +686,18 @@ class _EgzaminViewState extends State<EgzaminView> {
     );
   }
 
-  Widget _buildShimmer() {
+  Widget _buildShimmer(BuildContext context) {
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     return RepaintBoundary(
       child: Shimmer.fromColors(
-        baseColor: Colors.grey[850]!,
-        highlightColor: Colors.grey[700]!,
+        baseColor: extras.shimmerBase,
+        highlightColor: extras.shimmerHighlight,
         period: const Duration(milliseconds: 1000),
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 6),
           height: 180,
           decoration: BoxDecoration(
-            color: Colors.grey[800],
+            color: extras.shimmerHighlight,
             borderRadius: BorderRadius.circular(8),
           ),
         ),
@@ -685,6 +707,7 @@ class _EgzaminViewState extends State<EgzaminView> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     if (isLoading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Egzamin')),
@@ -718,13 +741,8 @@ class _EgzaminViewState extends State<EgzaminView> {
           ],
         ),
 
-        iconTheme: IconThemeData(
-          color: Theme.of(context).colorScheme.onPrimary,
-        ),
-        titleTextStyle: TextStyle(
-          color: Theme.of(context).colorScheme.onPrimary,
-          fontSize: 22,
-        ),
+        iconTheme: IconThemeData(color: colorScheme.onPrimary),
+        titleTextStyle: TextStyle(color: colorScheme.onPrimary, fontSize: 22),
       ),
       body:
           widget.tryb == TrybEgzaminu.jednoPytanie
@@ -732,7 +750,7 @@ class _EgzaminViewState extends State<EgzaminView> {
               : _buildLazyList(),
       bottomNavigationBar:
           widget.tryb == TrybEgzaminu.czterdziesciPytan
-              ? _buildFinishButton()
+              ? _buildFinishButton(context)
               : null,
     );
   }
@@ -742,6 +760,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       padding: const EdgeInsets.all(16),
       children: [
         _buildQuestionCard(
+          context,
           q,
           index: current,
           showResult: odpowiedzZatwierdzona,
@@ -807,13 +826,14 @@ class _EgzaminViewState extends State<EgzaminView> {
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) {
-                if (i >= items.length) return _buildShimmer();
+                if (i >= items.length) return _buildShimmer(context);
 
                 final q = items[i];
                 final originalIndex = questions.indexOf(q);
 
                 return RepaintBoundary(
                   child: _buildQuestionCard(
+                    context,
                     q,
                     index: originalIndex,
                     showResult: false,
@@ -831,15 +851,16 @@ class _EgzaminViewState extends State<EgzaminView> {
     );
   }
 
-  Widget _buildFinishButton() {
+  Widget _buildFinishButton(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(12),
       child: ElevatedButton(
         onPressed: _isButtonDisabled ? null : _finishExam,
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
+          backgroundColor: colorScheme.primary,
         ),
         child: Text(
           _isButtonDisabled ? "Wysyłanie..." : "Zakończ egzamin",
@@ -931,8 +952,9 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
+    final theme = Theme.of(context);
     return Material(
-      color: Theme.of(context).scaffoldBackgroundColor,
+      color: theme.scaffoldBackgroundColor,
       elevation: overlapsContent ? 2 : 0,
       child: child,
     );

@@ -577,7 +577,7 @@ class ModernAdminRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: colorScheme.onSurface.withValues(alpha: 0.05),
                 blurRadius: 6,
                 offset: const Offset(0, 3),
               ),
@@ -589,7 +589,7 @@ class ModernAdminRow extends StatelessWidget {
               CircleAvatar(
                 backgroundColor: colorScheme.primaryContainer,
                 radius: 18,
-                child: const Icon(Icons.person_outline, color: Colors.white),
+                child: Icon(Icons.person_outline, color: colorScheme.surface),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -643,7 +643,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   String searchQuery = '';
   DateTime? startDate;
   DateTime? endDate;
-  
+
   @override
   void initState() {
     super.initState();
@@ -740,17 +740,29 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final filteredResults = allResults.where((exam) {
-      final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
-      if (examDate == null) return false;
+    final colorScheme = theme.colorScheme;
+    final filteredResults =
+        allResults.where((exam) {
+          final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
+          if (examDate == null) return false;
 
-      final afterStart = startDate == null || examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
-      final beforeEnd = endDate == null || examDate.isBefore(endDate!.add(const Duration(days: 1)));
+          final afterStart =
+              startDate == null ||
+              examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
+          final beforeEnd =
+              endDate == null ||
+              examDate.isBefore(endDate!.add(const Duration(days: 1)));
 
-      return afterStart && beforeEnd;
-    }).toList();
-    final users = _groupBy(filteredResults, (r) => (r['userID'] ?? '').toString().trim());
-    final qualifications = _groupBy(filteredResults, (r) => (r['kwalifikacja'] ?? 'Nieznana').toString());
+          return afterStart && beforeEnd;
+        }).toList();
+    final users = _groupBy(
+      filteredResults,
+      (r) => (r['userID'] ?? '').toString().trim(),
+    );
+    final qualifications = _groupBy(
+      filteredResults,
+      (r) => (r['kwalifikacja'] ?? 'Nieznana').toString(),
+    );
 
     final filteredUsers =
         users.entries
@@ -784,7 +796,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                       children: [
                         Icon(
                           Icons.person_2,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: colorScheme.primary,
                           size: 32,
                         ),
                         const SizedBox(width: 8),
@@ -798,8 +810,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                           child: TextButton.icon(
                             icon: const Icon(Icons.date_range),
                             label: Text(
-                              startDate == null ? 'Data od' 
-                              : 'Od: ${startDate!.toLocal().toString().split(' ')[0]}',
+                              startDate == null
+                                  ? 'Data od'
+                                  : 'Od: ${startDate!.toLocal().toString().split(' ')[0]}',
                             ),
                             onPressed: () async {
                               final picked = await showDatePicker(
@@ -808,8 +821,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                 firstDate: DateTime(2000),
                                 lastDate: DateTime.now(),
                               );
-                              if(picked != null)
-                              {
+                              if (picked != null) {
                                 setState(() => startDate = picked);
                               }
                             },
@@ -820,18 +832,18 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                           child: TextButton.icon(
                             icon: const Icon(Icons.date_range),
                             label: Text(
-                              endDate == null ? 'Data do'
-                              : 'Do: ${endDate!.toLocal().toString().split(' ')[0]}',
+                              endDate == null
+                                  ? 'Data do'
+                                  : 'Do: ${endDate!.toLocal().toString().split(' ')[0]}',
                             ),
-                            onPressed: () async{
+                            onPressed: () async {
                               final picked = await showDatePicker(
                                 context: context,
                                 initialDate: endDate ?? DateTime.now(),
                                 firstDate: DateTime(2000),
                                 lastDate: DateTime.now(),
                               );
-                              if(picked != null)
-                              {
+                              if (picked != null) {
                                 setState(() => endDate = picked);
                               }
                             },
@@ -839,7 +851,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),                   
+                    const SizedBox(height: 8),
                     if (startDate != null || endDate != null)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -847,7 +859,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                           'Zakres: ${startDate != null ? startDate!.toLocal().toString().split(' ')[0] : '—'} '
                           '→ ${endDate != null ? endDate!.toLocal().toString().split(' ')[0] : '—'}',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -860,15 +872,25 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                       ),
                     ...filteredUsers.map((entry) {
                       final user = entry.key;
-                      final exams = List<dynamic>.from(entry.value).where((exam) {
-                        final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
-                        if (examDate == null) return false;
+                      final exams =
+                          List<dynamic>.from(entry.value).where((exam) {
+                            final examDate = DateTime.tryParse(
+                              exam['data_czas'] ?? '',
+                            );
+                            if (examDate == null) return false;
 
-                        final afterStart = startDate == null || examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
-                        final beforeEnd = endDate == null || examDate.isBefore(endDate!.add(const Duration(days: 1)));
-                        return afterStart && beforeEnd;
-                      }).toList();
-
+                            final afterStart =
+                                startDate == null ||
+                                examDate.isAfter(
+                                  startDate!.subtract(const Duration(days: 1)),
+                                );
+                            final beforeEnd =
+                                endDate == null ||
+                                examDate.isBefore(
+                                  endDate!.add(const Duration(days: 1)),
+                                );
+                            return afterStart && beforeEnd;
+                          }).toList();
 
                       exams.sort((a, b) {
                         final da =
@@ -926,7 +948,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                       children: [
                         Icon(
                           Icons.school,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: colorScheme.primary,
                           size: 32,
                         ),
                         const SizedBox(width: 8),
@@ -951,10 +973,17 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
               ),
     );
   }
-    Map<String, List<dynamic>> _groupBy(List<dynamic> list, String Function(dynamic) keySelector) {
+
+  Map<String, List<dynamic>> _groupBy(
+    List<dynamic> list,
+    String Function(dynamic) keySelector,
+  ) {
     final Map<String, List<dynamic>> grouped = {};
     for (final item in list) {
-      final key = keySelector(item).isEmpty ? 'Użytkownik anonimowy' : keySelector(item);
+      final key =
+          keySelector(item).isEmpty
+              ? 'Użytkownik anonimowy'
+              : keySelector(item);
       grouped.putIfAbsent(key, () => []).add(item);
     }
     return grouped;
@@ -968,9 +997,10 @@ class _SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final fill =
         theme.inputDecorationTheme.fillColor ??
-        theme.colorScheme.surfaceContainerHighest;
+        colorScheme.surfaceContainerHighest;
 
     return TextField(
       onChanged: onChanged,
@@ -1121,21 +1151,22 @@ class _UserExpansionTile extends StatelessWidget {
                       DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
                   return db.compareTo(da);
                 });
-              final recent = (startDate == null && endDate == null)
-                ? qualExams.take(5).toList()
-                : qualExams;
-                final qualStats = calculateStats(qualEntry.value);
+              final recent =
+                  (startDate == null && endDate == null)
+                      ? qualExams.take(5).toList()
+                      : qualExams;
+              final qualStats = calculateStats(qualEntry.value);
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _QualificationTile(
-                    qualification: qual,
-                    recentExams: recent,
-                    qualStats: qualStats,
-                    scoreFormatter: _scoreStr,
-                    fmtDuration: fmtDuration,
-                  ),
-                );
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _QualificationTile(
+                  qualification: qual,
+                  recentExams: recent,
+                  qualStats: qualStats,
+                  scoreFormatter: _scoreStr,
+                  fmtDuration: fmtDuration,
+                ),
+              );
             }).toList(),
       ),
     );

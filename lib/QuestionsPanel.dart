@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/app_themes.dart';
 import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
@@ -74,8 +75,7 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
       final response = await http.get(
         Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php'),
         headers: {
-          'Authorization':
-              'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^', // <-- add your token
+          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
           'Content-Type': 'application/json',
         },
       );
@@ -186,12 +186,15 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
     }
   }
 
-  Widget _buildDifficultyBadge(dynamic stat) {
+  Widget _buildDifficultyBadge(BuildContext context, dynamic stat) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final extras = theme.extension<ExtraColors>()!;
     final trudnosc =
         (stat['trudnosc'] is num)
             ? (stat['trudnosc'] as num).toDouble()
             : double.tryParse(stat['trudnosc'].toString()) ?? 0.0;
-    final color = trudnosc > 50 ? Colors.red : Colors.green;
+    final color = trudnosc > 50 ? extras.incorrect : extras.correct;
     final label = trudnosc > 50 ? 'TRUDNE' : 'ŁATWE';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -201,12 +204,13 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
       ),
       child: Text(
         '$label (${trudnosc.toStringAsFixed(1)}%)',
-        style: const TextStyle(color: Colors.white, fontSize: 12),
+        style: TextStyle(color: colorScheme.surface, fontSize: 12),
       ),
     );
   }
 
-  Widget buildZoomableImage(String url) {
+  Widget buildZoomableImage(BuildContext context, String url) {
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     return GestureDetector(
       onTap: () {
         showGeneralDialog(
@@ -236,18 +240,18 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
           return Shimmer.fromColors(
-            baseColor: Colors.grey[850]!,
-            highlightColor: Colors.grey[700]!,
+            baseColor: extras.shimmerBase,
+            highlightColor: extras.shimmerHighlight,
             child: Container(
               width: double.infinity,
               height: 250,
-              color: Colors.grey[800],
+              color: extras.shimmerBase,
             ),
           );
         },
         errorBuilder:
             (context, error, stack) => Container(
-              color: Colors.grey[850],
+              color: extras.shimmerBase,
               height: 250,
               child: const Center(
                 child: Icon(Icons.broken_image, color: Colors.grey),
@@ -258,6 +262,9 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
   }
 
   Widget _buildQuestionCard(dynamic q) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final extras = theme.extension<ExtraColors>()!;
     final questionId = q['pytanie_id'] ?? '-';
     final qualification = q['kwalifikacja'] ?? '-';
     final totalAnswers = int.tryParse(q['ilosc_odpowiedzi'].toString()) ?? 0;
@@ -307,19 +314,16 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: colorScheme.primary,
                     ),
                   ),
-                  _buildDifficultyBadge(q),
+                  _buildDifficultyBadge(context, q),
                 ],
               ),
               const SizedBox(height: 8),
               Text(
                 pytanie,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                ),
+                style: TextStyle(fontSize: 16, color: colorScheme.onPrimary),
               ),
               if (images.isNotEmpty) ...[
                 const SizedBox(height: 8),
@@ -329,7 +333,7 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
                           .map(
                             (url) => Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: buildZoomableImage(url),
+                              child: buildZoomableImage(context, url),
                             ),
                           )
                           .toList(),
@@ -359,7 +363,7 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
                   margin: const EdgeInsets.only(bottom: 6),
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isCorrect ? Colors.green : null,
+                      backgroundColor: isCorrect ? extras.correct : null,
                       alignment: Alignment.centerLeft,
                     ),
                     onPressed: () {},
@@ -367,7 +371,7 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
                       odp,
                       style: TextStyle(
                         fontSize: 15,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -376,8 +380,8 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
               const SizedBox(height: 4),
               Text(
                 '✅ Poprawna: $poprawna',
-                style: const TextStyle(
-                  color: Colors.green,
+                style: TextStyle(
+                  color: extras.correct,
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
                 ),
@@ -385,16 +389,13 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
               const SizedBox(height: 4),
               Text(
                 'Kwalifikacja: $qualification',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: colorScheme.onSurface, fontSize: 13),
               ),
               Text(
                 'Odpowiedzi: $totalAnswers, Poprawne: $correctAnswers ($successRate%)',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -405,16 +406,17 @@ class _QuestionStatsPageState extends State<QuestionStatsPage>
   }
 
   Widget _buildAnimatedShimmer() {
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     return RepaintBoundary(
       child: Shimmer.fromColors(
-        baseColor: Colors.grey[850]!,
-        highlightColor: Colors.grey[700]!,
+        baseColor: extras.shimmerBase,
+        highlightColor: extras.shimmerHighlight,
         period: const Duration(milliseconds: 1000),
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 6),
           height: 110,
           decoration: BoxDecoration(
-            color: Colors.grey[800],
+            color: extras.shimmerBase,
             borderRadius: BorderRadius.circular(8),
           ),
         ),

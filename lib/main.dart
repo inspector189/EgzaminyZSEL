@@ -280,7 +280,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_userName == null || _userEmail == null) {
       return;
     }
-
+    final colorScheme = Theme.of(context).colorScheme;
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(1000, 60, 16, 0),
@@ -291,9 +291,7 @@ class _MyHomePageState extends State<MyHomePage> {
           enabled: false,
           child: Container(
             width: 250,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-            ),
+            decoration: BoxDecoration(color: colorScheme.surface),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -301,12 +299,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   children: [
                     CircleAvatar(
                       radius: 24,
-                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      backgroundColor: colorScheme.primary,
                       child: Text(
                         _userName![0].toUpperCase(),
                         style: TextStyle(
                           fontSize: 20,
-                          color: Theme.of(context).colorScheme.onPrimary,
+                          color: colorScheme.onPrimary,
                         ),
                       ),
                     ),
@@ -320,7 +318,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: colorScheme.onSurface,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -328,10 +326,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             _userEmail!,
                             style: TextStyle(
                               fontSize: 12,
-                              color:
-                                  Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
+                              color: colorScheme.onSurfaceVariant,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -355,17 +350,13 @@ class _MyHomePageState extends State<MyHomePage> {
                       'Dostępny',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
 
-                Divider(
-                  height: 20,
-                  thickness: 1,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                ),
+                Divider(height: 20, thickness: 1, color: colorScheme.onPrimary),
                 if (_isAdmin)
                   ProfileMenuItem(
                     icon: Icons.admin_panel_settings,
@@ -437,6 +428,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget buildPopupMenu(String title) {
+    final colorScheme = Theme.of(context).colorScheme;
     if (title == 'Strona Główna') {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6.0),
@@ -461,7 +453,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSecondary,
+                    color: colorScheme.onSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -478,7 +470,7 @@ class _MyHomePageState extends State<MyHomePage> {
       child: PopupMenuButton<String>(
         tooltip: title,
         offset: const Offset(0, kToolbarHeight),
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (value) {
           _navigatorKey.currentState?.pushAndRemoveUntil(
@@ -486,7 +478,7 @@ class _MyHomePageState extends State<MyHomePage> {
               builder:
                   (context) => QualificationPage(
                     qualification: value,
-                    isAdmin: _isAdmin, // ⬅️
+                    isAdmin: _isAdmin,
                   ),
             ),
             ModalRoute.withName('/home'),
@@ -505,7 +497,7 @@ class _MyHomePageState extends State<MyHomePage> {
             child: Text(
               title,
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSecondary,
+                color: colorScheme.onSecondary,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -529,7 +521,7 @@ class _MyHomePageState extends State<MyHomePage> {
               builder:
                   (context) => QualificationPage(
                     qualification: title,
-                    isAdmin: _isAdmin, // ⬅️
+                    isAdmin: _isAdmin,
                   ),
             ),
           );
@@ -540,6 +532,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Scaffold(
       drawer:
           MediaQuery.of(context).size.width <= 900
@@ -548,13 +542,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   padding: EdgeInsets.zero,
                   children: [
                     DrawerHeader(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                      decoration: BoxDecoration(color: colorScheme.primary),
                       child: Text(
                         'Menu',
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary,
+                          color: colorScheme.onPrimary,
                           fontSize: 24,
                         ),
                       ),
@@ -594,7 +586,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isAdmin: _isAdmin, // ⬅️
+                                          isAdmin: _isAdmin,
                                         ),
                                   ),
                                 );
@@ -615,7 +607,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isAdmin: _isAdmin, // ⬅️
+                                          isAdmin: _isAdmin,
                                         ),
                                   ),
                                 );
@@ -636,7 +628,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isAdmin: _isAdmin, // ⬅️
+                                          isAdmin: _isAdmin,
                                         ),
                                   ),
                                 );
@@ -657,7 +649,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isAdmin: _isAdmin, // ⬅️
+                                          isAdmin: _isAdmin,
                                         ),
                                   ),
                                 );
@@ -710,10 +702,10 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                     ListTile(
                       leading: Icon(
-                        Theme.of(context).brightness == Brightness.dark
+                        theme.brightness == Brightness.dark
                             ? Icons.wb_sunny
                             : Icons.nightlight_round,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: colorScheme.onSurface,
                       ),
                       title: const Text('Przełącz motyw'),
                       onTap: () {
@@ -730,7 +722,7 @@ class _MyHomePageState extends State<MyHomePage> {
               : null,
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: colorScheme.primary,
         actions:
             MediaQuery.of(context).size.width > 900
                 ? [
@@ -746,7 +738,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   IconButton(
                     icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
                     tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
-                    color: Theme.of(context).colorScheme.onPrimary,
+                    color: colorScheme.onPrimary,
                     onPressed: () async {
                       if (_isLoggedIn) {
                         _showProfilePopup(context);
@@ -766,10 +758,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   IconButton(
                     icon: Icon(
-                      Theme.of(context).brightness == Brightness.dark
+                      theme.brightness == Brightness.dark
                           ? Icons.wb_sunny
                           : Icons.nightlight_round,
-                      color: Theme.of(context).colorScheme.onPrimary,
+                      color: colorScheme.onPrimary,
                     ),
                     tooltip: 'Przełącz motyw',
                     onPressed: () {
@@ -821,6 +813,8 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
       children: [
@@ -829,17 +823,17 @@ class HomeContent extends StatelessWidget {
           children: [
             Text(
               'Witamy w aplikacji Egzaminy! 👋',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onPrimary,
+                color: colorScheme.onPrimary,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
               'Przygotuj się do egzaminu zawodowego z najlepszą bazą pytań! Poniżej znajdziesz kwalifikacje, które możesz przeglądać:',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -849,7 +843,7 @@ class HomeContent extends StatelessWidget {
               style: TextStyle(
                 fontStyle: FontStyle.italic,
                 fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1017,7 +1011,8 @@ class QuestionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     final screenWidth = MediaQuery.of(context).size.width;
     final itemWidth = screenWidth < 600 ? screenWidth - 40 : 300.0;
 
@@ -1029,11 +1024,11 @@ class QuestionTile extends StatelessWidget {
         height: 200,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
+              color: colorScheme.onSurface.withValues(alpha: 0.2),
               blurRadius: 10,
               offset: const Offset(0, 6),
             ),
@@ -1042,14 +1037,14 @@ class QuestionTile extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 36, color: theme.colorScheme.primary),
+            Icon(icon, size: 36, color: colorScheme.primary),
             const SizedBox(height: 12),
             Text(
               code,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
-                color: theme.colorScheme.onSurface,
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 6),
@@ -1058,7 +1053,7 @@ class QuestionTile extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                color: colorScheme.onSurface.withValues(alpha: 0.8),
               ),
             ),
             const SizedBox(height: 10),
@@ -1066,12 +1061,10 @@ class QuestionTile extends StatelessWidget {
             FutureBuilder<int?>(
               future: QuestionCountCache.instance.getCount(code),
               builder: (context, snapshot) {
-                final theme = Theme.of(context);
-
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Shimmer.fromColors(
-                    baseColor: theme.colorScheme.primary,
-                    highlightColor: theme.colorScheme.surface,
+                    baseColor: colorScheme.primary,
+                    highlightColor: colorScheme.surface,
                     period: const Duration(milliseconds: 1500),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1082,7 +1075,7 @@ class QuestionTile extends StatelessWidget {
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation(
-                              theme.colorScheme.primary.withValues(alpha: 0.8),
+                              colorScheme.primary.withValues(alpha: 0.8),
                             ),
                           ),
                         ),
@@ -1091,19 +1084,31 @@ class QuestionTile extends StatelessWidget {
                           'Ładowanie...',
                           style: TextStyle(
                             fontSize: 12,
-                            color: theme.colorScheme.onSurface,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                       ],
                     ),
                   );
                 } else if (snapshot.hasError) {
-                  return Text(
-                    '❌Wystąpił błąd',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.error,
-                    ),
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.close_rounded,
+                        color: colorScheme.error,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Wystąpił błąd',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.error,
+                        ),
+                      ),
+                    ],
                   );
                 } else if (snapshot.hasData) {
                   if (snapshot.data! > 0) {
@@ -1111,27 +1116,49 @@ class QuestionTile extends StatelessWidget {
                       '${snapshot.data} pytań',
                       style: TextStyle(
                         fontSize: 12,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
+                        color: colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     );
                   } else {
-                    return Text(
-                      '⚠️ Brak pytań',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurface,
-                      ),
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.warning_rounded,
+                          color: extras.noAnswer,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Brak pytań',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
                     );
                   }
                 } else {
-                  return Text(
-                    '❌ Brak danych',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface,
-                    ),
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.close_rounded,
+                        color: colorScheme.error,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Brak danych',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
                   );
                 }
               },

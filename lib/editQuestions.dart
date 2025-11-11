@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app/app_themes.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:video_player/video_player.dart';
@@ -69,10 +70,11 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final colorScheme = Theme.of(context).colorScheme;
     if (_initError) {
-      return const Text(
-        'Failed to load video.',
-        style: TextStyle(color: Colors.red),
+      return Text(
+        'Nie udało się wczytać wideo',
+        style: TextStyle(color: colorScheme.error),
       );
     }
     if (_chewie == null) {
@@ -171,9 +173,10 @@ Widget buildZoomableImage(BuildContext context, String url) {
           child: CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.contain,
-            placeholder: (_, _) => _buildImagePlaceholder(maxWidth),
+            placeholder: (_, _) => _buildImagePlaceholder(context, maxWidth),
             errorWidget:
-                (_, _, _) => _buildImagePlaceholder(maxWidth, error: true),
+                (_, _, _) =>
+                    _buildImagePlaceholder(context, maxWidth, error: true),
           ),
         ),
       );
@@ -181,22 +184,27 @@ Widget buildZoomableImage(BuildContext context, String url) {
   );
 }
 
-Widget _buildImagePlaceholder(double width, {bool error = false}) {
+Widget _buildImagePlaceholder(
+  BuildContext context,
+  double width, {
+  bool error = false,
+}) {
+  final extras = Theme.of(context).extension<ExtraColors>()!;
   return Container(
     width: width,
     decoration: BoxDecoration(
-      color: error ? Colors.grey[850] : Colors.grey[700],
+      color: error ? extras.shimmerBase : extras.shimmerHighlight,
       borderRadius: BorderRadius.circular(8),
     ),
     child:
         error
             ? const Icon(Icons.broken_image, color: Colors.grey)
             : Shimmer.fromColors(
-              baseColor: Colors.grey[600]!,
-              highlightColor: Colors.grey[400]!,
+              baseColor: extras.shimmerBase,
+              highlightColor: extras.shimmerHighlight,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[600],
+                  color: extras.shimmerHighlight,
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -462,39 +470,42 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   Future<Map<int, Map<String, dynamic>>> _fetchAllTrudnosci() async {
-  final url = Uri.parse(
-    'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
-  );
-  
-  final res = await http.get(
-    url,
-    headers: {
-      'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
-      'Content-Type': 'application/json',
-    },
-  );
+    final url = Uri.parse(
+      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
+    );
 
-  if (res.statusCode != 200) return {};
-  final String kval = _sanitizedTable();
-  final List<dynamic> jsonList = json.decode(res.body);
-  final Map<int, Map<String, dynamic>> result = {};
+    final res = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        'Content-Type': 'application/json',
+      },
+    );
 
-  for (final item in jsonList) {
-    final String itemKval =
-        (item['kwalifikacja'] ?? '').toString().replaceAll(' ', '').toLowerCase();
-    if (itemKval != kval) continue;
-    final int? id = int.tryParse('${item['pytanie_id']}');
-    if (id == null) continue;
-    final double trud = (item['trudnosc'] is num)
-        ? (item['trudnosc'] as num).toDouble()
-        : double.tryParse('${item['trudnosc']}') ?? 0.0;
-    final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
-    result[id] = {'trudnosc': trud, 'ilosc_odpowiedzi': ilosc};
+    if (res.statusCode != 200) return {};
+    final String kval = _sanitizedTable();
+    final List<dynamic> jsonList = json.decode(res.body);
+    final Map<int, Map<String, dynamic>> result = {};
+
+    for (final item in jsonList) {
+      final String itemKval =
+          (item['kwalifikacja'] ?? '')
+              .toString()
+              .replaceAll(' ', '')
+              .toLowerCase();
+      if (itemKval != kval) continue;
+      final int? id = int.tryParse('${item['pytanie_id']}');
+      if (id == null) continue;
+      final double trud =
+          (item['trudnosc'] is num)
+              ? (item['trudnosc'] as num).toDouble()
+              : double.tryParse('${item['trudnosc']}') ?? 0.0;
+      final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
+      result[id] = {'trudnosc': trud, 'ilosc_odpowiedzi': ilosc};
+    }
+
+    return result;
   }
-
-  return result;
-}
-
 
   void _applyTextFilter(String value) {
     setState(() => searchText = value.trim());
@@ -782,6 +793,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   void _showImageDialogUrl(String imageUrl) {
     _showImageDialogBody(
+      context,
       builder:
           (screen) => Image.network(
             imageUrl,
@@ -793,6 +805,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   void _showImageDialogBytes(Uint8List bytes) {
     _showImageDialogBody(
+      context,
       builder:
           (screen) => Image.memory(
             bytes,
@@ -802,7 +815,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  void _showImageDialogBody({required Widget Function(Size screen) builder}) {
+  void _showImageDialogBody(
+    BuildContext context, {
+    required Widget Function(Size screen) builder,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -850,7 +867,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                         icon: Icon(
                           Icons.close,
                           size: 30,
-                          color: Theme.of(context).colorScheme.surface,
+                          color: colorScheme.surface,
                         ),
                         tooltip: 'Zamknij',
                         onPressed:
@@ -1252,23 +1269,21 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   Widget _buildRightToolbar(BuildContext context) {
     final found = _filteredQuestions.length;
     final total = questions.length;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Material(
-      color: Theme.of(context).colorScheme.surface,
+      color: colorScheme.surface,
       elevation: 1,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
         child: Row(
           children: [
-            Icon(
-              Icons.filter_alt,
-              size: 20,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            Icon(Icons.filter_alt, size: 20, color: colorScheme.primary),
             const SizedBox(width: 8),
             Text(
               'Wyniki: $found / $total',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimary,
+                color: colorScheme.onPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1329,7 +1344,10 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  Widget _buildBadge(dynamic q) {
+  Widget _buildBadge(BuildContext context, dynamic q) {
+    final theme = Theme.of(context);
+    final extras = theme.extension<ExtraColors>()!;
+    final colorScheme = theme.colorScheme;
     final trudnosc = q['trudnosc'];
     final iloscOdp = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
     if (trudnosc == null || iloscOdp < 5) return const SizedBox.shrink();
@@ -1340,13 +1358,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isTrudne ? Colors.red : Colors.green,
+        color: isTrudne ? extras.incorrect : extras.correct,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         isTrudne ? 'TRUDNE' : 'ŁATWE',
         style: TextStyle(
-          color: Theme.of(context).colorScheme.onPrimary,
+          color: colorScheme.onPrimary,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -1374,12 +1392,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final leftPanel = _buildLeftPanel(context);
     final rightList =
         isLoading
             ? const Center(child: CircularProgressIndicator())
             : (_showPreview
-                ? _buildLivePreview()
+                ? _buildLivePreview(context)
                 : Column(
                   children: [
                     _buildRightToolbar(context),
@@ -1390,7 +1410,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Edytor pytań — ${widget.qualification.toUpperCase()}'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: colorScheme.primary,
         actions: [
           IconButton(
             tooltip: 'Odśwież',
@@ -1403,7 +1423,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(width: 420, child: leftPanel),
-          Container(width: 1, color: Theme.of(context).dividerColor),
+          Container(width: 1, color: theme.dividerColor),
           Expanded(child: rightList),
         ],
       ),
@@ -1411,12 +1431,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   Widget _buildLeftPanel(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final labelStyle = TextStyle(
       fontWeight: FontWeight.w600,
-      color: Theme.of(context).colorScheme.onPrimary,
+      color: colorScheme.onPrimary,
     );
     return Container(
-      color: Theme.of(context).colorScheme.surface,
+      color: colorScheme.surface,
       child: Scrollbar(
         controller: _leftPanelScroll,
         thumbVisibility: true,
@@ -1432,19 +1454,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 controller: _textSearchCtrl,
                 decoration: InputDecoration(
                   labelText: 'Szukaj w treści/odpowiedziach/ID',
-                  prefixIcon: Icon(
-                    Icons.search,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                  ),
+                  prefixIcon: Icon(Icons.search, color: colorScheme.onPrimary),
                   border: OutlineInputBorder(),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    borderSide: BorderSide(color: colorScheme.primary),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.secondary,
+                      color: colorScheme.secondary,
                       width: 2.0,
                     ),
                   ),
@@ -1453,7 +1470,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 onChanged: _applyTextFilter,
               ),
               const SizedBox(height: 16),
-              Divider(color: Theme.of(context).dividerColor, height: 1),
+              Divider(color: theme.dividerColor, height: 1),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -1464,7 +1481,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onPrimary,
+                      color: colorScheme.onPrimary,
                     ),
                   ),
                   const Spacer(),
@@ -1481,9 +1498,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 margin: EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
+                  border: Border.all(color: colorScheme.secondary),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -1495,9 +1510,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       spacing: 12,
                       children: [
                         ChoiceChip(
-                          selectedColor: Theme.of(context).colorScheme.primary,
+                          selectedColor: colorScheme.primary,
                           side: BorderSide(
-                            color: Theme.of(context).colorScheme.onPrimary,
+                            color: colorScheme.onPrimary,
                             width: 1,
                           ),
                           label: const Text('Brak'),
@@ -1510,11 +1525,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                           },
                         ),
                         ChoiceChip(
-                          selectedColor: Theme.of(context).colorScheme.primary,
+                          selectedColor: colorScheme.primary,
                           label: const Text('Obrazek'),
                           selected: _mediaKind == MediaKind.image,
                           side: BorderSide(
-                            color: Theme.of(context).colorScheme.onPrimary,
+                            color: colorScheme.onPrimary,
                             width: 1,
                           ),
                           onSelected: (_) {
@@ -1529,11 +1544,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                           },
                         ),
                         ChoiceChip(
-                          selectedColor: Theme.of(context).colorScheme.primary,
+                          selectedColor: colorScheme.primary,
                           label: const Text('Film'),
                           selected: _mediaKind == MediaKind.video,
                           side: BorderSide(
-                            color: Theme.of(context).colorScheme.onPrimary,
+                            color: colorScheme.onPrimary,
                             width: 1,
                           ),
                           onSelected: (_) {
@@ -1665,13 +1680,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   labelText: 'Treść pytania',
                   border: OutlineInputBorder(),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    borderSide: BorderSide(color: colorScheme.primary),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.secondary,
+                      color: colorScheme.secondary,
                       width: 2.0,
                     ),
                   ),
@@ -1687,13 +1700,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   labelText: 'Opis (dla poprawnej odpowiedzi) - opcjonalnie',
                   border: OutlineInputBorder(),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    borderSide: BorderSide(color: colorScheme.primary),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.secondary,
+                      color: colorScheme.secondary,
                       width: 2.0,
                     ),
                   ),
@@ -1709,13 +1720,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   labelText: 'Opis (dla niepoprawnej odpowiedzi) - opcjonalnie',
                   border: OutlineInputBorder(),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    borderSide: BorderSide(color: colorScheme.primary),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.secondary,
+                      color: colorScheme.secondary,
                       width: 2.0,
                     ),
                   ),
@@ -1734,13 +1743,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       labelText: 'Odpowiedź A',
                       border: OutlineInputBorder(),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        borderSide: BorderSide(color: colorScheme.primary),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.secondary,
+                          color: colorScheme.secondary,
                           width: 2.0,
                         ),
                       ),
@@ -1755,13 +1762,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       labelText: 'Odpowiedź B',
                       border: OutlineInputBorder(),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        borderSide: BorderSide(color: colorScheme.primary),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.secondary,
+                          color: colorScheme.secondary,
                           width: 2.0,
                         ),
                       ),
@@ -1776,13 +1781,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       labelText: 'Odpowiedź C',
                       border: OutlineInputBorder(),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        borderSide: BorderSide(color: colorScheme.primary),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.secondary,
+                          color: colorScheme.secondary,
                           width: 2.0,
                         ),
                       ),
@@ -1797,13 +1800,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       labelText: 'Odpowiedź D',
                       border: OutlineInputBorder(),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        borderSide: BorderSide(color: colorScheme.primary),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.secondary,
+                          color: colorScheme.secondary,
                           width: 2.0,
                         ),
                       ),
@@ -1827,12 +1828,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       DropdownMenuItem(value: 'C', child: Text('C')),
                       DropdownMenuItem(value: 'D', child: Text('D')),
                     ],
-                    focusColor: Theme.of(context).colorScheme.primary,
-                    dropdownColor: Theme.of(context).colorScheme.surface,
-                    underline: Container(
-                      height: 1,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    focusColor: colorScheme.primary,
+                    dropdownColor: colorScheme.surface,
+                    underline: Container(height: 1, color: colorScheme.primary),
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -1899,15 +1897,17 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       itemCount: displayCount + (_isLoadingMore ? 3 : 0),
       itemBuilder: (context, index) {
         if (index >= displayCount) {
-          return _buildShimmerCard();
+          return _buildShimmerCard(context);
         }
         final q = items[index] as Map<String, dynamic>;
-        return _buildQuestionCard(q);
+        return _buildQuestionCard(context, q);
       },
     );
   }
 
-  Widget _buildQuestionCard(Map<String, dynamic> q) {
+  Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final id = int.tryParse(q['id']?.toString() ?? '');
     final answers =
         ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
@@ -1920,8 +1920,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             child: ElevatedButton(
               onPressed: null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                foregroundColor: Theme.of(context).colorScheme.primary,
+                backgroundColor: colorScheme.surface,
+                foregroundColor: colorScheme.primary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1950,11 +1950,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   'Pytanie (ID: $id)',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: colorScheme.primary,
                   ),
                 ),
                 const Spacer(),
-                _buildBadge(q),
+                _buildBadge(context, q),
               ],
             ),
             const SizedBox(height: 8),
@@ -1977,19 +1977,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               children: [
                 TextButton.icon(
                   onPressed: () => _openForEdit(q),
-                  icon: Icon(
-                    Icons.edit,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                  icon: Icon(Icons.edit, color: colorScheme.primary),
                   label: const Text('Edytuj'),
                 ),
                 const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: id == null ? null : () => _resetTrudnoscOne(id),
-                  icon: Icon(
-                    Icons.restart_alt,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                  icon: Icon(Icons.restart_alt, color: colorScheme.primary),
                   label: const Text('Restartuj trudność'),
                 ),
                 const SizedBox(width: 8),
@@ -2031,10 +2025,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                             if (!mounted) return;
                             if (ok) await _deleteQuestion(id);
                           },
-                  icon: Icon(
-                    Icons.delete_outline,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                  icon: Icon(Icons.delete_outline, color: colorScheme.primary),
                   label: const Text('Usuń'),
                 ),
               ],
@@ -2045,7 +2036,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  Widget _buildLivePreview() {
+  Widget _buildLivePreview(BuildContext context) {
+    final theme = Theme.of(context);
     Widget? mediaWidget;
     if (_mediaKind == MediaKind.image) {
       String? imgSrc;
@@ -2104,10 +2096,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              'Podgląd pytania',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('Podgląd pytania', style: theme.textTheme.titleLarge),
             const SizedBox(height: 12),
             Card(
               child: Padding(
@@ -2148,28 +2137,30 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 }
 
-Widget _buildShimmerCard() {
+Widget _buildShimmerCard(BuildContext context) {
+  final colorScheme = Theme.of(context).colorScheme;
+  final extras = Theme.of(context).extension<ExtraColors>()!;
   return Card(
     margin: const EdgeInsets.symmetric(vertical: 8),
     child: Padding(
       padding: const EdgeInsets.all(12),
       child: Shimmer.fromColors(
-        baseColor: Colors.grey[850]!,
-        highlightColor: Colors.grey[700]!,
+        baseColor: extras.shimmerBase,
+        highlightColor: extras.shimmerHighlight,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(height: 24, width: 180, color: Colors.white),
+            Container(height: 24, width: 180, color: colorScheme.surface),
             const SizedBox(height: 12),
-            Container(height: 60, color: Colors.white),
+            Container(height: 60, color: colorScheme.surface),
             const SizedBox(height: 16),
-            Container(height: 200, color: Colors.white),
+            Container(height: 200, color: colorScheme.surface),
             const SizedBox(height: 16),
             ...List.generate(
               4,
               (_) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Container(height: 48, color: Colors.grey[700]),
+                child: Container(height: 48, color: extras.shimmerHighlight),
               ),
             ),
           ],
