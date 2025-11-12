@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>OAuth Redirect</title>
-  <script>
-    window.onload = function () {
-      if (window.opener) {
-        window.opener.postMessage(window.location.href, "*");
-        window.close();
-      } else {
-        document.body.innerText = "No window.opener found.";
-      }
-    };
-  </script> 
+  <meta charset="utf-8">
+  <title>Logowanie...</title>
 </head>
 <body>
-  Logging you in...
+  <h3>Trwa logowanie...</h3>
+  <script>
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+
+    if (code && state) {
+      window.location.href = `https://interpage.pl/egzaminyzsel/?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
+    } else {
+      console.error('BŁĄD: Brak code lub state!', url.href);
+      window.location.href = 'https://interpage.pl/egzaminyzsel/?error=no_code&debug=' + encodeURIComponent(url.href);
+    }
+  </script>
 </body>
 </html>

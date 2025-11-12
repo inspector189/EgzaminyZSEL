@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-
+import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +21,13 @@ import 'theme_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+      final success = await OAuth2Service.handleRedirect();
+      if (success)
+      {
+        cleanUrl();
+      } 
+    }
   if (!kIsWeb) {
     try {
       final ByteData data = await rootBundle.load('assets/cert/interpage.cer');
@@ -39,6 +46,15 @@ void main() async {
       child: const MyApp(),
     ),
   );
+}
+void cleanUrl() {
+  if (kIsWeb) {
+    final uri = Uri.parse(html.window.location.href);
+    if (uri.queryParameters.containsKey('code') || uri.queryParameters.containsKey('state')) {
+      final cleanUri = uri.replace(queryParameters: {});
+      html.window.history.pushState(null, '', cleanUri.toString());
+    }
+  }
 }
 
 class MyApp extends StatefulWidget {
@@ -171,6 +187,9 @@ class _MyHomePageState extends State<MyHomePage> {
     ];
     selectedQuote = quotes[Random().nextInt(quotes.length)];
     _checkLoginState();
+    if (kIsWeb) {
+    Future.microtask(() => _checkLoginState());
+    }
   }
 
   Future<void> _checkLoginState() async {
@@ -259,7 +278,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _signOut() async {
-    await OAuth2Service.instance.oauth2Helper.removeAllTokens();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('userName');
     await prefs.remove('userEmail');
@@ -270,9 +288,9 @@ class _MyHomePageState extends State<MyHomePage> {
       _isAdmin = false;
     });
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Wylogowano')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Wylogowano')),
+      );
     }
   }
 
@@ -695,7 +713,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           );
 
                           if (result == true) {
-                            _checkLoginState();
+                            await _checkLoginState();
                           }
                         }
                       },
