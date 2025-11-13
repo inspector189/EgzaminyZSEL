@@ -1,6 +1,6 @@
-// lib/ouath2_service.dart
 import 'dart:convert';
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
+//import 'dart:html' as html;
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -10,7 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class OAuth2Service {
   static const String clientId = '67af475e-082d-4187-b1ef-5fa26fa0fe77';
   static const String tenantId = 'de78aefd-fda9-4eaf-a2d1-cf8492188649';
-  static const String redirectUri = 'https://egzaminy.zsel.edu.pl/redirect.html'; 
+  static const String redirectUri =
+      'https://egzaminy.zsel.edu.pl/redirect.html';
   static const String tokenUrl =
       'https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token';
   static const String authorizeUrl =
@@ -20,7 +21,7 @@ class OAuth2Service {
     'profile',
     'email',
     'User.Read',
-    'offline_access'
+    'offline_access',
   ];
 
   static String? _codeVerifier;
@@ -46,37 +47,38 @@ class OAuth2Service {
     final codeChallenge = _generateCodeChallenge(_codeVerifier!);
     _state = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
 
-    html.window.localStorage['code_verifier'] = _codeVerifier!;
-    html.window.localStorage['oauth_state'] = _state!;
+    web.window.localStorage.setItem('code_verifier', _codeVerifier!);
+    web.window.localStorage.setItem('oauth_state', _state!);
 
-    final authUrl = Uri.parse(authorizeUrl).replace(queryParameters: {
-      'client_id': clientId,
-      'response_type': 'code',
-      'redirect_uri': redirectUri,
-      'scope': scopes.join(' '),
-      'state': _state!,
-      'response_mode': 'query',
-      'code_challenge': codeChallenge, // DODAJ TO!
-      'code_challenge_method': 'S256', // DODAJ TO!
-    });
+    final authUrl = Uri.parse(authorizeUrl).replace(
+      queryParameters: {
+        'client_id': clientId,
+        'response_type': 'code',
+        'redirect_uri': redirectUri,
+        'scope': scopes.join(' '),
+        'state': _state!,
+        'response_mode': 'query',
+        'code_challenge': codeChallenge,
+        'code_challenge_method': 'S256',
+      },
+    );
 
-    html.window.location.href = authUrl.toString();
+    web.window.location.href = authUrl.toString();
   }
 
-  // Handle redirect – UŻYJ code_verifier DO TOKENA
   static Future<bool> handleRedirect() async {
-    final uri = Uri.parse(html.window.location.href);
+    final uri = Uri.parse(web.window.location.href);
     final code = uri.queryParameters['code'];
     final state = uri.queryParameters['state'];
-    final storedState = html.window.localStorage['oauth_state'];
-    final codeVerifier = html.window.localStorage['code_verifier'];
+    final storedState = web.window.localStorage.getItem('oauth_state');
+    final codeVerifier = web.window.localStorage.getItem('code_verifier');
 
     if (code == null || state != storedState || codeVerifier == null) {
       return false;
     }
 
-    html.window.localStorage.remove('oauth_state');
-    html.window.localStorage.remove('code_verifier');
+    web.window.localStorage.removeItem('oauth_state');
+    web.window.localStorage.removeItem('code_verifier');
 
     try {
       final response = await http.post(
@@ -87,7 +89,7 @@ class OAuth2Service {
           'grant_type': 'authorization_code',
           'code': code,
           'redirect_uri': redirectUri,
-          'code_verifier': codeVerifier, // DODAJ TO – KLUCZOWE!
+          'code_verifier': codeVerifier,
         },
       );
 
@@ -97,7 +99,9 @@ class OAuth2Service {
         await _saveUserFromIdToken(idToken);
         return true;
       } else {
-        if (kDebugMode) print('Token error: ${response.statusCode} - ${response.body}');
+        if (kDebugMode) {
+          print('Token error: ${response.statusCode} - ${response.body}');
+        }
       }
     } catch (e) {
       if (kDebugMode) print('Błąd tokena: $e');
@@ -105,7 +109,6 @@ class OAuth2Service {
     return false;
   }
 
-  // _saveUserFromIdToken – BEZ ZMIAN
   static Future<void> _saveUserFromIdToken(String? idToken) async {
     if (idToken == null) return;
 

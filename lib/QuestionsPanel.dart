@@ -8,10 +8,10 @@ import 'dart:convert';
 class QuestionStatsPage extends StatefulWidget {
   const QuestionStatsPage({super.key});
   @override
-  _QuestionStatsPageState createState() => _QuestionStatsPageState();
+  QuestionStatsPageState createState() => QuestionStatsPageState();
 }
 
-class _QuestionStatsPageState extends State<QuestionStatsPage>
+class QuestionStatsPageState extends State<QuestionStatsPage>
     with AutomaticKeepAliveClientMixin {
   bool isLoading = true;
   String? errorMessage;

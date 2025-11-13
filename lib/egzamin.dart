@@ -291,7 +291,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   String searchText = '';
 
   int _visibleCount = 30;
-  bool _isLoadingMore = false;
+  final bool _isLoadingMore = false;
   int get _totalQuestions => questions.length;
 
   List<dynamic> get _filteredQuestions {

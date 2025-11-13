@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'admin_panel.dart';
 import 'app_themes.dart';
-import 'logowanie.dart';
+//import 'logowanie.dart';
 import 'ouath2_service.dart';
 import 'personalisation_page.dart';
 import 'qualification_page.dart';
@@ -22,12 +22,11 @@ import 'theme_manager.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kIsWeb) {
-      final success = await OAuth2Service.handleRedirect();
-      if (success)
-      {
-        cleanUrl();
-      } 
+    final success = await OAuth2Service.handleRedirect();
+    if (success) {
+      cleanUrl();
     }
+  }
   if (!kIsWeb) {
     try {
       final ByteData data = await rootBundle.load('assets/cert/interpage.cer');
@@ -47,13 +46,12 @@ void main() async {
     ),
   );
 }
+
 void cleanUrl() {
   if (kIsWeb) {
-    final uri = Uri.parse(html.window.location.href);
-    if (uri.queryParameters.containsKey('code') || uri.queryParameters.containsKey('state')) {
-      final cleanUri = uri.replace(queryParameters: {});
-      html.window.history.pushState(null, '', cleanUri.toString());
-    }
+    final uri = Uri.parse(web.window.location.href);
+    final cleanUri = uri.replace(queryParameters: {});
+    web.window.history.replaceState(null, '', cleanUri.toString());
   }
 }
 
@@ -188,7 +186,7 @@ class _MyHomePageState extends State<MyHomePage> {
     selectedQuote = quotes[Random().nextInt(quotes.length)];
     _checkLoginState();
     if (kIsWeb) {
-    Future.microtask(() => _checkLoginState());
+      Future.microtask(() => _checkLoginState());
     }
   }
 
@@ -288,9 +286,9 @@ class _MyHomePageState extends State<MyHomePage> {
       _isAdmin = false;
     });
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Wylogowano')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Wylogowano')));
     }
   }
 
@@ -688,7 +686,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder:
                                         (context) => QualificationPage(
                                           qualification: kwal,
-                                          isAdmin: _isAdmin, // ⬅️
+                                          isAdmin: _isAdmin,
                                         ),
                                   ),
                                 );
@@ -702,22 +700,41 @@ class _MyHomePageState extends State<MyHomePage> {
                       title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
                       onTap: () async {
                         Navigator.pop(context);
+
                         if (_isLoggedIn) {
                           _showProfilePopup(context);
                         } else {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LogowaniePage(),
-                            ),
-                          );
-
-                          if (result == true) {
-                            await _checkLoginState();
+                          if (kIsWeb) {
+                            try {
+                              OAuth2Service.startLogin();
+                              await _checkLoginState();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Zalogowano pomyślnie'),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Błąd logowania: $e')),
+                                );
+                              }
+                            }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Logowanie dostępne tylko na webie',
+                                ),
+                              ),
+                            );
                           }
                         }
                       },
                     ),
+
                     ListTile(
                       leading: Icon(
                         theme.brightness == Brightness.dark
@@ -761,19 +778,25 @@ class _MyHomePageState extends State<MyHomePage> {
                       if (_isLoggedIn) {
                         _showProfilePopup(context);
                       } else {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LogowaniePage(),
-                          ),
-                        );
-
-                        if (result == true) {
-                          _checkLoginState();
+                        if (kIsWeb) {
+                          try {
+                            OAuth2Service.startLogin();
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Błąd logowania: $e')),
+                            );
+                          }
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Logowanie tylko na webie'),
+                            ),
+                          );
                         }
                       }
                     },
                   ),
+
                   IconButton(
                     icon: Icon(
                       theme.brightness == Brightness.dark
