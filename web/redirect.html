@@ -12,10 +12,10 @@
     const state = url.searchParams.get('state');
 
     if (code && state) {
-      window.location.href = `https://interpage.pl/egzaminyzsel/?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
+      window.location.href = `https://egzaminy.zsel.edu.pl/?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
     } else {
       console.error('BŁĄD: Brak code lub state!', url.href);
-      window.location.href = 'https://interpage.pl/egzaminyzsel/?error=no_code&debug=' + encodeURIComponent(url.href);
+      window.location.href = 'https://egzaminy.zsel.edu.pl/?error=no_code&debug=' + encodeURIComponent(url.href);
     }
   </script>
 </body>
