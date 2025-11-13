@@ -513,6 +513,11 @@ class _EgzaminViewState extends State<EgzaminView> {
       }
     }
 
+    final bool isResultOption =
+        showResult && (isCorrect || (!isCorrect && isSelected));
+    final Color textColor =
+        isResultOption ? Colors.black : colorScheme.onSurface;
+
     final Color? bgColor =
         !showResult && isSelected
             ? colorScheme.primary.withValues(alpha: 0.8)
@@ -526,7 +531,7 @@ class _EgzaminViewState extends State<EgzaminView> {
           backgroundColor: bgColor,
           disabledBackgroundColor: disabledBg,
           foregroundColor: colorScheme.onSurface,
-          disabledForegroundColor: colorScheme.onSurface,
+          disabledForegroundColor: textColor,
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'egzamin.dart';
 import 'editQuestions.dart';
+import 'widgets/question_tile.dart'; // import your tile
 
 class QualificationPage extends StatelessWidget {
   const QualificationPage({
@@ -12,71 +13,112 @@ class QualificationPage extends StatelessWidget {
   final String qualification;
   final bool isAdmin;
 
-  Widget _buildQuestionsBox(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    IconData icon = Icons.assignment,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 300,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.onSurface.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 50, color: colorScheme.primary),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final returnToHome = args?['returnToHome'] ?? false;
 
-    final colorScheme = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final itemWidth = screenWidth < 600 ? screenWidth - 40 : 300.0;
+
+    final tiles = [
+      QuestionTile(
+        icon: Icons.filter_1,
+        code: 'Losuj 1 pytanie',
+        label: 'Sprawdź swoją wiedzę',
+        showCount: false,
+        onTap: (_) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => EgzaminView(
+                    tryb: TrybEgzaminu.jednoPytanie,
+                    kwalifikacja: qualification.toLowerCase().replaceAll(
+                      '.',
+                      '',
+                    ),
+                    returnToHome: false,
+                  ),
+            ),
+          );
+        },
+      ),
+      QuestionTile(
+        icon: Icons.list_alt,
+        code: 'Test 40 losowych pytań',
+        label: 'Pełny egzamin próbny',
+        showCount: false,
+        onTap: (_) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => EgzaminView(
+                    tryb: TrybEgzaminu.czterdziesciPytan,
+                    kwalifikacja: qualification.toLowerCase().replaceAll(
+                      '.',
+                      '',
+                    ),
+                    returnToHome: false,
+                  ),
+            ),
+          );
+        },
+      ),
+      QuestionTile(
+        icon: Icons.library_books,
+        code: 'Baza wszystkich odpowiedzi',
+        label: 'Przeglądaj wszystkie pytania',
+        showCount: false,
+        onTap: (_) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => EgzaminView(
+                    tryb: TrybEgzaminu.wszystkie,
+                    kwalifikacja: qualification.toLowerCase().replaceAll(
+                      '.',
+                      '',
+                    ),
+                    returnToHome: false,
+                  ),
+            ),
+          );
+        },
+      ),
+    ];
+
+    if (isAdmin) {
+      tiles.add(
+        QuestionTile(
+          icon: Icons.edit_note,
+          code: 'Edytuj pytania',
+          label: 'Zarządzaj bazą egzaminów',
+          showCount: false,
+          onTap: (_) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (_) => EditQuestionsPage(
+                      qualification: qualification.toLowerCase().replaceAll(
+                        '.',
+                        '',
+                      ),
+                    ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(qualification),
-        backgroundColor: colorScheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -91,99 +133,14 @@ class QualificationPage extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
         child: Center(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 20,
-                runSpacing: 20,
-                children: [
-                  _buildQuestionsBox(
-                    context,
-                    title: 'Losuj 1 pytanie',
-                    subtitle: 'Sprawdź swoją wiedzę',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) => EgzaminView(
-                                tryb: TrybEgzaminu.jednoPytanie,
-                                kwalifikacja: qualification
-                                    .toLowerCase()
-                                    .replaceAll('.', ''),
-                                returnToHome: false,
-                              ),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildQuestionsBox(
-                    context,
-                    title: 'Test 40 losowych pytań',
-                    subtitle: 'Pełny egzamin próbny',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) => EgzaminView(
-                                tryb: TrybEgzaminu.czterdziesciPytan,
-                                kwalifikacja: qualification
-                                    .toLowerCase()
-                                    .replaceAll('.', ''),
-                                returnToHome: false,
-                              ),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildQuestionsBox(
-                    context,
-                    title: 'Baza wszystkich odpowiedzi',
-                    subtitle: 'Przeglądaj wszystkie pytania',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) => EgzaminView(
-                                tryb: TrybEgzaminu.wszystkie,
-                                kwalifikacja: qualification
-                                    .toLowerCase()
-                                    .replaceAll('.', ''),
-                                returnToHome: false,
-                              ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-              if (isAdmin)
-                _buildQuestionsBox(
-                  context,
-                  title: 'Edytuj pytania',
-                  subtitle: 'Zarządzaj bazą egzaminów',
-                  icon: Icons.edit_note,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (_) => EditQuestionsPage(
-                              qualification: qualification
-                                  .toLowerCase()
-                                  .replaceAll('.', ''),
-                            ),
-                      ),
-                    );
-                  },
-                ),
-            ],
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 20,
+            runSpacing: 20,
+            children:
+                tiles.map((tile) {
+                  return SizedBox(width: itemWidth, child: tile);
+                }).toList(),
           ),
         ),
       ),

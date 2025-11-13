@@ -2,7 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'ouath2_service.dart'; 
+import 'oauth2_service.dart'; 
 
 class LogowaniePage extends StatefulWidget {
   const LogowaniePage({super.key});

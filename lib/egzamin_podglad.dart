@@ -205,9 +205,8 @@ void _showZoomedImage(BuildContext context, String url) {
 class EgzaminPodgladView extends StatelessWidget {
   final List<dynamic> questions;
   final List<String?> selectedAnswers;
-  final HtmlUnescape _unescape = HtmlUnescape();
 
-  EgzaminPodgladView({
+  const EgzaminPodgladView({
     super.key,
     required this.questions,
     required this.selectedAnswers,
@@ -217,27 +216,29 @@ class EgzaminPodgladView extends StatelessWidget {
     final q = questions[index];
     final selected = selectedAnswers[index];
     final poprawna = q['poprawna']?.toString() ?? '';
-    final isCorrect = selected == poprawna;
     final colorScheme = Theme.of(context).colorScheme;
     final extras = Theme.of(context).extension<ExtraColors>()!;
+    final HtmlUnescape unescape = HtmlUnescape();
 
-    final pytanieText = _unescape.convert(q['pytanie']?.toString() ?? '');
-
+    final pytanieText = unescape.convert(q['pytanie']?.toString() ?? '');
     final List<String> pytanieImages =
         (q['images'] as List?)?.cast<String>() ?? [];
     final List<String> pytanieVideos =
         (q['videos'] as List?)?.cast<String>() ?? [];
 
-    final Map<String, String> odpText = {};
-    final Map<String, List<String>> odpImages = {};
-    final Map<String, List<String>> odpVideos = {};
+    final List<_AnswerOption> options = List.generate(4, (i) {
+      final key = 'odp${i + 1}';
+      return _AnswerOption(
+        letter: 'ABCD'[i],
+        text: unescape.convert(q[key]?.toString() ?? ''),
+        images: (q['${key}_images'] as List?)?.cast<String>() ?? [],
+        videos: (q['${key}_videos'] as List?)?.cast<String>() ?? [],
+        isCorrect: 'ABCD'[i] == poprawna,
+        isSelected: selected == 'ABCD'[i],
+      );
+    });
 
-    for (int i = 1; i <= 4; i++) {
-      final key = 'odp$i';
-      odpText[key] = _unescape.convert(q[key]?.toString() ?? '');
-      odpImages[key] = (q['${key}_images'] as List?)?.cast<String>() ?? [];
-      odpVideos[key] = (q['${key}_videos'] as List?)?.cast<String>() ?? [];
-    }
+    final bool isCorrect = selected == poprawna;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -246,27 +247,17 @@ class EgzaminPodgladView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Pytanie ${index + 1}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                const SizedBox.shrink(),
-              ],
+            Text(
+              'Pytanie ${index + 1}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: colorScheme.primary,
+              ),
             ),
             const SizedBox(height: 8),
 
-            Text(
-              pytanieText,
-              style: const TextStyle(fontSize: 16),
-              textAlign: TextAlign.left,
-            ),
+            Text(pytanieText, style: const TextStyle(fontSize: 16)),
             ...pytanieImages.map(
               (url) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -281,69 +272,12 @@ class EgzaminPodgladView extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            ...['A', 'B', 'C', 'D'].map((litera) {
-              final key = 'odp${'ABCD'.indexOf(litera) + 1}';
-              final text = odpText[key] ?? '';
-              final images = odpImages[key] ?? [];
-              final videos = odpVideos[key] ?? [];
-              final isCorrectAnswer = litera == poprawna;
-              final isSelected = selected == litera;
-              final isWrong = isSelected && !isCorrectAnswer;
+            ...options.map(
+              (opt) => _buildAnswerOption(context, opt, extras, colorScheme),
+            ),
 
-              Color? bg;
-              if (isCorrectAnswer) {
-                bg = extras.correct;
-              } else if (isSelected && isWrong) {
-                bg = extras.incorrect;
-              } else {
-                bg = colorScheme.surface;
-              }
-
-              return Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 6),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    disabledBackgroundColor: bg,
-                    disabledForegroundColor: colorScheme.onSurface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                      horizontal: 16,
-                    ),
-                    alignment: Alignment.centerLeft,
-                  ),
-                  onPressed: null,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        text,
-                        style: const TextStyle(fontSize: 15),
-                        textAlign: TextAlign.left,
-                      ),
-                      ...images.map(
-                        (url) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: buildZoomableImage(context, url),
-                        ),
-                      ),
-                      ...videos.map(
-                        (url) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: _InlineVideoPlayer(url: url),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-
-            if (selected != null) ...[
-              const SizedBox(height: 8),
+            const SizedBox(height: 8),
+            if (selected != null)
               Text(
                 isCorrect
                     ? 'Wybrano poprawną odpowiedź: $selected.'
@@ -352,11 +286,33 @@ class EgzaminPodgladView extends StatelessWidget {
                   color: isCorrect ? extras.correct : extras.incorrect,
                   fontStyle: FontStyle.italic,
                 ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Nie wybrano odpowiedzi.',
+                    style: TextStyle(
+                      color: extras.noAnswer,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  Text(
+                    'Poprawna odpowiedź: $poprawna.',
+                    style: TextStyle(
+                      color: extras.correct,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
               ),
+
+            if (selected != null) ...[
               if (isCorrect &&
                   (q['opisPoprawne']?.toString().isNotEmpty ?? false))
                 Text(
-                  _unescape.convert(q['opisPoprawne'].toString()),
+                  unescape.convert(q['opisPoprawne'].toString()),
                   style: const TextStyle(
                     fontSize: 13,
                     fontStyle: FontStyle.italic,
@@ -365,29 +321,65 @@ class EgzaminPodgladView extends StatelessWidget {
               if (!isCorrect &&
                   (q['opisNiepoprawne']?.toString().isNotEmpty ?? false))
                 Text(
-                  _unescape.convert(q['opisNiepoprawne'].toString()),
+                  unescape.convert(q['opisNiepoprawne'].toString()),
                   style: const TextStyle(
                     fontSize: 13,
                     fontStyle: FontStyle.italic,
                   ),
                 ),
-            ] else ...[
-              const SizedBox(height: 8),
-              Text(
-                'Nie wybrano odpowiedzi.',
-                style: TextStyle(
-                  color: extras.noAnswer,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-              Text(
-                'Poprawna odpowiedź: $poprawna.',
-                style: TextStyle(
-                  color: extras.correct,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Answer option helper
+  Widget _buildAnswerOption(
+    BuildContext context,
+    _AnswerOption opt,
+    ExtraColors extras,
+    ColorScheme colorScheme,
+  ) {
+    final bool isResultOption =
+        opt.isCorrect || (opt.isSelected && !opt.isCorrect);
+    final Color textColor =
+        isResultOption ? Colors.black : colorScheme.onSurface;
+    final Color bgColor =
+        opt.isCorrect
+            ? extras.correct
+            : (opt.isSelected && !opt.isCorrect)
+            ? extras.incorrect
+            : colorScheme.surface;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ElevatedButton(
+        onPressed: null,
+        style: ElevatedButton.styleFrom(
+          disabledBackgroundColor: bgColor,
+          disabledForegroundColor: textColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          alignment: Alignment.centerLeft,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(opt.text, style: TextStyle(fontSize: 15, color: textColor)),
+            ...opt.images.map(
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: buildZoomableImage(context, url),
+              ),
+            ),
+            ...opt.videos.map(
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: _InlineVideoPlayer(url: url),
+              ),
+            ),
           ],
         ),
       ),
@@ -405,4 +397,22 @@ class EgzaminPodgladView extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AnswerOption {
+  final String letter;
+  final String text;
+  final List<String> images;
+  final List<String> videos;
+  final bool isCorrect;
+  final bool isSelected;
+
+  _AnswerOption({
+    required this.letter,
+    required this.text,
+    required this.images,
+    required this.videos,
+    required this.isCorrect,
+    required this.isSelected,
+  });
 }

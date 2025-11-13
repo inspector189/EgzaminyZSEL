@@ -1,3 +1,5 @@
+import 'widgets/question_tile.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -7,13 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
+import 'widgets/home_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'admin_panel.dart';
 import 'app_themes.dart';
+import 'widgets/profile_popup.dart';
 //import 'logowanie.dart';
-import 'ouath2_service.dart';
+import 'oauth2_service.dart';
 import 'personalisation_page.dart';
 import 'qualification_page.dart';
 import 'statistics.dart';
@@ -81,7 +84,7 @@ class _MyAppState extends State<MyApp> {
       themeMode: themeProvider.themeMode,
       home: const MyHomePage(title: 'Egzaminy'),
       themeAnimationDuration: const Duration(milliseconds: 100),
-      themeAnimationCurve: Curves.easeInOut,
+      themeAnimationCurve: Curves.easeInOutCubic,
     );
   }
 }
@@ -93,57 +96,6 @@ class MyHomePage extends StatefulWidget {
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class ProfileMenuItem extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final VoidCallback onTap;
-
-  const ProfileMenuItem({
-    required this.icon,
-    required this.text,
-    required this.onTap,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final Color hoverColor = colorScheme.primary.withValues(alpha: 0.1);
-    final Color pressedColor = colorScheme.primary.withValues(alpha: 0.2);
-    final Color normalColor = Colors.transparent;
-
-    return Material(
-      color: normalColor,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-
-        overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
-          if (states.contains(WidgetState.pressed)) return pressedColor;
-          if (states.contains(WidgetState.hovered)) return hoverColor;
-          return normalColor;
-        }),
-
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Row(
-            children: [
-              Icon(icon, size: 18, color: colorScheme.secondary),
-              const SizedBox(width: 10),
-              Text(
-                text,
-                style: TextStyle(fontSize: 14, color: colorScheme.primary),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _MyHomePageState extends State<MyHomePage> {
@@ -184,10 +136,7 @@ class _MyHomePageState extends State<MyHomePage> {
       '„Ucz się, ucz, bo nauka to potęgi klucz, a kto ma dużo kluczy... zostaje woźnym.” – Ludowa mądrość z przestrogą',
     ];
     selectedQuote = quotes[Random().nextInt(quotes.length)];
-    _checkLoginState();
-    if (kIsWeb) {
-      Future.microtask(() => _checkLoginState());
-    }
+    Future.microtask(_checkLoginState);
   }
 
   Future<void> _checkLoginState() async {
@@ -209,7 +158,7 @@ class _MyHomePageState extends State<MyHomePage> {
     });
 
     if (_isLoggedIn && _userEmail != null) {
-      await _verifyEmail(_userEmail!);
+      unawaited(_verifyEmail(_userEmail!));
     }
 
     if (kDebugMode) {
@@ -292,136 +241,106 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _showProfilePopup(BuildContext context) {
-    if (_userName == null || _userEmail == null) {
+  OverlayEntry? _currentProfilePopup;
+
+  void _toggleProfilePopup(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (_currentProfilePopup != null) {
+      _closeProfilePopup();
       return;
     }
-    final colorScheme = Theme.of(context).colorScheme;
-    showMenu(
-      context: context,
-      position: RelativeRect.fromLTRB(1000, 60, 16, 0),
-      menuPadding: EdgeInsets.only(top: 15, bottom: 5),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      items: [
-        PopupMenuItem(
-          enabled: false,
-          child: Container(
-            width: 250,
-            decoration: BoxDecoration(color: colorScheme.surface),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: colorScheme.primary,
-                      child: Text(
-                        _userName![0].toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: colorScheme.onPrimary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _userName!,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: colorScheme.onSurface,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            _userEmail!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
 
-                const SizedBox(height: 8),
+    late OverlayEntry overlayEntry;
 
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle_rounded,
-                      color: Color.fromARGB(255, 126, 233, 3),
-                      size: 15,
-                    ),
-                    const SizedBox(width: 6, height: 20),
-                    Text(
-                      'Dostępny',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-
-                Divider(height: 20, thickness: 1, color: colorScheme.onPrimary),
-                if (_isAdmin)
-                  ProfileMenuItem(
-                    icon: Icons.admin_panel_settings,
-                    text: 'Panel Administratora',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AdminPanelPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ProfileMenuItem(
-                  icon: Icons.color_lens,
-                  text: 'Personalizacja',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PersonalisationPage(),
-                      ),
-                    );
-                  },
-                ),
-                ProfileMenuItem(
-                  icon: Icons.bar_chart,
-                  text: 'Statystyki',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openStatistics(context);
-                  },
-                ),
-                ProfileMenuItem(
-                  icon: Icons.logout,
-                  text: 'Wyloguj się',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _signOut();
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+    final controller = AnimationController(
+      vsync: Navigator.of(context),
+      duration: const Duration(milliseconds: 250),
     );
+    final fadeAnimation = CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeOut,
+    );
+    final slideAnimation = Tween<Offset>(
+      begin: const Offset(0.2, -0.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: controller, curve: Curves.easeOut));
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => Stack(
+            children: [
+              GestureDetector(
+                onTap: _closeProfilePopup,
+                behavior: HitTestBehavior.translucent,
+                child: Container(color: Colors.transparent),
+              ),
+              Positioned(
+                top: kToolbarHeight + 16,
+                right: 16,
+                width: 300,
+                child: FadeTransition(
+                  opacity: fadeAnimation,
+                  child: SlideTransition(
+                    position: slideAnimation,
+                    child: ProfilePopup(
+                      userName: _userName!,
+                      userEmail: _userEmail!,
+                      isAdmin: _isAdmin,
+                      colorScheme: colorScheme,
+                      onClose: _closeProfilePopup,
+                      onOpenAdminPanel: () {
+                        _closeProfilePopup();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AdminPanelPage(),
+                          ),
+                        );
+                      },
+                      onOpenPersonalisation: () {
+                        _closeProfilePopup();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PersonalisationPage(),
+                          ),
+                        );
+                      },
+                      onOpenStatistics: () {
+                        _closeProfilePopup();
+                        _openStatistics(context);
+                      },
+                      onSignOut: () async {
+                        _closeProfilePopup();
+                        await _signOut();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    _currentProfilePopup = overlayEntry;
+    Overlay.of(context).insert(overlayEntry);
+    controller.forward();
+
+    _profilePopupController = controller;
+  }
+
+  AnimationController? _profilePopupController;
+
+  void _closeProfilePopup() {
+    if (_currentProfilePopup == null) return;
+
+    _profilePopupController?.reverse().then((_) {
+      _currentProfilePopup?.remove();
+      _currentProfilePopup = null;
+      _profilePopupController?.dispose();
+      _profilePopupController = null;
+    });
   }
 
   List<String> getMenuItems(String category) {
@@ -700,9 +619,8 @@ class _MyHomePageState extends State<MyHomePage> {
                       title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
                       onTap: () async {
                         Navigator.pop(context);
-
                         if (_isLoggedIn) {
-                          _showProfilePopup(context);
+                          _toggleProfilePopup(context);
                         } else {
                           if (kIsWeb) {
                             try {
@@ -776,7 +694,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     color: colorScheme.onPrimary,
                     onPressed: () async {
                       if (_isLoggedIn) {
-                        _showProfilePopup(context);
+                        _toggleProfilePopup(context);
                       } else {
                         if (kIsWeb) {
                           try {
@@ -854,44 +772,12 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              'Witamy w aplikacji Egzaminy! 👋',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Przygotuj się do egzaminu zawodowego z najlepszą bazą pytań! Poniżej znajdziesz kwalifikacje, które możesz przeglądać:',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              '💬 $selectedQuote',
-              style: TextStyle(
-                fontStyle: FontStyle.italic,
-                fontSize: 16,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+        HomeHeader(selectedQuote: selectedQuote),
         const SizedBox(height: 40),
-        _buildGrid(context, '👨‍💻 Technik Programista', [
+        _buildGrid('👨‍💻 Technik Programista', [
           QuestionTile(
             icon: Icons.code,
             code: 'INF.03',
@@ -905,7 +791,7 @@ class HomeContent extends StatelessWidget {
             onTap: onQualificationTap,
           ),
         ]),
-        _buildGrid(context, '💻 Technik Informatyk', [
+        _buildGrid('💻 Technik Informatyk', [
           QuestionTile(
             icon: Icons.code,
             code: 'INF.03',
@@ -919,7 +805,7 @@ class HomeContent extends StatelessWidget {
             onTap: onQualificationTap,
           ),
         ]),
-        _buildGrid(context, '🌐 Technik Teleinformatyk', [
+        _buildGrid('🌐 Technik Teleinformatyk', [
           QuestionTile(
             icon: Icons.security,
             code: 'INF.08',
@@ -933,43 +819,33 @@ class HomeContent extends StatelessWidget {
             onTap: onQualificationTap,
           ),
         ]),
-        _buildGrid(context, '🧑‍🔧 Technik Elektronik', [
-          Column(
-            children: [
-              QuestionTile(
-                icon: Icons.devices_other,
-                code: 'E.06',
-                label: 'montaż urządzeń elektronicznych',
-                onTap: onQualificationTap,
-              ),
-              const SizedBox(height: 20),
-              QuestionTile(
-                icon: Icons.bolt,
-                code: 'EE.22',
-                label: 'eksploatacja instalacji elektrycznych',
-                onTap: onQualificationTap,
-              ),
-            ],
+        _buildGrid('🧑‍🔧 Technik Elektronik', [
+          QuestionTile(
+            icon: Icons.devices_other,
+            code: 'E.06',
+            label: 'montaż urządzeń elektronicznych',
+            onTap: onQualificationTap,
           ),
-          Column(
-            children: [
-              QuestionTile(
-                icon: Icons.analytics,
-                code: 'ELM.02',
-                label: 'instalacje i pomiary',
-                onTap: onQualificationTap,
-              ),
-              const SizedBox(height: 20),
-              QuestionTile(
-                icon: Icons.build,
-                code: 'ELM.05',
-                label: 'serwis urządzeń elektronicznych',
-                onTap: onQualificationTap,
-              ),
-            ],
+          QuestionTile(
+            icon: Icons.bolt,
+            code: 'EE.22',
+            label: 'eksploatacja instalacji elektrycznych',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.analytics,
+            code: 'ELM.02',
+            label: 'instalacje i pomiary',
+            onTap: onQualificationTap,
+          ),
+          QuestionTile(
+            icon: Icons.build,
+            code: 'ELM.05',
+            label: 'serwis urządzeń elektronicznych',
+            onTap: onQualificationTap,
           ),
         ]),
-        _buildGrid(context, '🧑‍🏭 Technik Elektryk', [
+        _buildGrid('🧑‍🏭 Technik Elektryk', [
           QuestionTile(
             icon: Icons.precision_manufacturing,
             code: 'ELE.05',
@@ -989,7 +865,7 @@ class HomeContent extends StatelessWidget {
             onTap: onQualificationTap,
           ),
         ]),
-        _buildGrid(context, '🤖 Technik Automatyk', [
+        _buildGrid('🤖 Technik Automatyk', [
           QuestionTile(
             icon: Icons.build_circle,
             code: 'ELM.01',
@@ -1013,7 +889,7 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _buildGrid(BuildContext context, String title, List<Widget> items) {
+  Widget _buildGrid(String title, List<QuestionTile> items) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
@@ -1031,181 +907,6 @@ class HomeContent extends StatelessWidget {
             children: items,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class QuestionTile extends StatelessWidget {
-  final IconData icon;
-  final String code;
-  final String label;
-  final Function(String) onTap;
-
-  const QuestionTile({
-    super.key,
-    required this.icon,
-    required this.code,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final extras = Theme.of(context).extension<ExtraColors>()!;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final itemWidth = screenWidth < 600 ? screenWidth - 40 : 300.0;
-
-    return InkWell(
-      onTap: () => onTap(code),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: itemWidth,
-        height: 200,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.onSurface.withValues(alpha: 0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 36, color: colorScheme.primary),
-            const SizedBox(height: 12),
-            Text(
-              code,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: colorScheme.onSurface.withValues(alpha: 0.8),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            FutureBuilder<int?>(
-              future: QuestionCountCache.instance.getCount(code),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Shimmer.fromColors(
-                    baseColor: colorScheme.primary,
-                    highlightColor: colorScheme.surface,
-                    period: const Duration(milliseconds: 1500),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(
-                              colorScheme.primary.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Ładowanie...',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (snapshot.hasError) {
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.close_rounded,
-                        color: colorScheme.error,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Wystąpił błąd',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  );
-                } else if (snapshot.hasData) {
-                  if (snapshot.data! > 0) {
-                    return Text(
-                      '${snapshot.data} pytań',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                    );
-                  } else {
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.warning_rounded,
-                          color: extras.noAnswer,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Brak pytań',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-                } else {
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.close_rounded,
-                        color: colorScheme.error,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Brak danych',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  );
-                }
-              },
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1259,11 +960,10 @@ class QuestionCountCache {
   final Map<String, Future<int?>> _cache = {};
 
   Future<int?> getCount(String code) {
-    if (_cache.containsKey(code)) return _cache[code]!;
-
-    final future = _fetchQuestionCount(code);
-    _cache[code] = future;
-    return future;
+    return _cache.putIfAbsent(
+      code,
+      () => Future.microtask(() => _fetchQuestionCount(code)),
+    );
   }
 
   Future<int?> _fetchQuestionCount(String kwalifikacja) async {

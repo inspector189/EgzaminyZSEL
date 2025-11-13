@@ -26,106 +26,48 @@ class StatisticsPage extends StatelessWidget {
           }
 
           final stats = snapshot.data!;
+          final entries = stats.entries.toList();
 
           return LayoutBuilder(
             builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 700;
-              final cardWidth =
-                  isWide
-                      ? (constraints.maxWidth / 2) - 24
-                      : constraints.maxWidth;
+              const maxCardWidth = 350;
+              final crossAxisCount = (constraints.maxWidth / maxCardWidth)
+                  .floor()
+                  .clamp(1, entries.length);
 
-              return SingleChildScrollView(
+              final rowCount = (entries.length / crossAxisCount).ceil();
+
+              return ListView.builder(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
+                itemCount: rowCount,
+                itemBuilder: (context, rowIndex) {
+                  final startIndex = rowIndex * crossAxisCount;
+                  final endIndex = (startIndex + crossAxisCount).clamp(
+                    0,
+                    entries.length,
+                  );
+                  final rowEntries = entries.sublist(startIndex, endIndex);
 
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children:
-                          stats.entries.map((qualificationEntry) {
-                            final statEntries =
-                                qualificationEntry.value.entries.toList();
-
-                            return SizedBox(
-                              width: cardWidth,
-                              child: Card(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                elevation: 4,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        borderRadius:
-                                            const BorderRadius.vertical(
-                                              top: Radius.circular(16),
-                                            ),
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            colorScheme.primary.withValues(
-                                              alpha: 0.85,
-                                            ),
-                                            colorScheme.primary.withValues(
-                                              alpha: 0.5,
-                                            ),
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.school_rounded,
-                                            color: colorScheme.onPrimary,
-                                            size: 30,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            qualificationEntry.key,
-                                            style: theme.textTheme.titleLarge
-                                                ?.copyWith(
-                                                  color: colorScheme.onPrimary,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: Column(
-                                        children: List.generate(
-                                          statEntries.length,
-                                          (i) {
-                                            final entry = statEntries[i];
-                                            return _StatRow(
-                                              label: entry.key,
-                                              value: entry.value.toString(),
-                                              isLast:
-                                                  i == statEntries.length - 1,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (int i = 0; i < rowEntries.length; i++) ...[
+                          Expanded(
+                            child: StatCard(
+                              entry: rowEntries[i],
+                              colorScheme: colorScheme,
+                              theme: theme,
+                            ),
+                          ),
+                          if (i != rowEntries.length - 1)
+                            const SizedBox(width: 16),
+                        ],
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               );
             },
           );
@@ -156,20 +98,104 @@ class StatisticsPage extends StatelessWidget {
       debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
       debugPrint('Treść odpowiedzi: ${response.body}');
     }
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data.containsKey('error')) {
-        throw Exception(data['error']);
+    try {
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('error')) throw Exception(data['error']);
+          return data;
+        } else {
+          throw Exception('❌ Format odpowiedzi jest niepoprawny!');
+        }
+      } else if (response.statusCode == 404) {
+        throw Exception('⚠️ Nie zrobiłeś(aś) jeszcze żadnego egzaminu!');
+      } else {
+        throw Exception('❌ ${response.statusCode} - ${response.body}');
       }
-      return data;
-    } else if (response.statusCode == 404) {
-      throw Exception('⚠️ Nie zrobiłeś jeszcze żadnego egzaminu!');
-    } else {
-      throw Exception(
-        '❌ Nie udało się pobrać statystyk: ${response.statusCode} - ${response.body}',
-      );
+    } catch (e) {
+      throw Exception('❌ Błąd pobierania statystyk: $e');
     }
+  }
+}
+
+class StatCard extends StatelessWidget {
+  final MapEntry<String, dynamic> entry;
+  final ColorScheme colorScheme;
+  final ThemeData theme;
+
+  const StatCard({
+    required this.entry,
+    required this.colorScheme,
+    required this.theme,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final statEntries = (entry.value as Map<String, dynamic>).entries.toList();
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primary.withValues(alpha: 0.85),
+                  colorScheme.primary.withValues(alpha: 0.5),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.school_rounded,
+                  color: colorScheme.onPrimary,
+                  size: 30,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    entry.key,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: colorScheme.onPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(statEntries.length, (i) {
+                final stat = statEntries[i];
+                return _StatRow(
+                  label: stat.key,
+                  value: stat.value.toString(),
+                  isLast: i == statEntries.length - 1,
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -204,7 +230,7 @@ class _StatRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: theme.textTheme.bodyMedium),
+          Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
           Text(
             value,
             style: theme.textTheme.bodyMedium?.copyWith(
