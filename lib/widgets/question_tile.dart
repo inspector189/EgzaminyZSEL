@@ -84,7 +84,7 @@ class _QuestionTileState extends State<QuestionTile> {
     if (_loading) {
       return Shimmer.fromColors(
         baseColor: extras.shimmerBase,
-        highlightColor: extras.shimmerHighlight,
+        highlightColor: colorScheme.primary,
         period: const Duration(milliseconds: 1500),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
