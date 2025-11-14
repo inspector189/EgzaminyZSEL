@@ -877,12 +877,12 @@ class _EgzaminViewState extends State<EgzaminView> {
 
   Future<void> _finishExam() async {
     setState(() => _isButtonDisabled = true);
-    final correct =
-        selectedAnswers
-            .where(
-              (a) => a == questions[selectedAnswers.indexOf(a)]['poprawna'],
-            )
-            .length;
+    int correct = 0;
+    for (int i = 0; i < questions.length; i++) {
+      if (selectedAnswers[i] == questions[i]['poprawna']) {
+        correct++;
+      }
+    }
     final percent = (correct / questions.length) * 100;
     final endTime = DateTime.now();
     final duration = endTime.difference(startTime).inSeconds;
