@@ -13,6 +13,8 @@ import 'package:shimmer/shimmer.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'dart:async';
 
+const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+
 class ExamTimer extends StatelessWidget {
   final DateTime endTime;
   const ExamTimer({super.key, required this.endTime});
@@ -421,7 +423,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        'Authorization': 'Bearer $_apiKey',
       },
       body: {
         'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
@@ -447,7 +449,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        'Authorization': 'Bearer $_apiKey',
       },
       body: {
         'pytanie_id': pytanieId.toString(),

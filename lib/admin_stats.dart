@@ -102,11 +102,12 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
 
   Map<String, dynamic> calculateStats(List<dynamic> results) {
     if (results.isEmpty) return {'count': 0, 'avg': 0.0, 'best': 0, 'worst': 0};
-    final scores = results.map<double>((e) {
-      final raw = e['wynik'];
-      if (raw is num) return raw.toDouble();
-      return double.tryParse('$raw') ?? 0.0;
-    }).toList();
+    final scores =
+        results.map<double>((e) {
+          final raw = e['wynik'];
+          if (raw is num) return raw.toDouble();
+          return double.tryParse('$raw') ?? 0.0;
+        }).toList();
     final avg = scores.reduce((a, b) => a + b) / scores.length;
     final best = scores.reduce((a, b) => a > b ? a : b);
     final worst = scores.reduce((a, b) => a < b ? a : b);
@@ -117,15 +118,18 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final filteredResults = allResults.where((exam) {
-      final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
-      if (examDate == null) return false;
-      final afterStart = startDate == null ||
-          examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
-      final beforeEnd = endDate == null ||
-          examDate.isBefore(endDate!.add(const Duration(days: 1)));
-      return afterStart && beforeEnd;
-    }).toList();
+    final filteredResults =
+        allResults.where((exam) {
+          final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
+          if (examDate == null) return false;
+          final afterStart =
+              startDate == null ||
+              examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
+          final beforeEnd =
+              endDate == null ||
+              examDate.isBefore(endDate!.add(const Duration(days: 1)));
+          return afterStart && beforeEnd;
+        }).toList();
     final users = _groupBy(
       filteredResults,
       (r) => (r['userID'] ?? '').toString().trim(),
@@ -134,218 +138,228 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
       filteredResults,
       (r) => (r['kwalifikacja'] ?? 'Nieznana').toString(),
     );
-    final filteredUsers = users.entries
-        .where((e) => e.key.toLowerCase().contains(searchQuery.toLowerCase()))
-        .toList()
-      ..sort((a, b) {
-        if (a.key == 'Użytkownik anonimowy') return 1;
-        if (b.key == 'Użytkownik anonimowy') return -1;
-        return a.key.compareTo(b.key);
-      });
+    final filteredUsers =
+        users.entries
+            .where(
+              (e) => e.key.toLowerCase().contains(searchQuery.toLowerCase()),
+            )
+            .toList()
+          ..sort((a, b) {
+            if (a.key == 'Użytkownik anonimowy') return 1;
+            if (b.key == 'Użytkownik anonimowy') return -1;
+            return a.key.compareTo(b.key);
+          });
     return Scaffold(
       appBar: AppBar(title: const Text('📊 Statystyki Egzaminów')),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : errorMessage != null
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : errorMessage != null
               ? Center(child: Text(errorMessage!))
               : RefreshIndicator(
-                  onRefresh: fetchAllStats,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _SearchBar(
-                        onChanged: (value) => setState(() => searchQuery = value),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.person_2,
-                            color: colorScheme.primary,
-                            size: 32,
-                          ),
-                          const SizedBox(width: 8),
-                          const _SectionTitle('Statystyki według użytkownika'),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: TextButton.icon(
-                              icon: const Icon(Icons.date_range),
-                              label: Text(
-                                startDate == null
-                                    ? 'Data od'
-                                    : 'Od: ${startDate!.toLocal().toString().split(' ')[0]}',
-                              ),
-                              onPressed: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: startDate ?? DateTime.now(),
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime.now(),
-                                );
-                                if (picked != null) {
-                                  setState(() => startDate = picked);
-                                }
-                              },
+                onRefresh: fetchAllStats,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _SearchBar(
+                      onChanged: (value) => setState(() => searchQuery = value),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_2,
+                          color: colorScheme.primary,
+                          size: 32,
+                        ),
+                        const SizedBox(width: 8),
+                        const _SectionTitle('Statystyki według użytkownika'),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.date_range),
+                            label: Text(
+                              startDate == null
+                                  ? 'Data od'
+                                  : 'Od: ${startDate!.toLocal().toString().split(' ')[0]}',
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextButton.icon(
-                              icon: const Icon(Icons.date_range),
-                              label: Text(
-                                endDate == null
-                                    ? 'Data do'
-                                    : 'Do: ${endDate!.toLocal().toString().split(' ')[0]}',
-                              ),
-                              onPressed: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: endDate ?? DateTime.now(),
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime.now(),
-                                );
-                                if (picked != null) {
-                                  setState(() => endDate = picked);
-                                }
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (startDate != null || endDate != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            'Zakres: ${startDate != null ? startDate!.toLocal().toString().split(' ')[0] : '—'} '
-                            '→ ${endDate != null ? endDate!.toLocal().toString().split(' ')[0] : '—'}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: startDate ?? DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setState(() => startDate = picked);
+                              }
+                            },
                           ),
                         ),
-                      if (filteredUsers.isEmpty)
-                        Center(
-                          child: Text(
-                            'Brak wyników dla tego użytkownika.',
-                            style: theme.textTheme.bodyMedium,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.date_range),
+                            label: Text(
+                              endDate == null
+                                  ? 'Data do'
+                                  : 'Do: ${endDate!.toLocal().toString().split(' ')[0]}',
+                            ),
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: endDate ?? DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime.now(),
+                              );
+                              if (picked != null) {
+                                setState(() => endDate = picked);
+                              }
+                            },
                           ),
                         ),
-                      ...filteredUsers.map((entry) {
-                        final user = entry.key;
-                        final exams = List<dynamic>.from(entry.value).where((exam) {
-                          final examDate = DateTime.tryParse(
-                            exam['data_czas'] ?? '',
-                          );
-                          if (examDate == null) return false;
-                          final afterStart = startDate == null ||
-                              examDate.isAfter(
-                                startDate!.subtract(const Duration(days: 1)),
-                              );
-                          final beforeEnd = endDate == null ||
-                              examDate.isBefore(
-                                endDate!.add(const Duration(days: 1)),
-                              );
-                          return afterStart && beforeEnd;
-                        }).toList();
-                        exams.sort((a, b) {
-                          final da = DateTime.tryParse(a['data_czas'] ?? '') ??
-                              DateTime(2000);
-                          final db = DateTime.tryParse(b['data_czas'] ?? '') ??
-                              DateTime(2000);
-                          return db.compareTo(da);
-                        });
-                        final userStats = calculateStats(exams);
-                        final Map<String, List<dynamic>> examsByQual = {};
-                        for (final exam in exams) {
-                          final kwal = exam['kwalifikacja'] ?? 'Nieznana';
-                          examsByQual.putIfAbsent(kwal, () => []).add(exam);
-                        }
-                        final visibleQualifications =
-                            examsByQual.entries
-                                .where((e) => e.value.isNotEmpty)
-                                .toList();
-                        final isAnonymous = user == 'Użytkownik anonimowy';
-                        if (isAnonymous) {
-                          return _AnonymousUserCard(
-                            user: user,
-                            userStats: userStats,
-                          );
-                        }
-                        final lastExam = exams.isNotEmpty ? exams.first : null;
-                        final lastExamScore =
-                            lastExam?['wynik']?.toString() ?? '-';
-                        final lastExamDate =
-                            lastExam?['data_czas']?.toString() ?? '-';
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: _UserExpansionTile(
-                            user: user,
-                            userStats: userStats,
-                            lastExamScore: lastExamScore,
-                            lastExamDate: lastExamDate,
-                            qualifications: visibleQualifications,
-                            calculateStats: calculateStats,
-                            fmtDuration: _fmtDuration,
-                            startDate: startDate,
-                            endDate: endDate,
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (startDate != null || endDate != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Zakres: ${startDate != null ? startDate!.toLocal().toString().split(' ')[0] : '—'} '
+                          '→ ${endDate != null ? endDate!.toLocal().toString().split(' ')[0] : '—'}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
-                        );
-                      }),
-                      const SizedBox(height: 24),
+                        ),
+                      ),
+                    if (filteredUsers.isEmpty)
                       Center(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.description),
-                          label: const Text('Zrób raport'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 12,
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ReportSelectionPage(
-                                  data: filteredResults,
-                                ),
-                              ),
-                            );
-                          },
+                        child: Text(
+                          'Brak wyników dla tego użytkownika.',
+                          style: theme.textTheme.bodyMedium,
                         ),
                       ),
-                      const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.school,
-                            color: colorScheme.primary,
-                            size: 32,
-                          ),
-                          const SizedBox(width: 8),
-                          const _SectionTitle('Statystyki według kwalifikacji'),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ...qualifications.entries.map((entry) {
-                        final q = entry.key.toUpperCase();
-                        final qStats = calculateStats(entry.value);
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: _QualificationCard(
-                            qualification: q,
-                            qStats: qStats,
-                          ),
+                    ...filteredUsers.map((entry) {
+                      final user = entry.key;
+                      final exams =
+                          List<dynamic>.from(entry.value).where((exam) {
+                            final examDate = DateTime.tryParse(
+                              exam['data_czas'] ?? '',
+                            );
+                            if (examDate == null) return false;
+                            final afterStart =
+                                startDate == null ||
+                                examDate.isAfter(
+                                  startDate!.subtract(const Duration(days: 1)),
+                                );
+                            final beforeEnd =
+                                endDate == null ||
+                                examDate.isBefore(
+                                  endDate!.add(const Duration(days: 1)),
+                                );
+                            return afterStart && beforeEnd;
+                          }).toList();
+                      exams.sort((a, b) {
+                        final da =
+                            DateTime.tryParse(a['data_czas'] ?? '') ??
+                            DateTime(2000);
+                        final db =
+                            DateTime.tryParse(b['data_czas'] ?? '') ??
+                            DateTime(2000);
+                        return db.compareTo(da);
+                      });
+                      final userStats = calculateStats(exams);
+                      final Map<String, List<dynamic>> examsByQual = {};
+                      for (final exam in exams) {
+                        final kwal = exam['kwalifikacja'] ?? 'Nieznana';
+                        examsByQual.putIfAbsent(kwal, () => []).add(exam);
+                      }
+                      final visibleQualifications =
+                          examsByQual.entries
+                              .where((e) => e.value.isNotEmpty)
+                              .toList();
+                      final isAnonymous = user == 'Użytkownik anonimowy';
+                      if (isAnonymous) {
+                        return _AnonymousUserCard(
+                          user: user,
+                          userStats: userStats,
                         );
-                      }),
-                    ],
-                  ),
+                      }
+                      final lastExam = exams.isNotEmpty ? exams.first : null;
+                      final lastExamScore =
+                          lastExam?['wynik']?.toString() ?? '-';
+                      final lastExamDate =
+                          lastExam?['data_czas']?.toString() ?? '-';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: _UserExpansionTile(
+                          user: user,
+                          userStats: userStats,
+                          lastExamScore: lastExamScore,
+                          lastExamDate: lastExamDate,
+                          qualifications: visibleQualifications,
+                          calculateStats: calculateStats,
+                          fmtDuration: _fmtDuration,
+                          startDate: startDate,
+                          endDate: endDate,
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.description),
+                        label: const Text('Zrób raport'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 12,
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => ReportSelectionPage(
+                                    data: filteredResults,
+                                  ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.school,
+                          color: colorScheme.primary,
+                          size: 32,
+                        ),
+                        const SizedBox(width: 8),
+                        const _SectionTitle('Statystyki według kwalifikacji'),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...qualifications.entries.map((entry) {
+                      final q = entry.key.toUpperCase();
+                      final qStats = calculateStats(entry.value);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: _QualificationCard(
+                          qualification: q,
+                          qStats: qStats,
+                        ),
+                      );
+                    }),
+                  ],
                 ),
+              ),
     );
   }
 
@@ -355,9 +369,10 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   ) {
     final Map<String, List<dynamic>> grouped = {};
     for (final item in list) {
-      final key = keySelector(item).isEmpty
-          ? 'Użytkownik anonimowy'
-          : keySelector(item);
+      final key =
+          keySelector(item).isEmpty
+              ? 'Użytkownik anonimowy'
+              : keySelector(item);
       grouped.putIfAbsent(key, () => []).add(item);
     }
     return grouped;
@@ -381,24 +396,34 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final qualifications = widget.data
-        .map((e) => (e['kwalifikacja'] ?? 'Nieznana').toString())
-        .toSet()
-        .toList()
-      ..sort();
+    final qualifications =
+        widget.data
+            .map((e) => (e['kwalifikacja'] ?? 'Nieznana').toString())
+            .toSet()
+            .toList()
+          ..sort();
     final Map<String, Map<String, List<dynamic>>> usersByQual = {};
     for (final qual in qualifications) {
-      final qualExams = widget.data.where((e) => e['kwalifikacja'].toString() == qual).toList();
+      final qualExams =
+          widget.data
+              .where((e) => e['kwalifikacja'].toString() == qual)
+              .toList();
       final users = <String, List<dynamic>>{};
       for (final exam in qualExams) {
         final user = (exam['userID'] ?? '').toString().trim();
-        final userKey = user.isEmpty || user.toLowerCase() == 'anonymous' ? 'Użytkownik anonimowy' : user;
+        final userKey =
+            user.isEmpty || user.toLowerCase() == 'anonymous'
+                ? 'Użytkownik anonimowy'
+                : user;
         users.putIfAbsent(userKey, () => []).add(exam);
       }
       usersByQual[qual] = users;
     }
 
-    final currentUsers = selectedQualification != null ? usersByQual[selectedQualification] ?? {} : {};
+    final currentUsers =
+        selectedQualification != null
+            ? usersByQual[selectedQualification] ?? {}
+            : {};
 
     return Scaffold(
       appBar: AppBar(
@@ -419,18 +444,19 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: selectedQualification,
+              initialValue: selectedQualification,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'Wybierz kwalifikację',
               ),
-              items: qualifications.map((qual) {
-                return DropdownMenuItem(value: qual, child: Text(qual));
-              }).toList(),
+              items:
+                  qualifications.map((qual) {
+                    return DropdownMenuItem(value: qual, child: Text(qual));
+                  }).toList(),
               onChanged: (value) {
                 setState(() {
                   selectedQualification = value;
-                  selectedUsers.clear(); // Wyczyść wybory przy zmianie
+                  selectedUsers.clear();
                 });
               },
             ),
@@ -487,24 +513,29 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.file_download),
-                  label: Text('Generuj raport dla ${selectedUsers.length} uczniów'),
-                  onPressed: selectedUsers.isEmpty
-                      ? null
-                      : () async {
-                          await generateReportPdf(
-                            context,
-                            selectedQualification!,
-                            selectedUsers.toList(),
-                            widget.data,
-                          );
-                          Navigator.pop(context);
-                        },
+                  label: Text(
+                    'Generuj raport dla ${selectedUsers.length} uczniów',
+                  ),
+                  onPressed:
+                      selectedUsers.isEmpty
+                          ? null
+                          : () async {
+                            await generateReportPdf(
+                              context,
+                              selectedQualification!,
+                              selectedUsers.toList(),
+                              widget.data,
+                            );
+                            Navigator.pop(context);
+                          },
                 ),
               ),
             ] else
               const Expanded(
                 child: Center(
-                  child: Text('Wybierz kwalifikację, aby zobaczyć listę uczniów.'),
+                  child: Text(
+                    'Wybierz kwalifikację, aby zobaczyć listę uczniów.',
+                  ),
                 ),
               ),
           ],
@@ -515,11 +546,12 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
 
   Map<String, dynamic> _calculateStats(List<dynamic> results) {
     if (results.isEmpty) return {'count': 0, 'avg': 0.0, 'best': 0, 'worst': 0};
-    final scores = results.map<double>((e) {
-      final raw = e['wynik'];
-      if (raw is num) return raw.toDouble();
-      return double.tryParse('$raw') ?? 0.0;
-    }).toList();
+    final scores =
+        results.map<double>((e) {
+          final raw = e['wynik'];
+          if (raw is num) return raw.toDouble();
+          return double.tryParse('$raw') ?? 0.0;
+        }).toList();
     final avg = scores.reduce((a, b) => a + b) / scores.length;
     final best = scores.reduce((a, b) => a > b ? a : b);
     final worst = scores.reduce((a, b) => a < b ? a : b);
@@ -533,21 +565,25 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
     List<dynamic> allData,
   ) async {
     final pdf = pw.Document();
-    // Filtruj dane dla kwalifikacji
-    final qualData = allData.where((e) => e['kwalifikacja'].toString() == qualification).toList();
+    final qualData =
+        allData
+            .where((e) => e['kwalifikacja'].toString() == qualification)
+            .toList();
 
-    // Przygotuj dane dla tabeli: dla każdego użytkownika znajdź ostatni egzamin
     final tableData = <List<String>>[];
     for (final userKey in selectedUsers) {
-      final userExams = qualData.where((exam) {
-        final examUser = (exam['userID'] ?? '').toString().trim();
-        final examUserKey = examUser.isEmpty || examUser.toLowerCase() == 'anonymous' ? 'Użytkownik anonimowy' : examUser;
-        return examUserKey == userKey;
-      }).toList();
+      final userExams =
+          qualData.where((exam) {
+            final examUser = (exam['userID'] ?? '').toString().trim();
+            final examUserKey =
+                examUser.isEmpty || examUser.toLowerCase() == 'anonymous'
+                    ? 'Użytkownik anonimowy'
+                    : examUser;
+            return examUserKey == userKey;
+          }).toList();
 
       if (userExams.isEmpty) continue;
 
-      // Posortuj po dacie (najnowszy pierwszy)
       userExams.sort((a, b) {
         final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
         final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
@@ -565,31 +601,51 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        build: (pw.Context context) => [
-          pw.Header(
-            level: 0,
-            child: pw.Center(
-              child: pw.Text(
-                'Raport Egzaminów - Kwalifikacja: $qualification',
-                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+        build:
+            (pw.Context context) => [
+              pw.Header(
+                level: 0,
+                child: pw.Center(
+                  child: pw.Text(
+                    'Raport Egzaminów - Kwalifikacja: $qualification',
+                    style: pw.TextStyle(
+                      fontSize: 24,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          pw.SizedBox(height: 20),
-          pw.Text(
-            'Data generowania: ${DateTime.now().toLocal().toString().split(' ')[0]}',
-            style: pw.TextStyle(fontSize: 12),
-          ),
-          pw.SizedBox(height: 20),
-          pw.Text('Wybrani uczniowie: ${selectedUsers.length}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 20),
-          pw.Text('Podsumowanie ostatnich egzaminów:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 10),
-          pw.Table.fromTextArray(
-            headers: ['Osoba', 'Wynik ostatniego egzaminu (%)', 'Data ostatniego egzaminu'],
-            data: tableData,
-          ),
-        ],
+              pw.SizedBox(height: 20),
+              pw.Text(
+                'Data generowania: ${DateTime.now().toLocal().toString().split(' ')[0]}',
+                style: pw.TextStyle(fontSize: 12),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Text(
+                'Wybrani uczniowie: ${selectedUsers.length}',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Text(
+                'Podsumowanie ostatnich egzaminów:',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 10),
+              pw.TableHelper.fromTextArray(
+                headers: [
+                  'Osoba',
+                  'Wynik ostatniego egzaminu (%)',
+                  'Data ostatniego egzaminu',
+                ],
+                data: tableData,
+              ),
+            ],
       ),
     );
 
@@ -599,16 +655,8 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
       filename: 'raport_${qualification.replaceAll(' ', '_')}.pdf',
     );
   }
-
-  String _fmtDuration(int? seconds) {
-    if (seconds == null || seconds <= 0) return '-';
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m}m ${s}s';
-  }
 }
 
-// Pozostałe klasy bez zmian...
 class _SearchBar extends StatelessWidget {
   final ValueChanged<String> onChanged;
   const _SearchBar({required this.onChanged});
@@ -616,7 +664,8 @@ class _SearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final fill = theme.inputDecorationTheme.fillColor ??
+    final fill =
+        theme.inputDecorationTheme.fillColor ??
         colorScheme.surfaceContainerHighest;
     return TextField(
       onChanged: onChanged,
@@ -748,29 +797,33 @@ class _UserExpansionTile extends StatelessWidget {
           horizontal: 16,
           vertical: 8,
         ),
-        children: qualifications.map((qualEntry) {
-          final qual = qualEntry.key;
-          final qualExams = List<dynamic>.from(qualEntry.value)
-            ..sort((a, b) {
-              final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
-              final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
-              return db.compareTo(da);
-            });
-          final recent = (startDate == null && endDate == null)
-              ? qualExams.take(5).toList()
-              : qualExams;
-          final qualStats = calculateStats(qualEntry.value);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _QualificationTile(
-              qualification: qual,
-              recentExams: recent,
-              qualStats: qualStats,
-              scoreFormatter: _scoreStr,
-              fmtDuration: fmtDuration,
-            ),
-          );
-        }).toList(),
+        children:
+            qualifications.map((qualEntry) {
+              final qual = qualEntry.key;
+              final qualExams = List<dynamic>.from(qualEntry.value)
+                ..sort((a, b) {
+                  final da =
+                      DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
+                  final db =
+                      DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
+                  return db.compareTo(da);
+                });
+              final recent =
+                  (startDate == null && endDate == null)
+                      ? qualExams.take(5).toList()
+                      : qualExams;
+              final qualStats = calculateStats(qualEntry.value);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _QualificationTile(
+                  qualification: qual,
+                  recentExams: recent,
+                  qualStats: qualStats,
+                  scoreFormatter: _scoreStr,
+                  fmtDuration: fmtDuration,
+                ),
+              );
+            }).toList(),
       ),
     );
   }
