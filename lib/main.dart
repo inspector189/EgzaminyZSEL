@@ -21,8 +21,6 @@ import 'qualification_page.dart';
 import 'statistics.dart';
 import 'theme_manager.dart';
 
-final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kIsWeb) {
@@ -72,7 +70,6 @@ class _MyAppState extends State<MyApp> {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
-      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Egzaminy',
       theme: AppThemes.lightTheme(
@@ -102,7 +99,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late final String selectedQuote;
-
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   bool _isLoggedIn = false;
   String? _userName;
   String? _userEmail;
