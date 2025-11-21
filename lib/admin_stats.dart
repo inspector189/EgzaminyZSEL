@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
@@ -567,6 +568,8 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
     List<dynamic> allData,
   ) async {
     final pdf = pw.Document();
+  final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
+  final ttf = pw.Font.ttf(fontData);
     final qualData =
         allData
             .where((e) => e['kwalifikacja'].toString() == qualification)
@@ -613,6 +616,7 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
                     style: pw.TextStyle(
                       fontSize: 24,
                       fontWeight: pw.FontWeight.bold,
+                      font: ttf,
                     ),
                   ),
                 ),
@@ -620,7 +624,7 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
               pw.SizedBox(height: 20),
               pw.Text(
                 'Data generowania: ${DateTime.now().toLocal().toString().split(' ')[0]}',
-                style: pw.TextStyle(fontSize: 12),
+                style: pw.TextStyle(font: ttf, fontSize: 12),
               ),
               pw.SizedBox(height: 20),
               pw.Text(
@@ -628,6 +632,7 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
                 style: pw.TextStyle(
                   fontSize: 14,
                   fontWeight: pw.FontWeight.bold,
+                  font: ttf,
                 ),
               ),
               pw.SizedBox(height: 20),
@@ -636,6 +641,7 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
                 style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
+                  font: ttf,
                 ),
               ),
               pw.SizedBox(height: 10),
@@ -646,6 +652,8 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
                   'Data ostatniego egzaminu',
                 ],
                 data: tableData,
+                headerStyle: pw.TextStyle(font: ttf, fontWeight: pw.FontWeight.bold, fontSize: 12),
+                cellStyle: pw.TextStyle(font: ttf, fontSize: 11),
               ),
             ],
       ),
