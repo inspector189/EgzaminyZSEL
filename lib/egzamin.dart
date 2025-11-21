@@ -877,57 +877,74 @@ class _EgzaminViewState extends State<EgzaminView> {
     );
   }
 
-  Future<void> _finishExam() async {
-    setState(() => _isButtonDisabled = true);
-    int correct = 0;
-    for (int i = 0; i < questions.length; i++) {
-      if (selectedAnswers[i] == questions[i]['poprawna']) {
-        correct++;
-      }
-    }
-    final percent = (correct / questions.length) * 100;
-    final endTime = DateTime.now();
-    final duration = endTime.difference(startTime).inSeconds;
+ Future<void> _finishExam() async {
+  setState(() => _isButtonDisabled = true);
 
-    final futures = <Future>[];
-    for (int i = 0; i < questions.length; i++) {
-      final pid = int.tryParse(questions[i]['id'].toString());
-      final odp = selectedAnswers[i];
-      if (pid != null && odp != null) {
-        futures.add(
-          zapiszTrudnoscDoBazy(
-            pid,
-            widget.kwalifikacja,
-            odp == questions[i]['poprawna'],
-          ),
-        );
-      }
-    }
-
-    await sendResultToServer(
-      kwalifikacja: widget.kwalifikacja,
-      wynik: percent,
-      dataCzas: endTime.toIso8601String(),
-      czasTrwania: duration,
-    );
-
-    setState(() => _isButtonDisabled = false);
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (_) => EgzaminWynikView(
-                correctAnswers: correct,
-                totalQuestions: questions.length,
-                questions: questions,
-                selectedAnswers: selectedAnswers,
-                returnToHome: true,
-              ),
-        ),
-      );
+  int correct = 0;
+  for (int i = 0; i < questions.length; i++) {
+    if (selectedAnswers[i] == questions[i]['poprawna']) {
+      correct++;
     }
   }
+
+  final percent = (correct / questions.length) * 100;
+  final endTime = DateTime.now();
+  final duration = endTime.difference(startTime).inSeconds;
+
+  // Przygotowanie danych do wysłania
+  final List<Map<String, dynamic>> pytaniaDoBazy = [];
+  for (var q in questions) {
+    pytaniaDoBazy.add({
+      'id': q['id'],
+      'pytanie': q['pytanie'],
+      'poprawna': q['poprawna'],
+    });
+  }
+
+  final Map<String, dynamic> payload = {
+    'kwalifikacja': widget.kwalifikacja,
+    'wynik': percent,
+    'data_czas': endTime.toIso8601String(),
+    'czas_trwania': duration,
+    'pytania': pytaniaDoBazy,
+    'wybrane_odpowiedzi': selectedAnswers,
+  };
+  // Wysłanie POST do Twojego API
+  final uri = Uri.parse('https://interpage.pl/egzaminy/save_exam.php');
+  final response = await http.post(
+    uri,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $_apiKey',
+    },
+    body: jsonEncode(payload),
+  );
+
+  if (response.statusCode != 200) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Błąd zapisu egzaminu: ${response.body}')),
+    );
+  }
+
+  setState(() => _isButtonDisabled = false);
+
+  if (!mounted) return;
+
+  // Przejście do widoku wyniku
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => EgzaminWynikView(
+        correctAnswers: correct,
+        totalQuestions: questions.length,
+        questions: questions,
+        selectedAnswers: selectedAnswers,
+        returnToHome: true,
+      ),
+    ),
+  );
+}
+
 
   void _losujNowePytanie() {
     if (questions.length <= 1) return;

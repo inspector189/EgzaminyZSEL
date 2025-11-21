@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 //import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_app/egzamin_podglad.dart';
 import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -678,6 +679,37 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
   }
 }
 
+Future<Map<String, dynamic>?> fetchExamDetails(int examId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('https://interpage.pl/egzaminy/get_exam_details.php'),
+      headers: <String, String>{
+        'Content-Type': 'application/x-www-form-urlencoded', 
+      },
+      body: <String, String>{
+        'api_token': 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        'exam_id': examId.toString(),
+      },
+    );
+
+    print('→ fetchExamDetails($examId)');
+    print('Status: ${response.statusCode}');
+    print('Response: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final jsonData = json.decode(response.body);
+      if (jsonData['questions'] != null) {
+        return {
+          'questions': jsonData['questions'] as List<dynamic>,
+          'selectedAnswers': (jsonData['selectedAnswers'] as List<dynamic>).cast<String?>(),
+        };
+      }
+    }
+  } catch (e) {
+    print('Błąd w fetchExamDetails: $e');
+  }
+  return null;
+}
 class _SearchBar extends StatelessWidget {
   final ValueChanged<String> onChanged;
   const _SearchBar({required this.onChanged});
@@ -915,9 +947,40 @@ class _QualificationTile extends StatelessWidget {
                   ? exam['czas_trwania_sec'] as int
                   : int.tryParse('${exam['czas_trwania_sec'] ?? ''}'),
             );
-            final tryb = (exam['tryb'] ?? exam['mode'] ?? '') as String;
-            return _ExamTile(date: date, wynik: wynik, czas: czas, tryb: tryb);
-          }),
+          final tryb = (exam['tryb'] ?? exam['mode'] ?? '') as String;
+          final int examId = exam['id'] is int 
+              ? exam['id'] as int 
+              : int.tryParse(exam['id']?.toString() ?? '') ?? 0;
+
+          return _ExamTile(
+            date: date.split(' ').first,
+            wynik: wynik,
+            czas: czas,
+            tryb: tryb,
+            examId: examId,
+            onPreview: examId == 0
+                ? null
+                : () async {
+                    final details = await fetchExamDetails(examId);
+                    if (!context.mounted) return;
+
+                    if (details != null) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => EgzaminPodgladView(
+                            questions: details['questions'] as List<dynamic>,
+                            selectedAnswers: (details['selectedAnswers'] as List<dynamic>).cast<String?>(),
+                          ),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Nie udało się wczytać podglądu egzaminu')),
+                      );
+                    }
+                  },
+          );
+        }).toList(),
         Divider(thickness: 1, height: 8, color: colorScheme.primary),
       ],
     );
@@ -929,28 +992,35 @@ class _ExamTile extends StatelessWidget {
   final String wynik;
   final String czas;
   final String tryb;
+  final int examId;
+  final VoidCallback? onPreview;
+
   const _ExamTile({
     required this.date,
     required this.wynik,
     required this.czas,
     required this.tryb,
+    required this.examId,
+    required this.onPreview,
   });
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return ListTile(
-      contentPadding: const EdgeInsets.only(left: 12, right: 0),
-      leading: Icon(
-        Icons.history,
-        color: Theme.of(context).colorScheme.primary,
-        size: 28,
-      ),
-      title: Text(date, style: theme.textTheme.bodyMedium),
-      subtitle: Text(
-        'Wynik: $wynik% • Czas: $czas${tryb.isNotEmpty ? ' • Tryb: $tryb' : ''}',
+      contentPadding: const EdgeInsets.only(left: 16, right: 8),
+      leading: Icon(Icons.history, color: Theme.of(context).colorScheme.primary),
+      title: Text(date, style: const TextStyle(fontWeight: FontWeight.w500)),
+      subtitle: Text('Wynik: $wynik% • Czas: $czas${tryb.isNotEmpty ? ' • $tryb' : ''}'),
+      trailing: ElevatedButton.icon(
+        icon: const Icon(Icons.visibility, size: 16),
+        label: const Text('Podgląd', style: TextStyle(fontSize: 12)),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          visualDensity: VisualDensity.compact,
+        ),
+        onPressed: onPreview,
       ),
       dense: true,
-      visualDensity: const VisualDensity(vertical: -2),
     );
   }
 }
