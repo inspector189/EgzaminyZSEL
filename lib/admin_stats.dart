@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 //import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:html' as html;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:pdf/pdf.dart';
@@ -650,10 +652,21 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
     );
 
     final bytes = await pdf.save();
-    await Printing.sharePdf(
-      bytes: bytes,
-      filename: 'raport_${qualification.replaceAll(' ', '_')}.pdf',
-    );
+    final filename = 'raport_${qualification.replaceAll(' ', '_')}.pdf';
+    if (kIsWeb) {
+    final blob = html.Blob([bytes]);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', filename)
+      ..style.display = 'none'
+      ..click();
+      html.Url.revokeObjectUrl(url);
+    } else {
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: filename,
+      );
+    }
   }
 }
 
