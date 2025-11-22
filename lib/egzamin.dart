@@ -890,7 +890,8 @@ class _EgzaminViewState extends State<EgzaminView> {
   final percent = (correct / questions.length) * 100;
   final endTime = DateTime.now();
   final duration = endTime.difference(startTime).inSeconds;
-
+  final prefs = await SharedPreferences.getInstance();
+  final userName = prefs.getString("userName") ?? "anonymous";
   // Przygotowanie danych do wysłania
   final List<Map<String, dynamic>> pytaniaDoBazy = [];
   for (var q in questions) {
@@ -900,15 +901,16 @@ class _EgzaminViewState extends State<EgzaminView> {
       'poprawna': q['poprawna'],
     });
   }
-
   final Map<String, dynamic> payload = {
     'kwalifikacja': widget.kwalifikacja,
     'wynik': percent,
     'data_czas': endTime.toIso8601String(),
     'czas_trwania': duration,
+    'userName': userName, 
     'pytania': pytaniaDoBazy,
     'wybrane_odpowiedzi': selectedAnswers,
   };
+
   // Wysłanie POST do Twojego API
   final uri = Uri.parse('https://interpage.pl/egzaminy/save_exam.php');
   final response = await http.post(
