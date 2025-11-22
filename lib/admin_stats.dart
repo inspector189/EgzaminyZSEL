@@ -679,34 +679,26 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
   }
 }
 
-Future<Map<String, dynamic>?> fetchExamDetails(int examId) async {
+Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
   try {
     final response = await http.post(
-      Uri.parse('https://interpage.pl/egzaminy/get_exam_details.php'),
-      headers: <String, String>{
-        'Content-Type': 'application/x-www-form-urlencoded', 
-      },
-      body: <String, String>{
+      Uri.parse('https://interpage.pl/egzaminy/get_exam_full.php'),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {
         'api_token': 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
         'exam_id': examId.toString(),
       },
     );
 
-    print('→ fetchExamDetails($examId)');
-    print('Status: ${response.statusCode}');
-    print('Response: ${response.body}');
-
     if (response.statusCode == 200) {
       final jsonData = json.decode(response.body);
-      if (jsonData['questions'] != null) {
-        return {
-          'questions': jsonData['questions'] as List<dynamic>,
-          'selectedAnswers': (jsonData['selectedAnswers'] as List<dynamic>).cast<String?>(),
-        };
-      }
+      return {
+        'questions': jsonData['questions'],
+        'selectedAnswers': (jsonData['selectedAnswers'] as List).cast<String?>(),
+      };
     }
   } catch (e) {
-    print('Błąd w fetchExamDetails: $e');
+    print("Błąd fetchExamDetailsFull: $e");
   }
   return null;
 }
@@ -961,7 +953,7 @@ class _QualificationTile extends StatelessWidget {
             onPreview: examId == 0
                 ? null
                 : () async {
-                    final details = await fetchExamDetails(examId);
+                    final details = await fetchExamDetailsFull(examId);
                     if (!context.mounted) return;
 
                     if (details != null) {
