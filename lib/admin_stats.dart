@@ -12,6 +12,11 @@ import 'package:printing/printing.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+  bool isValidQualification(String? qual) {
+  if (qual == null) return false;
+  final trimmed = qual.trim();
+  return RegExp(r'^[a-z]{3}\d{2}$').hasMatch(trimmed);
+}
 
 class AdminStatsPage extends StatefulWidget {
   const AdminStatsPage({super.key});
@@ -117,7 +122,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     final worst = scores.reduce((a, b) => a < b ? a : b);
     return {'count': scores.length, 'avg': avg, 'best': best, 'worst': worst};
   }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -138,10 +142,13 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
       filteredResults,
       (r) => (r['userID'] ?? '').toString().trim(),
     );
-    final qualifications = _groupBy(
-      filteredResults,
-      (r) => (r['kwalifikacja'] ?? 'Nieznana').toString(),
-    );
+   final qualifications = <String, List<dynamic>>{};
+      for (final r in filteredResults) {
+        final q = (r['kwalifikacja'] ?? '').toString().trim();
+        if (isValidQualification(q)) {
+          qualifications.putIfAbsent(q, () => []).add(r);
+        }
+      }
     final filteredUsers =
         users.entries
             .where(
@@ -279,8 +286,10 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                       final userStats = calculateStats(exams);
                       final Map<String, List<dynamic>> examsByQual = {};
                       for (final exam in exams) {
-                        final kwal = exam['kwalifikacja'] ?? 'Nieznana';
-                        examsByQual.putIfAbsent(kwal, () => []).add(exam);
+                        final qualRaw = (exam['kwalifikacja'] ?? '').toString().trim();
+                        if (isValidQualification(qualRaw)) {
+                          examsByQual.putIfAbsent(qualRaw, () => []).add(exam);
+                        }
                       }
                       final visibleQualifications =
                           examsByQual.entries
@@ -400,12 +409,12 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final qualifications =
-        widget.data
-            .map((e) => (e['kwalifikacja'] ?? 'Nieznana').toString())
-            .toSet()
-            .toList()
-          ..sort();
+    final qualifications = widget.data
+        .map((e) => (e['kwalifikacja'] ?? '').toString().trim())
+        .where(isValidQualification)
+        .toSet()
+        .toList()
+      ..sort();
     final Map<String, Map<String, List<dynamic>>> usersByQual = {};
     for (final qual in qualifications) {
       final qualExams =
@@ -562,19 +571,21 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
     return {'count': scores.length, 'avg': avg, 'best': best, 'worst': worst};
   }
 
-  Future<void> generateReportPdf(
+Future<void> generateReportPdf(
     BuildContext context,
     String qualification,
     List<String> selectedUsers,
     List<dynamic> allData,
   ) async {
     final pdf = pw.Document();
-  final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
-  final ttf = pw.Font.ttf(fontData);
-    final qualData =
-        allData
-            .where((e) => e['kwalifikacja'].toString() == qualification)
-            .toList();
+    final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
+    final ttf = pw.Font.ttf(fontData);
+    final qualData = allData
+        .where((e) {
+          final q = (e['kwalifikacja'] ?? '').toString().trim();
+          return isValidQualification(q) && q == qualification;
+        })
+        .toList();
 
     final tableData = <List<String>>[];
     for (final userKey in selectedUsers) {
@@ -633,7 +644,7 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
                 style: pw.TextStyle(
                   fontSize: 14,
                   fontWeight: pw.FontWeight.bold,
-                  font: ttf,
+                  font: ttf, 
                 ),
               ),
               pw.SizedBox(height: 20),
@@ -642,7 +653,7 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
                 style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
-                  font: ttf,
+                  font: ttf, 
                 ),
               ),
               pw.SizedBox(height: 10),
@@ -659,7 +670,6 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
             ],
       ),
     );
-
     final bytes = await pdf.save();
     final filename = 'raport_${qualification.replaceAll(' ', '_')}.pdf';
     if (kIsWeb) {
