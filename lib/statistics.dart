@@ -234,7 +234,7 @@ class StatisticsPage extends StatelessWidget {
     if (userName == 'anonymous') return [];
 
     final response = await http.post(
-      Uri.parse('https://interpage.pl/egzaminy/stats_all.php'),
+      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/stats_all.php'),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
@@ -265,7 +265,7 @@ class StatisticsPage extends StatelessWidget {
       throw Exception('ℹ️ Funkcja statystyk wymaga zalogowania.');
     }
 
-    final url = Uri.parse('https://interpage.pl/egzaminy/stats.php');
+    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/stats.php');
     final response = await http.post(
       url,
       headers: {

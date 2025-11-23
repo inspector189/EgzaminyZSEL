@@ -495,7 +495,7 @@ String? _extractFirstVideoSrcSmart(String html) {
           .toLowerCase();
 
   Future<List<dynamic>> _fetchQuestions(String kval) async {
-    final url = Uri.parse('https://interpage.pl/egzaminy/$kval.php');
+    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/$kval.php');
     final res = await http.get(url);
     if (res.statusCode == 200 && res.body.isNotEmpty) {
       final decoded = json.decode(res.body);
@@ -507,7 +507,7 @@ String? _extractFirstVideoSrcSmart(String html) {
 
   Future<Map<int, Map<String, dynamic>>> _fetchAllTrudnosci() async {
     final url = Uri.parse(
-      'https://interpage.pl/egzaminy/wyswietl_trudnosci.php',
+      'https://egzaminy.zsel.edu.pl/egzaminy/wyswietl_trudnosci.php',
     );
 
     final res = await http.get(
@@ -805,7 +805,7 @@ String? _extractFirstVideoSrcSmart(String html) {
     _refreshIfPreview(immediate: true);
     try {
       final uri = Uri.parse(
-        'https://interpage.pl/egzaminy/upload_image_next.php',
+        'https://egzaminy.zsel.edu.pl/egzaminy/upload_image_next.php',
       );
       String ext = (_imageName ?? 'jpg').split('.').last.toLowerCase();
       if (ext.isEmpty) ext = 'jpg';
@@ -996,7 +996,7 @@ String? _extractFirstVideoSrcSmart(String html) {
     if (_videoBytes == null || _videoName == null) return;
     setState(() => _isUploading = true);
     try {
-      final uri = Uri.parse('https://interpage.pl/egzaminy/upload_video.php');
+      final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/upload_video.php');
       final ext = _videoName!.split('.').last.toLowerCase();
       final mt = switch (ext) {
         'webm' => http_parser.MediaType('video', 'webm'),
@@ -1170,7 +1170,7 @@ String? _extractFirstVideoSrcSmart(String html) {
     }
     try {
       final res = await http.post(
-        Uri.parse('https://interpage.pl/egzaminy/add_question.php'),
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/add_question.php'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
@@ -1212,7 +1212,7 @@ String? _extractFirstVideoSrcSmart(String html) {
   Future<void> _deleteQuestion(int id) async {
     try {
       final res = await http.post(
-        Uri.parse('https://interpage.pl/egzaminy/delete_question.php'),
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/delete_question.php'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json',
@@ -1269,7 +1269,7 @@ String? _extractFirstVideoSrcSmart(String html) {
     setState(() => _busyResetAll = true);
     try {
       final res = await http.post(
-        Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/reset_trudnosc.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
           'Authorization': 'Bearer $_apiToken',
@@ -1322,7 +1322,7 @@ String? _extractFirstVideoSrcSmart(String html) {
     if (!ok) return;
     try {
       final res = await http.post(
-        Uri.parse('https://interpage.pl/egzaminy/reset_trudnosc.php'),
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/reset_trudnosc.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
           'Authorization': 'Bearer $_apiToken',

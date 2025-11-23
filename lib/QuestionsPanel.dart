@@ -73,7 +73,7 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
 
     try {
       final response = await http.get(
-        Uri.parse('https://interpage.pl/egzaminy/wyswietl_trudnosci.php'),
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/wyswietl_trudnosci.php'),
         headers: {
           'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
           'Content-Type': 'application/json',
@@ -116,7 +116,7 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
     try {
       final res = await http.get(
         Uri.parse(
-          'https://interpage.pl/egzaminy/${kwal.replaceAll(" ", "")}.php',
+          'https://egzaminy.zsel.edu.pl/egzaminy/${kwal.replaceAll(" ", "")}.php',
         ),
       );
 

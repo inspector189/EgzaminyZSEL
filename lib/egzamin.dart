@@ -356,7 +356,7 @@ class _EgzaminViewState extends State<EgzaminView> {
 
   Future<void> fetchQuestions() async {
     final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
-    final url = Uri.parse('https://interpage.pl/egzaminy/$kwalifikacja.php');
+    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/$kwalifikacja.php');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200 && response.body.isNotEmpty) {
@@ -418,7 +418,7 @@ class _EgzaminViewState extends State<EgzaminView> {
         widget.userName ??
         (await SharedPreferences.getInstance()).getString('userName') ??
         'anonymous';
-    final url = Uri.parse('https://interpage.pl/egzaminy/zapisz_wynik.php');
+    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/zapisz_wynik.php');
     final response = await http.post(
       url,
       headers: {
@@ -444,7 +444,7 @@ class _EgzaminViewState extends State<EgzaminView> {
     bool poprawna,
   ) async {
     if (pytanieId <= 0) return;
-    final url = Uri.parse('https://interpage.pl/egzaminy/zapis_trudnosci.php');
+    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/zapis_trudnosci.php');
     final response = await http.post(
       url,
       headers: {
@@ -912,7 +912,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   };
 
   // Wysłanie POST do Twojego API
-  final uri = Uri.parse('https://interpage.pl/egzaminy/save_exam.php');
+  final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/save_exam.php');
   final response = await http.post(
     uri,
     headers: {

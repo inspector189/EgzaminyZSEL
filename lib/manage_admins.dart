@@ -33,7 +33,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
   Future<void> fetchUsers() async {
     try {
       final response = await http.post(
-        Uri.parse('https://interpage.pl/egzaminy/showAdmins.php'),
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/showAdmins.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': 'Bearer $_apiKey',
@@ -97,7 +97,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://interpage.pl/egzaminy/add_admin.php'),
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/add_admin.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': 'Bearer $_apiKey',
@@ -138,7 +138,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
   Future<void> deleteUser(int id) async {
     try {
       final response = await http.post(
-        Uri.parse('https://interpage.pl/egzaminy/delete_admin.php'),
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/delete_admin.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': 'Bearer $_apiKey',

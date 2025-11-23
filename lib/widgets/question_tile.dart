@@ -55,7 +55,7 @@ class _QuestionTileState extends State<QuestionTile> {
     try {
       final sanitized = widget.code.replaceAll('.', '').toLowerCase();
       final url = Uri.parse(
-        'https://interpage.pl/egzaminy/count/countQuestions.php?egzamin=$sanitized',
+        'https://egzaminy.zsel.edu.pl/egzaminy/count/countQuestions.php?egzamin=$sanitized',
       );
 
       if (kDebugMode) debugPrint('Requesting: $url');

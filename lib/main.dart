@@ -171,7 +171,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _isVerifyingEmail = true;
 
     try {
-      final url = Uri.parse('https://interpage.pl/egzaminy/verify-email.php');
+      final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/verify-email.php');
       final response = await HttpService.postJson(url, {'email': email});
 
       if (response != null && response.statusCode == 200) {
@@ -968,7 +968,7 @@ class QuestionCountCache {
     try {
       final sanitized = kwalifikacja.replaceAll('.', '').toLowerCase();
       final url = Uri.parse(
-        'https://interpage.pl/egzaminy/count/countQuestions.php?egzamin=$sanitized',
+        'https://egzaminy.zsel.edu.pl/egzaminy/count/countQuestions.php?egzamin=$sanitized',
       );
       debugPrint('Requesting: $url');
 

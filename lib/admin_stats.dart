@@ -45,7 +45,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
       errorMessage = null;
     });
     try {
-      final url = Uri.parse('https://interpage.pl/egzaminy/stats_all.php');
+      final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/stats_all.php');
       final response = await http.post(
         url,
         headers: {
@@ -692,7 +692,7 @@ Future<void> generateReportPdf(
 Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
   try {
     final response = await http.post(
-      Uri.parse('https://interpage.pl/egzaminy/get_exam_full.php'),
+      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/get_exam_full.php'),
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body: {
         'api_token': 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
