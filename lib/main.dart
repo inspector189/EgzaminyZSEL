@@ -103,7 +103,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isLoggedIn = false;
   String? _userName;
   String? _userEmail;
-  bool _isAdmin = true;
+  bool _isAdmin = false;
 
   bool _isVerifyingEmail = false;
 
