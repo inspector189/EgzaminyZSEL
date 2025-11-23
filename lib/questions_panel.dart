@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
 import 'dart:convert';
+import 'utils/zoomable_image.dart';
 
 class QuestionStatsPage extends StatefulWidget {
   const QuestionStatsPage({super.key});
@@ -205,58 +206,6 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
       child: Text(
         '$label (${trudnosc.toStringAsFixed(1)}%)',
         style: TextStyle(color: colorScheme.surface, fontSize: 12),
-      ),
-    );
-  }
-
-  Widget buildZoomableImage(BuildContext context, String url) {
-    final extras = Theme.of(context).extension<ExtraColors>()!;
-    return GestureDetector(
-      onTap: () {
-        showGeneralDialog(
-          context: context,
-          barrierDismissible: true,
-          barrierLabel: 'Close',
-          pageBuilder: (context, anim1, anim2) {
-            return Center(
-              child: InteractiveViewer(
-                panEnabled: true,
-                minScale: 1.0,
-                maxScale: 5.0,
-                child: Image(image: NetworkImage(url), fit: BoxFit.contain),
-              ),
-            );
-          },
-          transitionBuilder: (context, anim1, anim2, child) {
-            return FadeTransition(opacity: anim1, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 300),
-        );
-      },
-      child: Image.network(
-        url,
-        fit: BoxFit.contain,
-        alignment: Alignment.center,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return Shimmer.fromColors(
-            baseColor: extras.shimmerBase,
-            highlightColor: extras.shimmerHighlight,
-            child: Container(
-              width: double.infinity,
-              height: 250,
-              color: extras.shimmerBase,
-            ),
-          );
-        },
-        errorBuilder:
-            (context, error, stack) => Container(
-              color: extras.shimmerBase,
-              height: 250,
-              child: const Center(
-                child: Icon(Icons.broken_image, color: Colors.grey),
-              ),
-            ),
       ),
     );
   }

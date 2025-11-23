@@ -7,7 +7,6 @@ import 'package:web/web.dart' as web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'widgets/home_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +19,7 @@ import 'personalisation_page.dart';
 import 'qualification_page.dart';
 import 'statistics.dart';
 import 'theme_manager.dart';
+import 'utils/http_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -907,88 +907,5 @@ class HomeContent extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class HttpService {
-  HttpService._();
-  static final http.Client _client = http.Client();
-  static const Duration _defaultTimeout = Duration(seconds: 10);
-
-  static Future<http.Response?> postJson(
-    Uri url,
-    Object body, {
-    Map<String, String>? headers,
-  }) async {
-    try {
-      final response = await _client
-          .post(
-            url,
-            headers: headers ?? {'Content-Type': 'application/json'},
-            body: jsonEncode(body),
-          )
-          .timeout(_defaultTimeout);
-      return response;
-    } catch (e) {
-      if (kDebugMode) debugPrint('Json error: $e');
-      return null;
-    }
-  }
-
-  static Future<http.Response?> get(
-    Uri url, {
-    Map<String, String>? headers,
-  }) async {
-    try {
-      final response = await _client
-          .get(url, headers: headers)
-          .timeout(_defaultTimeout);
-      return response;
-    } catch (e) {
-      if (kDebugMode) debugPrint('Get error: $e');
-      return null;
-    }
-  }
-}
-
-class QuestionCountCache {
-  QuestionCountCache._();
-  static final QuestionCountCache instance = QuestionCountCache._();
-
-  final Map<String, Future<int?>> _cache = {};
-
-  Future<int?> getCount(String code) {
-    return _cache.putIfAbsent(
-      code,
-      () => Future.microtask(() => _fetchQuestionCount(code)),
-    );
-  }
-
-  Future<int?> _fetchQuestionCount(String kwalifikacja) async {
-    try {
-      final sanitized = kwalifikacja.replaceAll('.', '').toLowerCase();
-      final url = Uri.parse(
-        'https://egzaminy.zsel.edu.pl/egzaminy/count/countQuestions.php?egzamin=$sanitized',
-      );
-      debugPrint('Requesting: $url');
-
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data is Map && data.containsKey('count')) {
-          return data['count'] as int;
-        } else {
-          debugPrint('⚠️ Nieprawidłowy format: $data');
-        }
-      } else {
-        debugPrint('❌ Serwer zwrócił kod błędu ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('❌ Błąd podczas zbierania danych: $e');
-    }
-
-    return null;
   }
 }

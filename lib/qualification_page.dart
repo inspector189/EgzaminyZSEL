@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'egzamin.dart';
-import 'editQuestions.dart';
-import 'widgets/question_tile.dart'; // import your tile
+import 'edit_questions.dart';
+import 'widgets/question_tile.dart';
 
 class QualificationPage extends StatelessWidget {
   const QualificationPage({

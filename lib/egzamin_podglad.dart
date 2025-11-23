@@ -1,206 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/app_themes.dart';
 import 'package:html_unescape/html_unescape.dart';
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
-import 'package:shimmer/shimmer.dart';
-
-class _InlineVideoPlayer extends StatefulWidget {
-  const _InlineVideoPlayer({required this.url, this.height});
-  final String url;
-  final double? height;
-
-  @override
-  State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
-}
-
-class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
-    with AutomaticKeepAliveClientMixin {
-  ChewieController? _chewie;
-  bool _initError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    try {
-      _chewie = await _VideoPool().getChewie(widget.url);
-      if (mounted) setState(() {});
-    } catch (_) {
-      if (mounted) setState(() => _initError = true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _VideoPool().release(widget.url);
-    super.dispose();
-  }
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    super.build(context);
-    if (_initError) {
-      return Text(
-        'Nie udało się załadować wideo.',
-        style: TextStyle(color: colorScheme.error),
-      );
-    }
-    if (_chewie == null) {
-      return const SizedBox(
-        height: 160,
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      );
-    }
-
-    final vp = _chewie!.videoPlayerController;
-    final aspect =
-        vp.value.isInitialized && vp.value.aspectRatio != 0
-            ? vp.value.aspectRatio
-            : 16 / 9;
-
-    Widget player = Chewie(controller: _chewie!);
-    if (widget.height != null) {
-      final h = widget.height!;
-      player = SizedBox(
-        height: h,
-        child: FittedBox(
-          fit: BoxFit.contain,
-          child: SizedBox(width: h * aspect, height: h, child: player),
-        ),
-      );
-    } else {
-      player = AspectRatio(aspectRatio: aspect, child: player);
-    }
-
-    return RepaintBoundary(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: player,
-      ),
-    );
-  }
-}
-
-class _VideoPool {
-  static final _VideoPool _i = _VideoPool._();
-  factory _VideoPool() => _i;
-  _VideoPool._();
-
-  final Map<String, VideoPlayerController> _vp = {};
-  final Map<String, ChewieController> _chewie = {};
-  final Map<String, int> _refs = {};
-
-  Future<ChewieController> getChewie(String url) async {
-    if (!_vp.containsKey(url)) {
-      final v = VideoPlayerController.networkUrl(Uri.parse(url));
-      await v.initialize();
-      _vp[url] = v;
-    }
-    if (!_chewie.containsKey(url)) {
-      _chewie[url] = ChewieController(
-        videoPlayerController: _vp[url]!,
-        autoInitialize: true,
-        autoPlay: false,
-        looping: false,
-        showControls: true,
-        allowMuting: true,
-        allowFullScreen: true,
-        allowPlaybackSpeedChanging: true,
-      );
-    }
-    _refs[url] = (_refs[url] ?? 0) + 1;
-    return _chewie[url]!;
-  }
-
-  void release(String url) {
-    final r = (_refs[url] ?? 0) - 1;
-    if (r > 0) {
-      _refs[url] = r;
-      return;
-    }
-    _refs.remove(url);
-    _chewie.remove(url)?.dispose();
-    _vp.remove(url)?.dispose();
-  }
-}
-
-Widget buildZoomableImage(BuildContext context, String url) {
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      final maxWidth = constraints.maxWidth - 300;
-      return GestureDetector(
-        onTap: () => _showZoomedImage(context, url),
-        child: Center(
-          child: CachedNetworkImage(
-            imageUrl: url,
-            fit: BoxFit.contain,
-            placeholder: (_, _) => _buildImagePlaceholder(context, maxWidth),
-            errorWidget:
-                (_, _, _) =>
-                    _buildImagePlaceholder(context, maxWidth, error: true),
-          ),
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildImagePlaceholder(
-  BuildContext context,
-  double width, {
-  bool error = false,
-}) {
-  final extras = Theme.of(context).extension<ExtraColors>()!;
-  return Container(
-    width: width,
-    decoration: BoxDecoration(
-      color: error ? extras.shimmerBase : extras.shimmerHighlight,
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child:
-        error
-            ? Icon(Icons.broken_image, color: extras.shimmerBase)
-            : Shimmer.fromColors(
-              baseColor: extras.shimmerBase,
-              highlightColor: extras.shimmerHighlight,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: extras.shimmerHighlight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-  );
-}
-
-void _showZoomedImage(BuildContext context, String url) {
-  showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Close',
-    pageBuilder:
-        (c, a1, a2) => Center(
-          child: InteractiveViewer(
-            panEnabled: true,
-            minScale: 1.0,
-            maxScale: 5.0,
-            child: Image.network(url, fit: BoxFit.contain),
-          ),
-        ),
-    transitionBuilder:
-        (c, a1, a2, child) => FadeTransition(opacity: a1, child: child),
-    transitionDuration: const Duration(milliseconds: 300),
-  );
-}
+import 'utils/video_player.dart';
+import 'utils/zoomable_image.dart';
 
 class EgzaminPodgladView extends StatelessWidget {
   final List<dynamic> questions;
@@ -267,7 +69,7 @@ class EgzaminPodgladView extends StatelessWidget {
             ...pytanieVideos.map(
               (url) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: _InlineVideoPlayer(url: url),
+                child: InlineVideoPlayer(url: url),
               ),
             ),
             const SizedBox(height: 12),
@@ -334,7 +136,6 @@ class EgzaminPodgladView extends StatelessWidget {
     );
   }
 
-  // Answer option helper
   Widget _buildAnswerOption(
     BuildContext context,
     _AnswerOption opt,
@@ -377,7 +178,7 @@ class EgzaminPodgladView extends StatelessWidget {
             ...opt.videos.map(
               (url) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: _InlineVideoPlayer(url: url),
+                child: InlineVideoPlayer(url: url),
               ),
             ),
           ],

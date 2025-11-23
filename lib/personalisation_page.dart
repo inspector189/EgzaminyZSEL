@@ -8,6 +8,8 @@ class PersonalisationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     final colorMap = {
       Colors.red: Colors.redAccent,
@@ -59,7 +61,6 @@ class PersonalisationPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 30),
 
-                  // Color options
                   Wrap(
                     spacing: 22,
                     runSpacing: 22,
@@ -106,10 +107,6 @@ class PersonalisationPage extends StatelessWidget {
                                               spreadRadius: 4,
                                             ),
                                         ],
-                                        border: Border.all(
-                                          color: Colors.transparent,
-                                          width: 3,
-                                        ),
                                       ),
                                     ),
                                   ),
@@ -159,7 +156,7 @@ class PersonalisationPage extends StatelessWidget {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: themeProvider.primaryColor
                                       .withValues(alpha: 0.9),
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: colorScheme.onPrimary,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
                                     vertical: 12,

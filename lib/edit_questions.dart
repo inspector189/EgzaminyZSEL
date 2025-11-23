@@ -1,236 +1,21 @@
 import 'dart:convert';
 import 'dart:typed_data';
-//import 'package:flutter/gestures.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/app_themes.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' as http_parser;
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_html/html.dart' as html;
 import 'dart:async';
 import 'package:shimmer/shimmer.dart';
+import 'utils/admin_video_player.dart';
+
+const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
 enum MediaKind { none, image, video }
-
-class _InlineVideoPlayer extends StatefulWidget {
-  const _InlineVideoPlayer({this.url, this.filePath, this.blobUrl, this.height})
-    : assert(
-        url != null || filePath != null || blobUrl != null,
-        'Podaj url, filePath albo blobUrl (co najmniej jedno)',
-      );
-
-  final String? url;
-  final String? filePath;
-  final String? blobUrl;
-  final double? height;
-
-  @override
-  State<_InlineVideoPlayer> createState() => _InlineVideoPlayerState();
-}
-
-class _InlineVideoPlayerState extends State<_InlineVideoPlayer>
-    with AutomaticKeepAliveClientMixin {
-  ChewieController? _chewie;
-  bool _initError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    try {
-      _chewie = await _VideoPool().getChewie(
-        widget.url ?? widget.blobUrl ?? widget.filePath!,
-        filePath: widget.filePath,
-        blobUrl: widget.blobUrl,
-      );
-      if (mounted) setState(() {});
-    } catch (_) {
-      if (mounted) setState(() => _initError = true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _VideoPool().release(widget.url ?? widget.blobUrl ?? widget.filePath!);
-    super.dispose();
-  }
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final colorScheme = Theme.of(context).colorScheme;
-    if (_initError) {
-      return Text(
-        'Nie udało się wczytać wideo',
-        style: TextStyle(color: colorScheme.error),
-      );
-    }
-    if (_chewie == null) {
-      return const SizedBox(
-        height: 160,
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      );
-    }
-
-    final vp = _chewie!.videoPlayerController;
-    final aspect =
-        vp.value.isInitialized && vp.value.aspectRatio != 0
-            ? vp.value.aspectRatio
-            : 16 / 9;
-
-    Widget player = Chewie(controller: _chewie!);
-    if (widget.height != null) {
-      final h = widget.height!;
-      player = SizedBox(
-        height: h,
-        child: FittedBox(
-          fit: BoxFit.contain,
-          child: SizedBox(width: h * aspect, height: h, child: player),
-        ),
-      );
-    } else {
-      player = AspectRatio(aspectRatio: aspect, child: player);
-    }
-
-    return RepaintBoundary(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: player,
-      ),
-    );
-  }
-}
-
-class _VideoPool {
-  static final _VideoPool _i = _VideoPool._();
-  factory _VideoPool() => _i;
-  _VideoPool._();
-
-  final Map<String, VideoPlayerController> _vp = {};
-  final Map<String, ChewieController> _chewie = {};
-  final Map<String, int> _refs = {};
-
-  Future<ChewieController> getChewie(
-    String key, {
-    String? filePath,
-    String? blobUrl,
-  }) async {
-    if (!_vp.containsKey(key)) {
-      final v =
-          filePath != null
-              ? VideoPlayerController.file(File(filePath))
-              : VideoPlayerController.networkUrl(Uri.parse(blobUrl ?? key));
-      await v.initialize();
-      _vp[key] = v;
-    }
-    if (!_chewie.containsKey(key)) {
-      _chewie[key] = ChewieController(
-        videoPlayerController: _vp[key]!,
-        autoInitialize: true,
-        autoPlay: false,
-        looping: false,
-        showControls: true,
-        allowMuting: true,
-        allowFullScreen: true,
-        allowPlaybackSpeedChanging: true,
-      );
-    }
-    _refs[key] = (_refs[key] ?? 0) + 1;
-    return _chewie[key]!;
-  }
-
-  void release(String key) {
-    final r = (_refs[key] ?? 0) - 1;
-    if (r > 0) {
-      _refs[key] = r;
-      return;
-    }
-    _refs.remove(key);
-    _chewie.remove(key)?.dispose();
-    _vp.remove(key)?.dispose();
-  }
-}
-
-Widget buildZoomableImage(BuildContext context, String url) {
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      final maxWidth = constraints.maxWidth - 300;
-      return GestureDetector(
-        onTap: () => _showZoomedImage(context, url),
-        child: Center(
-          child: CachedNetworkImage(
-            imageUrl: url,
-            fit: BoxFit.contain,
-            placeholder: (_, _) => _buildImagePlaceholder(context, maxWidth),
-            errorWidget:
-                (_, _, _) =>
-                    _buildImagePlaceholder(context, maxWidth, error: true),
-          ),
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildImagePlaceholder(
-  BuildContext context,
-  double width, {
-  bool error = false,
-}) {
-  final extras = Theme.of(context).extension<ExtraColors>()!;
-  return Container(
-    width: width,
-    decoration: BoxDecoration(
-      color: error ? extras.shimmerBase : extras.shimmerHighlight,
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child:
-        error
-            ? const Icon(Icons.broken_image, color: Colors.grey)
-            : Shimmer.fromColors(
-              baseColor: extras.shimmerBase,
-              highlightColor: extras.shimmerHighlight,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: extras.shimmerHighlight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-  );
-}
-
-void _showZoomedImage(BuildContext context, String url) {
-  showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Close',
-    pageBuilder:
-        (c, a1, a2) => Center(
-          child: InteractiveViewer(
-            panEnabled: true,
-            minScale: 1.0,
-            maxScale: 5.0,
-            child: Image.network(url, fit: BoxFit.contain),
-          ),
-        ),
-    transitionBuilder:
-        (c, a1, a2, child) => FadeTransition(opacity: a1, child: child),
-    transitionDuration: const Duration(milliseconds: 300),
-  );
-}
 
 class EditQuestionsPage extends StatefulWidget {
   const EditQuestionsPage({super.key, required this.qualification});
@@ -262,42 +47,60 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   String? _tempVideoPath;
   String? _webBlobUrl;
   Timer? _previewDebounce;
-String? _firstMatch(RegExp re, String s, [int group = 1]) {
-  final m = re.firstMatch(s);
-  return m == null ? null : m.group(group);
-}
+  String? _firstMatch(RegExp re, String s, [int group = 1]) {
+    final m = re.firstMatch(s);
+    return m?.group(group);
+  }
 
-String? _extractFirstImageSrcSmart(String html) {
-  // surowy <img ... src="...">
-  final raw = _firstMatch(RegExp('<img[^>]+src=["\']([^"\']+)["\']', caseSensitive: false), html);
-  if (raw != null) return raw;
+  String? _extractFirstImageSrcSmart(String html) {
+    // surowy <img ... src="...">
+    final raw = _firstMatch(
+      RegExp('<img[^>]+src=["\']([^"\']+)["\']', caseSensitive: false),
+      html,
+    );
+    if (raw != null) return raw;
 
-  // escaped: &lt;img ... src=&quot;...&quot;&gt;
-  final esc = _firstMatch(RegExp('&lt;img[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false), html);
-  if (esc != null) return esc;
+    // escaped: &lt;img ... src=&quot;...&quot;&gt;
+    final esc = _firstMatch(
+      RegExp('&lt;img[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false),
+      html,
+    );
+    if (esc != null) return esc;
 
-  return null;
-}
+    return null;
+  }
 
-String? _extractFirstVideoSrcSmart(String html) {
-  // <video src="...">
-  final rawVideo = _firstMatch(RegExp('<video[^>]+src=["\']([^"\']+)["\']', caseSensitive: false), html);
-  if (rawVideo != null) return rawVideo;
+  String? _extractFirstVideoSrcSmart(String html) {
+    // <video src="...">
+    final rawVideo = _firstMatch(
+      RegExp('<video[^>]+src=["\']([^"\']+)["\']', caseSensitive: false),
+      html,
+    );
+    if (rawVideo != null) return rawVideo;
 
-  // <video><source src="..."></video>
-  final rawSource = _firstMatch(RegExp('<source[^>]+src=["\']([^"\']+)["\']', caseSensitive: false), html);
-  if (rawSource != null) return rawSource;
+    // <video><source src="..."></video>
+    final rawSource = _firstMatch(
+      RegExp('<source[^>]+src=["\']([^"\']+)["\']', caseSensitive: false),
+      html,
+    );
+    if (rawSource != null) return rawSource;
 
-  // escaped &lt;video ... src=&quot;...&quot;&gt;
-  final escVideo = _firstMatch(RegExp('&lt;video[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false), html);
-  if (escVideo != null) return escVideo;
+    // escaped &lt;video ... src=&quot;...&quot;&gt;
+    final escVideo = _firstMatch(
+      RegExp('&lt;video[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false),
+      html,
+    );
+    if (escVideo != null) return escVideo;
 
-  // escaped &lt;source src=&quot;...&quot;&gt;
-  final escSource = _firstMatch(RegExp('&lt;source[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false), html);
-  if (escSource != null) return escSource;
+    // escaped &lt;source src=&quot;...&quot;&gt;
+    final escSource = _firstMatch(
+      RegExp('&lt;source[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false),
+      html,
+    );
+    if (escSource != null) return escSource;
 
-  return null;
-}
+    return null;
+  }
 
   void _refreshTextPreview() {
     if (_showPreview && mounted) setState(() {});
@@ -513,7 +316,7 @@ String? _extractFirstVideoSrcSmart(String html) {
     final res = await http.get(
       url,
       headers: {
-        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        'Authorization': 'Bearer $_apiKey',
         'Content-Type': 'application/json',
       },
     );
@@ -577,90 +380,89 @@ String? _extractFirstVideoSrcSmart(String html) {
   }
 
   void _openForEdit(Map<String, dynamic> q) {
-  setState(() {
-    editingId = int.tryParse(q['id']?.toString() ?? '');
+    setState(() {
+      editingId = int.tryParse(q['id']?.toString() ?? '');
 
-    final rawHtml = q['pytanie']?.toString() ?? '';
-    final unescapedHtml = _unescapeLtGt(rawHtml);
+      final rawHtml = q['pytanie']?.toString() ?? '';
+      final unescapedHtml = _unescapeLtGt(rawHtml);
 
-    // 1) Spróbuj z tablic w JSON (jeśli są)
-    String? vidUrl =
-        (q['videos'] is List && (q['videos'] as List).isNotEmpty)
-            ? q['videos'][0]?.toString()
-            : null;
-    String? imgUrl =
-        (q['images'] is List && (q['images'] as List).isNotEmpty)
-            ? q['images'][0]?.toString()
-            : null;
+      // 1) Spróbuj z tablic w JSON (jeśli są)
+      String? vidUrl =
+          (q['videos'] is List && (q['videos'] as List).isNotEmpty)
+              ? q['videos'][0]?.toString()
+              : null;
+      String? imgUrl =
+          (q['images'] is List && (q['images'] as List).isNotEmpty)
+              ? q['images'][0]?.toString()
+              : null;
 
-    // 2) Jeśli brak w tablicach – spróbuj z HTML
-    vidUrl ??= _extractFirstVideoSrcSmart(unescapedHtml);
-    imgUrl ??= _extractFirstImageSrcSmart(unescapedHtml);
+      // 2) Jeśli brak w tablicach – spróbuj z HTML
+      vidUrl ??= _extractFirstVideoSrcSmart(unescapedHtml);
+      imgUrl ??= _extractFirstImageSrcSmart(unescapedHtml);
 
-    // 3) Ustaw multimedia i wyczyść przeciwne bufory
-    if (vidUrl != null && vidUrl.isNotEmpty) {
-      _mediaKind = MediaKind.video;
+      // 3) Ustaw multimedia i wyczyść przeciwne bufory
+      if (vidUrl != null && vidUrl.isNotEmpty) {
+        _mediaKind = MediaKind.video;
 
-      _uploadedVideoUrl = vidUrl;
-      _uploadedVideoFilename = _filenameFromUrl(vidUrl);
+        _uploadedVideoUrl = vidUrl;
+        _uploadedVideoFilename = _filenameFromUrl(vidUrl);
 
-      // wyczyść obraz
-      _imageBytes = null;
-      _imageName = null;
-      _uploadedImageUrl = null;
-      _uploadedImageFilename = null;
-      _imageCtrl.clear();
-    } else if (imgUrl != null && imgUrl.isNotEmpty) {
-      _mediaKind = MediaKind.image;
+        // wyczyść obraz
+        _imageBytes = null;
+        _imageName = null;
+        _uploadedImageUrl = null;
+        _uploadedImageFilename = null;
+        _imageCtrl.clear();
+      } else if (imgUrl != null && imgUrl.isNotEmpty) {
+        _mediaKind = MediaKind.image;
 
-      _uploadedImageUrl = imgUrl;
-      _uploadedImageFilename = _filenameFromUrl(imgUrl);
-      _imageCtrl.text = imgUrl;
+        _uploadedImageUrl = imgUrl;
+        _uploadedImageFilename = _filenameFromUrl(imgUrl);
+        _imageCtrl.text = imgUrl;
 
-      // wyczyść wideo
-      _videoBytes = null;
-      _videoName = null;
-      _uploadedVideoUrl = null;
-      _uploadedVideoFilename = null;
-      _disposeLocalTempVideo();
-    } else {
-      _mediaKind = MediaKind.none;
+        // wyczyść wideo
+        _videoBytes = null;
+        _videoName = null;
+        _uploadedVideoUrl = null;
+        _uploadedVideoFilename = null;
+        _disposeLocalTempVideo();
+      } else {
+        _mediaKind = MediaKind.none;
 
-      // wyczyść oba
-      _imageBytes = null;
-      _imageName = null;
-      _uploadedImageUrl = null;
-      _uploadedImageFilename = null;
-      _imageCtrl.clear();
+        // wyczyść oba
+        _imageBytes = null;
+        _imageName = null;
+        _uploadedImageUrl = null;
+        _uploadedImageFilename = null;
+        _imageCtrl.clear();
 
-      _videoBytes = null;
-      _videoName = null;
-      _uploadedVideoUrl = null;
-      _uploadedVideoFilename = null;
-      _disposeLocalTempVideo();
-    }
+        _videoBytes = null;
+        _videoName = null;
+        _uploadedVideoUrl = null;
+        _uploadedVideoFilename = null;
+        _disposeLocalTempVideo();
+      }
 
-    // 4) Wysokość (parsujemy na unescapowanym HTML)
-    _imageHeightPx = _parseTagHeightPx(unescapedHtml);
-    _imageHeightCtrl.text = _imageHeightPx?.toString() ?? '';
+      // 4) Wysokość (parsujemy na unescapowanym HTML)
+      _imageHeightPx = _parseTagHeightPx(unescapedHtml);
+      _imageHeightCtrl.text = _imageHeightPx?.toString() ?? '';
 
-    // 5) Reszta pól
-    final cleaned = _stripStyleAndImage(rawHtml);
-    _contentCtrl.text = _unescapeLtGt(cleaned);
+      // 5) Reszta pól
+      final cleaned = _stripStyleAndImage(rawHtml);
+      _contentCtrl.text = _unescapeLtGt(cleaned);
 
-    _odp1Ctrl.text = _answerToUi(q['odp1']?.toString());
-    _odp2Ctrl.text = _answerToUi(q['odp2']?.toString());
-    _odp3Ctrl.text = _answerToUi(q['odp3']?.toString());
-    _odp4Ctrl.text = _answerToUi(q['odp4']?.toString());
+      _odp1Ctrl.text = _answerToUi(q['odp1']?.toString());
+      _odp2Ctrl.text = _answerToUi(q['odp2']?.toString());
+      _odp3Ctrl.text = _answerToUi(q['odp3']?.toString());
+      _odp4Ctrl.text = _answerToUi(q['odp4']?.toString());
 
-    _opisPoprawneCtrl.text = q['opisPoprawne']?.toString() ?? '';
-    _opisNiepoprawneCtrl.text = q['opisNiepoprawne']?.toString() ?? '';
+      _opisPoprawneCtrl.text = q['opisPoprawne']?.toString() ?? '';
+      _opisNiepoprawneCtrl.text = q['opisNiepoprawne']?.toString() ?? '';
 
-    final poprawna = (q['poprawna']?.toString().toUpperCase() ?? 'A');
-    _correct = ['A', 'B', 'C', 'D'].contains(poprawna) ? poprawna : 'A';
-  });
-}
-
+      final poprawna = (q['poprawna']?.toString().toUpperCase() ?? 'A');
+      _correct = ['A', 'B', 'C', 'D'].contains(poprawna) ? poprawna : 'A';
+    });
+  }
 
   int? _parseTagHeightPx(String html) {
     final i1 = html.toLowerCase().indexOf('<img');
@@ -687,7 +489,7 @@ String? _extractFirstVideoSrcSmart(String html) {
     return v;
   }
 
-  String? _extractFirstTagSrc(String html, String tagName) {
+  /*String? _extractFirstTagSrc(String html, String tagName) {
     final idx = html.toLowerCase().indexOf('<$tagName');
     if (idx == -1) return null;
     final srcIdx = html.indexOf('src=', idx);
@@ -700,7 +502,7 @@ String? _extractFirstVideoSrcSmart(String html) {
     final end = html.indexOf(quote, start);
     if (end == -1) return null;
     return html.substring(start, end);
-  }
+  }*/
 
   String _stripStyleAndImage(String html) {
     var out = html;
@@ -815,9 +617,8 @@ String? _extractFirstVideoSrcSmart(String html) {
       );
       final req =
           http.MultipartRequest('POST', uri)
-            ..headers['Authorization'] =
-                'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-            ..headers['X-API-Key'] = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+            ..headers['Authorization'] = 'Bearer $_apiKey'
+            ..headers['X-API-Key'] = _apiKey
             ..headers['Accept'] = 'application/json'
             ..fields['kwalifikacja'] = _sanitizedTable()
             ..fields['egzamin'] = _sanitizedTable()
@@ -1005,9 +806,8 @@ String? _extractFirstVideoSrcSmart(String html) {
       };
       final req =
           http.MultipartRequest('POST', uri)
-            ..headers['Authorization'] =
-                'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
-            ..headers['X-API-Key'] = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^'
+            ..headers['Authorization'] = 'Bearer $_apiKey'
+            ..headers['X-API-Key'] = _apiKey
             ..headers['Accept'] = 'application/json'
             ..fields['kwalifikacja'] = _sanitizedTable()
             ..fields['egzamin'] = _sanitizedTable()
@@ -1077,7 +877,7 @@ String? _extractFirstVideoSrcSmart(String html) {
                 const SizedBox(height: 8),
                 AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: _InlineVideoPlayer(
+                  child: InlineVideoPlayer(
                     url: _uploadedVideoUrl,
                     filePath: kIsWeb ? null : localPathOrBlob,
                     blobUrl: kIsWeb ? localPathOrBlob : null,
@@ -1173,7 +973,7 @@ String? _extractFirstVideoSrcSmart(String html) {
         Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/add_question.php'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+          'Authorization': 'Bearer $_apiKey',
           'Accept': 'application/json',
         },
         body: jsonEncode(payload),
@@ -1216,8 +1016,8 @@ String? _extractFirstVideoSrcSmart(String html) {
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json',
-          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
-          'X-API-Key': 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+          'Authorization': 'Bearer $_apiKey',
+          'X-API-Key': _apiKey,
         },
         body: jsonEncode({'egzamin': _sanitizedTable(), 'id': id}),
       );
@@ -1240,7 +1040,6 @@ String? _extractFirstVideoSrcSmart(String html) {
   }
 
   bool _busyResetAll = false;
-  final String _apiToken = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
   Future<void> _resetTrudnoscAll() async {
     final ok =
@@ -1272,7 +1071,7 @@ String? _extractFirstVideoSrcSmart(String html) {
         Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/reset_trudnosc.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-          'Authorization': 'Bearer $_apiToken',
+          'Authorization': 'Bearer $_apiKey',
         },
         body: {'kwalifikacja': _sanitizedTable()},
       );
@@ -1325,7 +1124,7 @@ String? _extractFirstVideoSrcSmart(String html) {
         Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/reset_trudnosc.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-          'Authorization': 'Bearer $_apiToken',
+          'Authorization': 'Bearer $_apiKey',
         },
         body: {'kwalifikacja': _sanitizedTable(), 'pytanie_id': '$id'},
       );
@@ -1399,51 +1198,41 @@ String? _extractFirstVideoSrcSmart(String html) {
   bool _isLoadingMore = false;
 
   Widget _renderHtml(
-  String text, {
-  List<String>? images,
-  List<String>? videos,
-}) {
-  // Szukanie wysokości z <img>
-  final heightPx = () {
-    final reg = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false);
-    final match = reg.firstMatch(text);
-    if (match != null) {
-      return double.tryParse(match.group(1)!);
-    }
-    return null;
-  }();
+    String text, {
+    List<String>? images,
+    List<String>? videos,
+  }) {
+    // Szukanie wysokości z <img>
+    final heightPx = () {
+      final reg = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false);
+      final match = reg.firstMatch(text);
+      if (match != null) {
+        return double.tryParse(match.group(1)!);
+      }
+      return null;
+    }();
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(text, style: const TextStyle(fontSize: 16)),
-      ...?images?.map(
-        (url) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Center(
-            child: Image.network(
-              url,
-              fit: BoxFit.contain,
-              height: heightPx,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(text, style: const TextStyle(fontSize: 16)),
+        ...?images?.map(
+          (url) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Center(
+              child: Image.network(url, fit: BoxFit.contain, height: heightPx),
             ),
           ),
         ),
-      ),
-      ...?videos?.map(
-        (url) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Center(
-            child: _InlineVideoPlayer(
-              url: url,
-              height: 400, 
-            ),
+        ...?videos?.map(
+          (url) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: InlineVideoPlayer(url: url, height: 400)),
           ),
         ),
-      ),
-    ],
-  );
-}
-
+      ],
+    );
+  }
 
   Widget _buildBadge(BuildContext context, dynamic q) {
     final theme = Theme.of(context);
@@ -2011,33 +1800,33 @@ String? _extractFirstVideoSrcSmart(String html) {
     final colorScheme = theme.colorScheme;
     final id = int.tryParse(q['id']?.toString() ?? '');
     final answers =
-    ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-  final odp = q['odp${e.key + 1}']?.toString() ?? '';
-  final body = _unescapeLtGt(
-    odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
-  );
-  return Container(
-    margin: const EdgeInsets.only(bottom: 6),
-    child: ElevatedButton(
-      onPressed: null,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.primary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        elevation: 2,
-        padding: const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 16,
-        ),
-        alignment: Alignment.centerLeft,
-        minimumSize: const Size(double.infinity, 48),
-      ),
-      child: _renderHtml('${e.value}. $body'),
-    ),
-  );
-}).toList();
+        ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+          final odp = q['odp${e.key + 1}']?.toString() ?? '';
+          final body = _unescapeLtGt(
+            odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
+          );
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ElevatedButton(
+              onPressed: null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.surface,
+                foregroundColor: colorScheme.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+                alignment: Alignment.centerLeft,
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              child: _renderHtml('${e.value}. $body'),
+            ),
+          );
+        }).toList();
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -2165,36 +1954,35 @@ String? _extractFirstVideoSrcSmart(String html) {
     } else if (_mediaKind == MediaKind.video && _uploadedVideoUrl != null) {
       mediaWidget = Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: _InlineVideoPlayer(
+        child: InlineVideoPlayer(
           url: _uploadedVideoUrl!,
           height: _imageHeightPx?.toDouble(),
         ),
       );
     }
     final answers =
-    ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-  final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
-  final body = textCtrl.text.trim();
-  return Container(
-    margin: const EdgeInsets.only(top: 6),
-    child: ElevatedButton(
-      onPressed: null,
-      style: ElevatedButton.styleFrom(
-        alignment: Alignment.centerLeft,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        elevation: 2,
-        padding: const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 16,
-        ),
-      ),
-      // ⬇⬇⬇ DODANY PREFIKS A./B./C./D.
-      child: _renderHtml('${e.value}. $body'),
-    ),
-  );
-}).toList();
+        ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+          final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
+          final body = textCtrl.text.trim();
+          return Container(
+            margin: const EdgeInsets.only(top: 6),
+            child: ElevatedButton(
+              onPressed: null,
+              style: ElevatedButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+              ),
+              child: _renderHtml('${e.value}. $body'),
+            ),
+          );
+        }).toList();
 
     return Stack(
       children: [

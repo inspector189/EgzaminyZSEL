@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:web/web.dart' as web;
-//import 'dart:html' as html;
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -27,21 +26,18 @@ class OAuth2Service {
   static String? _codeVerifier;
   static String? _state;
 
-  // Generuj code_verifier (PKCE)
   static String _generateCodeVerifier() {
     final random = Random.secure();
     final values = List<int>.generate(128, (_) => random.nextInt(256));
     return base64UrlEncode(values).replaceAll('=', '').substring(0, 128);
   }
 
-  // Generuj code_challenge (S256)
   static String _generateCodeChallenge(String verifier) {
     final bytes = utf8.encode(verifier);
     final digest = sha256.convert(bytes);
     return base64UrlEncode(digest.bytes).replaceAll('=', '');
   }
 
-  // Start login – DODAJ PKCE DO URL
   static void startLogin() {
     _codeVerifier = _generateCodeVerifier();
     final codeChallenge = _generateCodeChallenge(_codeVerifier!);

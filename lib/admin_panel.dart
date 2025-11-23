@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import "QuestionsPanel.dart";
+import "questions_panel.dart";
 import 'widgets/admin_tiles.dart';
 import 'admin_stats.dart';
 import 'manage_admins.dart';

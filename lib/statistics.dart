@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'admin_stats.dart';
+import 'report_selection_page.dart';
 import 'egzamin_podglad.dart';
+
+const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
 class StatisticsPage extends StatelessWidget {
   const StatisticsPage({super.key});
@@ -33,16 +35,19 @@ class StatisticsPage extends StatelessWidget {
           return LayoutBuilder(
             builder: (context, constraints) {
               const maxCardWidth = 350;
-              final crossAxisCount =
-                  (constraints.maxWidth / maxCardWidth).floor().clamp(1, entries.length);
+              final crossAxisCount = (constraints.maxWidth / maxCardWidth)
+                  .floor()
+                  .clamp(1, entries.length);
 
               final rowCount = (entries.length / crossAxisCount).ceil();
 
-              // Tworzymy listę widgetów statystyk głównych
               List<Widget> mainStatsWidgets = [];
               for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
                 final startIndex = rowIndex * crossAxisCount;
-                final endIndex = (startIndex + crossAxisCount).clamp(0, entries.length);
+                final endIndex = (startIndex + crossAxisCount).clamp(
+                  0,
+                  entries.length,
+                );
                 final rowEntries = entries.sublist(startIndex, endIndex);
 
                 mainStatsWidgets.add(
@@ -59,7 +64,8 @@ class StatisticsPage extends StatelessWidget {
                               theme: theme,
                             ),
                           ),
-                          if (i != rowEntries.length - 1) const SizedBox(width: 16),
+                          if (i != rowEntries.length - 1)
+                            const SizedBox(width: 16),
                         ],
                       ],
                     ),
@@ -67,145 +73,38 @@ class StatisticsPage extends StatelessWidget {
                 );
               }
 
-              // Ostatnie egzaminy
               Widget lastExamsWidget = FutureBuilder<List<dynamic>>(
-              future: fetchUserExams(),
-              builder: (context, snapshot2) {
-                if (snapshot2.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                future: fetchUserExams(),
+                builder: (context, snapshot2) {
+                  if (snapshot2.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                if (!snapshot2.hasData || snapshot2.data!.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 10),
-                    child: Text('Brak zapisanych egzaminów użytkownika.'),
-                  );
-                }
+                  if (!snapshot2.hasData || snapshot2.data!.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 10),
+                      child: Text('Brak zapisanych egzaminów użytkownika.'),
+                    );
+                  }
 
-                final exams = snapshot2.data!;
-                final Map<String, List<dynamic>> examsByQual = {};
-                for (final exam in exams) {
-                  final qual = exam['kwalifikacja'] ?? 'Nieznana';
-                  examsByQual.putIfAbsent(qual, () => []).add(exam);
-                }
+                  final exams = snapshot2.data!;
+                  final Map<String, List<dynamic>> examsByQual = {};
+                  for (final exam in exams) {
+                    final qual = exam['kwalifikacja'] ?? 'Nieznana';
+                    examsByQual.putIfAbsent(qual, () => []).add(exam);
+                  }
 
-                return Column(
-                  children: examsByQual.entries.map((qualEntry) {
-                    final qualName = qualEntry.key;
-                    final qualExams = qualEntry.value
-                      ..sort((a, b) {
-                        final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
-                        final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
-                        return db.compareTo(da);
-                      });
-
-                    return Card(
-                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 4,
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: ExpansionTile(
-
-                        tilePadding: EdgeInsets.zero,
-                        childrenPadding: const EdgeInsets.symmetric(vertical: 8),
-                        title: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                            gradient: LinearGradient(
-                              colors: [
-                                colorScheme.primary.withOpacity(0.85),
-                                colorScheme.primary.withOpacity(0.5),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.school_rounded, color: Colors.white, size: 28),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  qualName,
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    color: colorScheme.onPrimary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        children: qualExams.map((exam) {
-                          final date = (exam['data_czas'] ?? '').split(' ').first;
-                          final wynikRaw = exam['wynik']?.toString() ?? '';
-                          final wynikDouble = double.tryParse(wynikRaw);
-
-                          String wynik;
-                          if (wynikDouble == null) {
-                            wynik = '-';
-                          } else {
-                            if (wynikDouble % 1 == 0) {
-                              wynik = wynikDouble.toInt().toString();
-                            } else {
-                              wynik = wynikDouble.toStringAsFixed(1);
-                            }
-                          }
-                          final tryb = exam['tryb'] ?? exam['mode'] ?? '';
-                          final czas = exam['czas_trwania_sec']?.toString() ?? '-';
-                          final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
-
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface.withOpacity(0.05),
-                              border: Border(
-                                bottom: BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.08)),
-                              ),
-                            ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                              leading: const Icon(Icons.history),
-                              title: Text('$date — wynik: $wynik%'),
-                              subtitle: Text('Czas: ${czas}s${tryb.isNotEmpty ? " • $tryb" : ""}'),
-                              trailing: ElevatedButton(
-                                onPressed: examId == 0
-                                    ? null
-                                    : () async {
-                                        final data = await fetchExamDetailsFull(examId);
-                                        if (!context.mounted) return;
-
-                                        if (data != null) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => EgzaminPodgladView(
-                                                questions: data['questions'],
-                                                selectedAnswers: (data['selectedAnswers']).cast<String?>(),
-                                              ),
-                                            ),
-                                          );
-                                        } else {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Nie udało się wczytać podglądu.')),
-                                          );
-                                        }
-                                      },
-                                child: const Text('Podgląd'),
-                              ),
-                            ),
+                  return Column(
+                    children:
+                        examsByQual.entries.map((entry) {
+                          return LastExamCard(
+                            title: entry.key,
+                            exams: entry.value.cast(),
                           );
                         }).toList(),
-                      ),
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            );
+                  );
+                },
+              );
 
               return ListView(
                 padding: const EdgeInsets.all(16),
@@ -227,7 +126,6 @@ class StatisticsPage extends StatelessWidget {
     );
   }
 
-  // ------------------- Funkcje sieciowe -------------------
   Future<List<dynamic>> fetchUserExams() async {
     final prefs = await SharedPreferences.getInstance();
     final userName = prefs.getString('userName') ?? 'anonymous';
@@ -237,7 +135,7 @@ class StatisticsPage extends StatelessWidget {
       Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/stats_all.php'),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        'Authorization': 'Bearer $_apiKey',
       },
     );
 
@@ -246,7 +144,8 @@ class StatisticsPage extends StatelessWidget {
     final jsonData = jsonDecode(response.body);
     if (jsonData is! List) return [];
 
-    final exams = jsonData.where((e) => (e['userID'] ?? '') == userName).toList();
+    final exams =
+        jsonData.where((e) => (e['userID'] ?? '') == userName).toList();
 
     exams.sort((a, b) {
       final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
@@ -270,7 +169,7 @@ class StatisticsPage extends StatelessWidget {
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+        'Authorization': 'Bearer $_apiKey',
       },
       body: {'userName': userName},
     );
@@ -300,7 +199,6 @@ class StatisticsPage extends StatelessWidget {
   }
 }
 
-// ------------------- Komponenty pomocnicze -------------------
 class StatCard extends StatelessWidget {
   final MapEntry<String, dynamic> entry;
   final ColorScheme colorScheme;
@@ -328,11 +226,13 @@ class StatCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
               gradient: LinearGradient(
                 colors: [
-                  colorScheme.primary.withOpacity(0.85),
-                  colorScheme.primary.withOpacity(0.5),
+                  colorScheme.primary.withValues(alpha: 0.85),
+                  colorScheme.primary.withValues(alpha: 0.5),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -340,7 +240,11 @@ class StatCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.school_rounded, color: colorScheme.onPrimary, size: 30),
+                Icon(
+                  Icons.school_rounded,
+                  color: colorScheme.onPrimary,
+                  size: 30,
+                ),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
@@ -394,11 +298,14 @@ class _StatRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
       decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : Border(
-                bottom: BorderSide(color: colorScheme.onSurface.withOpacity(0.08)),
-              ),
+        border:
+            isLast
+                ? null
+                : Border(
+                  bottom: BorderSide(
+                    color: colorScheme.onSurface.withValues(alpha: 0.08),
+                  ),
+                ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -406,7 +313,196 @@ class _StatRow extends StatelessWidget {
           Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
           Text(
             value,
-            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class LastExamCard extends StatelessWidget {
+  final String title;
+  final List<Map<String, dynamic>> exams;
+
+  const LastExamCard({super.key, required this.title, required this.exams});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.primary.withValues(alpha: 0.85),
+                colorScheme.primary.withValues(alpha: 0.5),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Theme(
+            data: theme.copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              collapsedBackgroundColor: Colors.transparent,
+              title: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.school_rounded,
+                      color: colorScheme.onPrimary,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(16),
+                    ),
+                  ),
+                  child: Column(
+                    children:
+                        exams.asMap().entries.map((e) {
+                          final index = e.key;
+                          final exam = e.value;
+
+                          return LastExamRow(
+                            exam: exam,
+                            showBorder: index != exams.length - 1,
+                          );
+                        }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class LastExamRow extends StatelessWidget {
+  final Map<String, dynamic> exam;
+  final bool showBorder;
+
+  const LastExamRow({super.key, required this.exam, required this.showBorder});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final date = (exam['data_czas'] ?? '').split(' ').first;
+
+    final wynikRaw = exam['wynik']?.toString() ?? '';
+    final wynikDouble = double.tryParse(wynikRaw);
+
+    String wynik;
+    if (wynikDouble == null) {
+      wynik = '-';
+    } else {
+      wynik =
+          (wynikDouble % 1 == 0)
+              ? wynikDouble.toInt().toString()
+              : wynikDouble.toStringAsFixed(1);
+    }
+
+    final tryb = exam['tryb'] ?? exam['mode'] ?? '';
+    final czas = exam['czas_trwania_sec']?.toString() ?? '-';
+    final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        border:
+            showBorder
+                ? Border(
+                  bottom: BorderSide(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                  ),
+                )
+                : null,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "$date — wynik: $wynik%",
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  "Czas: ${czas}s${tryb.isNotEmpty ? ' • $tryb' : ''}",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          ElevatedButton(
+            onPressed:
+                examId == 0
+                    ? null
+                    : () async {
+                      final data = await fetchExamDetailsFull(examId);
+                      if (!context.mounted) return;
+
+                      if (data != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (_) => EgzaminPodgladView(
+                                  questions: data['questions'],
+                                  selectedAnswers:
+                                      (data['selectedAnswers']).cast<String?>(),
+                                ),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Nie udało się wczytać podglądu."),
+                          ),
+                        );
+                      }
+                    },
+            child: const Text("Podgląd"),
           ),
         ],
       ),
