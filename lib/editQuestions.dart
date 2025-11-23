@@ -262,6 +262,42 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   String? _tempVideoPath;
   String? _webBlobUrl;
   Timer? _previewDebounce;
+String? _firstMatch(RegExp re, String s, [int group = 1]) {
+  final m = re.firstMatch(s);
+  return m == null ? null : m.group(group);
+}
+
+String? _extractFirstImageSrcSmart(String html) {
+  // surowy <img ... src="...">
+  final raw = _firstMatch(RegExp('<img[^>]+src=["\']([^"\']+)["\']', caseSensitive: false), html);
+  if (raw != null) return raw;
+
+  // escaped: &lt;img ... src=&quot;...&quot;&gt;
+  final esc = _firstMatch(RegExp('&lt;img[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false), html);
+  if (esc != null) return esc;
+
+  return null;
+}
+
+String? _extractFirstVideoSrcSmart(String html) {
+  // <video src="...">
+  final rawVideo = _firstMatch(RegExp('<video[^>]+src=["\']([^"\']+)["\']', caseSensitive: false), html);
+  if (rawVideo != null) return rawVideo;
+
+  // <video><source src="..."></video>
+  final rawSource = _firstMatch(RegExp('<source[^>]+src=["\']([^"\']+)["\']', caseSensitive: false), html);
+  if (rawSource != null) return rawSource;
+
+  // escaped &lt;video ... src=&quot;...&quot;&gt;
+  final escVideo = _firstMatch(RegExp('&lt;video[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false), html);
+  if (escVideo != null) return escVideo;
+
+  // escaped &lt;source src=&quot;...&quot;&gt;
+  final escSource = _firstMatch(RegExp('&lt;source[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false), html);
+  if (escSource != null) return escSource;
+
+  return null;
+}
 
   void _refreshTextPreview() {
     if (_showPreview && mounted) setState(() {});
@@ -541,42 +577,90 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   void _openForEdit(Map<String, dynamic> q) {
-    setState(() {
-      editingId = int.tryParse(q['id']?.toString() ?? '');
-      final rawHtml = q['pytanie']?.toString() ?? '';
-      final imgUrl = _extractFirstTagSrc(rawHtml, 'img');
-      final vidUrl = _extractFirstTagSrc(rawHtml, 'video');
-      if (vidUrl != null) {
-        _mediaKind = MediaKind.video;
-        _uploadedVideoUrl = vidUrl;
-        _uploadedVideoFilename = _filenameFromUrl(vidUrl);
-      } else if (imgUrl != null) {
-        _mediaKind = MediaKind.image;
-        _imageCtrl.text = imgUrl;
-        _uploadedImageUrl = imgUrl;
-        _uploadedImageFilename = _filenameFromUrl(imgUrl);
-      } else {
-        _mediaKind = MediaKind.none;
-      }
-      _imageHeightPx = _parseTagHeightPx(rawHtml);
-      _imageHeightCtrl.text = _imageHeightPx?.toString() ?? '';
-      final cleaned = _stripStyleAndImage(rawHtml);
-      _contentCtrl.text = _unescapeLtGt(cleaned);
-      _odp1Ctrl.text = _answerToUi(q['odp1']?.toString());
-      _odp2Ctrl.text = _answerToUi(q['odp2']?.toString());
-      _odp3Ctrl.text = _answerToUi(q['odp3']?.toString());
-      _odp4Ctrl.text = _answerToUi(q['odp4']?.toString());
-      _opisPoprawneCtrl.text = q['opisPoprawne']?.toString() ?? '';
-      _opisNiepoprawneCtrl.text = q['opisNiepoprawne']?.toString() ?? '';
-      final poprawna = (q['poprawna']?.toString().toUpperCase() ?? 'A');
-      _correct = ['A', 'B', 'C', 'D'].contains(poprawna) ? poprawna : 'A';
+  setState(() {
+    editingId = int.tryParse(q['id']?.toString() ?? '');
+
+    final rawHtml = q['pytanie']?.toString() ?? '';
+    final unescapedHtml = _unescapeLtGt(rawHtml);
+
+    // 1) Spróbuj z tablic w JSON (jeśli są)
+    String? vidUrl =
+        (q['videos'] is List && (q['videos'] as List).isNotEmpty)
+            ? q['videos'][0]?.toString()
+            : null;
+    String? imgUrl =
+        (q['images'] is List && (q['images'] as List).isNotEmpty)
+            ? q['images'][0]?.toString()
+            : null;
+
+    // 2) Jeśli brak w tablicach – spróbuj z HTML
+    vidUrl ??= _extractFirstVideoSrcSmart(unescapedHtml);
+    imgUrl ??= _extractFirstImageSrcSmart(unescapedHtml);
+
+    // 3) Ustaw multimedia i wyczyść przeciwne bufory
+    if (vidUrl != null && vidUrl.isNotEmpty) {
+      _mediaKind = MediaKind.video;
+
+      _uploadedVideoUrl = vidUrl;
+      _uploadedVideoFilename = _filenameFromUrl(vidUrl);
+
+      // wyczyść obraz
       _imageBytes = null;
       _imageName = null;
+      _uploadedImageUrl = null;
+      _uploadedImageFilename = null;
+      _imageCtrl.clear();
+    } else if (imgUrl != null && imgUrl.isNotEmpty) {
+      _mediaKind = MediaKind.image;
+
+      _uploadedImageUrl = imgUrl;
+      _uploadedImageFilename = _filenameFromUrl(imgUrl);
+      _imageCtrl.text = imgUrl;
+
+      // wyczyść wideo
       _videoBytes = null;
       _videoName = null;
+      _uploadedVideoUrl = null;
+      _uploadedVideoFilename = null;
       _disposeLocalTempVideo();
-    });
-  }
+    } else {
+      _mediaKind = MediaKind.none;
+
+      // wyczyść oba
+      _imageBytes = null;
+      _imageName = null;
+      _uploadedImageUrl = null;
+      _uploadedImageFilename = null;
+      _imageCtrl.clear();
+
+      _videoBytes = null;
+      _videoName = null;
+      _uploadedVideoUrl = null;
+      _uploadedVideoFilename = null;
+      _disposeLocalTempVideo();
+    }
+
+    // 4) Wysokość (parsujemy na unescapowanym HTML)
+    _imageHeightPx = _parseTagHeightPx(unescapedHtml);
+    _imageHeightCtrl.text = _imageHeightPx?.toString() ?? '';
+
+    // 5) Reszta pól
+    final cleaned = _stripStyleAndImage(rawHtml);
+    _contentCtrl.text = _unescapeLtGt(cleaned);
+
+    _odp1Ctrl.text = _answerToUi(q['odp1']?.toString());
+    _odp2Ctrl.text = _answerToUi(q['odp2']?.toString());
+    _odp3Ctrl.text = _answerToUi(q['odp3']?.toString());
+    _odp4Ctrl.text = _answerToUi(q['odp4']?.toString());
+
+    _opisPoprawneCtrl.text = q['opisPoprawne']?.toString() ?? '';
+    _opisNiepoprawneCtrl.text = q['opisNiepoprawne']?.toString() ?? '';
+
+    final poprawna = (q['poprawna']?.toString().toUpperCase() ?? 'A');
+    _correct = ['A', 'B', 'C', 'D'].contains(poprawna) ? poprawna : 'A';
+  });
+}
+
 
   int? _parseTagHeightPx(String html) {
     final i1 = html.toLowerCase().indexOf('<img');
@@ -760,11 +844,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             _filenameFromUrl(_uploadedImageUrl!);
         _mediaKind = MediaKind.image;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Obrazek został wgrany.')));
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1320,29 +1399,51 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   bool _isLoadingMore = false;
 
   Widget _renderHtml(
-    String text, {
-    List<String>? images,
-    List<String>? videos,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(text, style: const TextStyle(fontSize: 16)),
-        ...?images?.map(
-          (url) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: buildZoomableImage(context, url),
+  String text, {
+  List<String>? images,
+  List<String>? videos,
+}) {
+  // Szukanie wysokości z <img>
+  final heightPx = () {
+    final reg = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false);
+    final match = reg.firstMatch(text);
+    if (match != null) {
+      return double.tryParse(match.group(1)!);
+    }
+    return null;
+  }();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(text, style: const TextStyle(fontSize: 16)),
+      ...?images?.map(
+        (url) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Center(
+            child: Image.network(
+              url,
+              fit: BoxFit.contain,
+              height: heightPx,
+            ),
           ),
         ),
-        ...?videos?.map(
-          (url) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: _InlineVideoPlayer(url: url),
+      ),
+      ...?videos?.map(
+        (url) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Center(
+            child: _InlineVideoPlayer(
+              url: url,
+              height: 400, 
+            ),
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
+
 
   Widget _buildBadge(BuildContext context, dynamic q) {
     final theme = Theme.of(context);
@@ -1910,33 +2011,34 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final colorScheme = theme.colorScheme;
     final id = int.tryParse(q['id']?.toString() ?? '');
     final answers =
-        ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-          final odp = q['odp${e.key + 1}']?.toString() ?? '';
-          final body = _unescapeLtGt(
-            odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
-          );
-          return Container(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ElevatedButton(
-              onPressed: null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colorScheme.surface,
-                foregroundColor: colorScheme.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 2,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                alignment: Alignment.centerLeft,
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              child: _renderHtml(body),
-            ),
-          );
-        }).toList();
+    ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+  final odp = q['odp${e.key + 1}']?.toString() ?? '';
+  final body = _unescapeLtGt(
+    odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
+  );
+  return Container(
+    margin: const EdgeInsets.only(bottom: 6),
+    child: ElevatedButton(
+      onPressed: null,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.primary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        elevation: 2,
+        padding: const EdgeInsets.symmetric(
+          vertical: 12,
+          horizontal: 16,
+        ),
+        alignment: Alignment.centerLeft,
+        minimumSize: const Size(double.infinity, 48),
+      ),
+      child: _renderHtml('${e.value}. $body'),
+    ),
+  );
+}).toList();
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
@@ -2070,27 +2172,30 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       );
     }
     final answers =
-        ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-          final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
-          return Container(
-            margin: const EdgeInsets.only(top: 6),
-            child: ElevatedButton(
-              onPressed: null,
-              style: ElevatedButton.styleFrom(
-                alignment: Alignment.centerLeft,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                elevation: 2,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-              ),
-              child: _renderHtml(textCtrl.text.trim()),
-            ),
-          );
-        }).toList();
+    ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+  final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
+  final body = textCtrl.text.trim();
+  return Container(
+    margin: const EdgeInsets.only(top: 6),
+    child: ElevatedButton(
+      onPressed: null,
+      style: ElevatedButton.styleFrom(
+        alignment: Alignment.centerLeft,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 2,
+        padding: const EdgeInsets.symmetric(
+          vertical: 12,
+          horizontal: 16,
+        ),
+      ),
+      // ⬇⬇⬇ DODANY PREFIKS A./B./C./D.
+      child: _renderHtml('${e.value}. $body'),
+    ),
+  );
+}).toList();
+
     return Stack(
       children: [
         ListView(
