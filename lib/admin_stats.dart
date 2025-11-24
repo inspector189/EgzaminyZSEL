@@ -36,7 +36,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
       errorMessage = null;
     });
     try {
-      final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/stats_all.php');
+      final url = Uri.parse(
+        'https://egzaminy.zsel.edu.pl/egzaminy/stats_all.php',
+      );
       final response = await http.post(
         url,
         headers: {
@@ -178,18 +180,14 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         const _SectionTitle('Statystyki według użytkownika'),
                       ],
                     ),
+                    const SizedBox(height: 12),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
-                          child: TextButton.icon(
-                            icon: const Icon(Icons.date_range),
-                            label: Text(
-                              startDate == null
-                                  ? 'Data od'
-                                  : 'Od: ${startDate!.toLocal().toString().split(' ')[0]}',
-                            ),
-                            onPressed: () async {
+                          child: InkWell(
+                            hoverColor:  colorScheme.secondary.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () async {
                               final picked = await showDatePicker(
                                 context: context,
                                 initialDate: startDate ?? DateTime.now(),
@@ -200,18 +198,47 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                 setState(() => startDate = picked);
                               }
                             },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: colorScheme.secondary,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.date_range,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    startDate == null
+                                        ? 'Data od'
+                                        : 'Od: ${startDate!.toLocal().toString().split(' ')[0]}',
+                                    style: theme.textTheme.bodyMedium!.copyWith(
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
+
                         const SizedBox(width: 8),
+
                         Expanded(
-                          child: TextButton.icon(
-                            icon: const Icon(Icons.date_range),
-                            label: Text(
-                              endDate == null
-                                  ? 'Data do'
-                                  : 'Do: ${endDate!.toLocal().toString().split(' ')[0]}',
-                            ),
-                            onPressed: () async {
+                          child: InkWell(
+                            hoverColor:  colorScheme.secondary.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () async {
                               final picked = await showDatePicker(
                                 context: context,
                                 initialDate: endDate ?? DateTime.now(),
@@ -222,6 +249,37 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                 setState(() => endDate = picked);
                               }
                             },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: colorScheme.secondary,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.date_range,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    endDate == null
+                                        ? 'Data do'
+                                        : 'Do: ${endDate!.toLocal().toString().split(' ')[0]}',
+                                    style: theme.textTheme.bodyMedium!.copyWith(
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -315,30 +373,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         ),
                       );
                     }),
-                    const SizedBox(height: 24),
-                    Center(
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.description),
-                        label: const Text('Zrób raport'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 12,
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => ReportSelectionPage(
-                                    data: filteredResults,
-                                  ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                     const SizedBox(height: 32),
                     Row(
                       children: [
@@ -350,6 +384,54 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         const SizedBox(width: 8),
                         const _SectionTitle('Statystyki według kwalifikacji'),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: InkWell(
+                        hoverColor:  colorScheme.secondary.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => ReportSelectionPage(
+                                    data: filteredResults,
+                                  ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: colorScheme.secondary,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.description,
+                                color: colorScheme.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Zrób raport',
+                                style: theme.textTheme.titleMedium!.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     ...qualifications.entries.map((entry) {

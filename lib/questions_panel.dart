@@ -12,6 +12,8 @@ class QuestionStatsPage extends StatefulWidget {
   QuestionStatsPageState createState() => QuestionStatsPageState();
 }
 
+final _apiKey = "zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^";
+
 class QuestionStatsPageState extends State<QuestionStatsPage>
     with AutomaticKeepAliveClientMixin {
   bool isLoading = true;
@@ -74,9 +76,11 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
 
     try {
       final response = await http.get(
-        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/wyswietl_trudnosci.php'),
+        Uri.parse(
+          'https://egzaminy.zsel.edu.pl/egzaminy/wyswietl_trudnosci.php',
+        ),
         headers: {
-          'Authorization': 'Bearer zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^',
+          'Authorization': 'Bearer $_apiKey',
           'Content-Type': 'application/json',
         },
       );
@@ -320,7 +324,7 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
                       odp,
                       style: TextStyle(
                         fontSize: 15,
-                        color: colorScheme.onSurface,
+                        color: isCorrect ? colorScheme.surface : colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -424,7 +428,7 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
                             )
                           else
                             SizedBox(
-                              height: 400,
+                              height: MediaQuery.of(context).size.height * 0.8,
                               child: ListView.builder(
                                 controller: controllers[kwal],
                                 addAutomaticKeepAlives: false,
