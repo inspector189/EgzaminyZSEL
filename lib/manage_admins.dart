@@ -1,145 +1,144 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'widgets/modern_admin_row.dart';
 
-const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+const String _apiBaseUrl = 'https://egzaminy.zsel.edu.pl/egzaminy';
+const String _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
 class ManageAdminsPage extends StatefulWidget {
   const ManageAdminsPage({super.key});
-
   @override
   State<ManageAdminsPage> createState() => _ManageAdminsPageState();
 }
 
 class _ManageAdminsPageState extends State<ManageAdminsPage> {
-  List users = [];
+  List<dynamic> users = [];
   bool isLoading = true;
-  String errorMessage = '';
+  bool isSuperAdmin = false;
+  String? currentUserEmail;
   final TextEditingController _emailController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    fetchUsers();
+    _loadUserAndCheckPermissions();
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    super.dispose();
-  }
+  Future<void> _loadUserAndCheckPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('userEmail');
 
-  Future<void> fetchUsers() async {
-    try {
-      final response = await http.post(
-        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/showAdmins.php'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Bearer $_apiKey',
-        },
-      );
-
-      if (kDebugMode) {
-        debugPrint('📥 Otrzymano odpowiedź: ${response.statusCode}');
-        debugPrint('Treść: ${response.body}');
-      }
-
-      if (response.statusCode == 200) {
-        if (response.body.isEmpty ||
-            response.body ==
-                '----------------------------------------------------------------------------------------------------') {
-          throw Exception('❌ Pusta odpowiedź od serwera!');
-        }
-        final data = json.decode(response.body);
-        if (data is List) {
-          setState(() {
-            users = data;
-            isLoading = false;
-            errorMessage = '';
-          });
-        } else if (data is Map && data.containsKey('error')) {
-          throw Exception('❌ Błąd serwera: ${data['error']}');
-        } else {
-          throw Exception('❌ Nieprawidłowy format odpowiedzi!');
-        }
-      } else {
-        throw Exception('❌ Kod błędu HTTP: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = e.toString();
-      });
+    if (email == null || email.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd ładowania użytkowników: $e')),
+          const SnackBar(content: Text('Brak danych logowania')),
         );
       }
-    }
-  }
-
-  bool _isSnackBarVisible = false;
-
-  Future<void> addUser(String email) async {
-    if (email.isEmpty || !email.contains('@')) {
-      if (_isSnackBarVisible) return;
-      _isSnackBarVisible = true;
-      final controller = ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ Podaj poprawny email (musi zawierać znak "@")'),
-          duration: Duration(seconds: 3),
-        ),
-      );
-      controller.closed.then((_) => _isSnackBarVisible = false);
+      setState(() => isLoading = false);
       return;
     }
 
+    setState(() => currentUserEmail = email);
+
+    await Future.wait([
+      _checkSuperAdminStatus(email),
+      _fetchAdmins(),
+    ]);
+
+    setState(() => isLoading = false);
+  }
+
+  Future<void> _checkSuperAdminStatus(String email) async {
     try {
       final response = await http.post(
-        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/add_admin.php'),
+        Uri.parse('$_apiBaseUrl/is_super_admin.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email}),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          isSuperAdmin = data['isSuperAdmin'] == true;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) print('Błąd sprawdzania Administrator Nadrzędny: $e');
+      setState(() => isSuperAdmin = false);
+    }
+  }
+
+  Future<void> _fetchAdmins() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_apiBaseUrl/showAdmins.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': 'Bearer $_apiKey',
         },
-        body: {'email': email},
       );
-
-      if (kDebugMode) {
-        debugPrint('📥 Otrzymano odpowiedź: ${response.statusCode}');
-        debugPrint('Treść: ${response.body}');
-      }
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ Administrator dodany')),
-            );
-          }
-          _emailController.clear();
-          fetchUsers();
-        } else {
-          throw Exception('❌ Dodanie administratora nie powiodło się!');
+        if (data is List) {
+          setState(() => users = data);
         }
-      } else {
-        throw Exception('❌ Kod błędu HTTP: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd przy dodawaniu administratora: $e')),
+          SnackBar(content: Text('Błąd ładowania listy: $e')),
         );
       }
     }
   }
 
-  Future<void> deleteUser(int id) async {
+  Future<void> _refreshAfterAction() async {
+    if (currentUserEmail != null) {
+      await _checkSuperAdminStatus(currentUserEmail!);
+    }
+    await _fetchAdmins();
+  }
+
+  // Akcje
+  Future<void> _addAdmin(String email) async {
+    if (!isSuperAdmin) return _noPermission();
+    if (!email.contains('@')) return _showError('Nieprawidłowy email');
+
     try {
       final response = await http.post(
-        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/delete_admin.php'),
+        Uri.parse('$_apiBaseUrl/add_admin.php'),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: {'email': email.trim()},
+      );
+      if (response.statusCode == 200 && json.decode(response.body)['success'] == true) {
+        _showSuccess('Administrator dodany');
+        _emailController.clear();
+        await _refreshAfterAction();
+      }
+    } catch (e) {
+      _showError('Błąd dodawania');
+    }
+  }
+
+ Future<void> _toggleSuperAdmin(int id, String email, bool currentlySuper) async {
+    if (!isSuperAdmin) return _noPermission();
+
+    if (email == currentUserEmail && currentlySuper) {
+      _showError('Nie możesz odebrać sobie statusu Admina Nadrzędnego!');
+      return;
+    }
+
+    final endpoint = currentlySuper
+        ? '$_apiBaseUrl/demote_super_admin.php'
+        : '$_apiBaseUrl/promote_super_admin.php';
+
+    try {
+      final response = await http.post(
+        Uri.parse(endpoint),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': 'Bearer $_apiKey',
@@ -147,33 +146,79 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         body: {'id': id.toString()},
       );
 
-      if (kDebugMode) {
-        debugPrint('📥 Otrzymano odpowiedź: ${response.statusCode}');
-        debugPrint('Treść: ${response.body}');
-      }
+      final responseBody = json.decode(response.body);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ Administrator został usunięty')),
-            );
-          }
-          fetchUsers();
-        } else {
-          throw Exception('❌ Nie udało się usunąć administratora!');
-        }
+      if (response.statusCode == 200 && responseBody['success'] == true) {
+        _showSuccess(currentlySuper
+            ? 'Odebrano status Admina Nadrzędnego'
+            : 'Nadano status Admina Nadrzędnego');
+        await _refreshAfterAction();
       } else {
-        throw Exception('❌ Kod błędu HTTP: ${response.statusCode}');
+        final errorMsg = responseBody['error'] 
+            ?? responseBody['message'] 
+            ?? 'Nieznany błąd serwera';
+        _showError(errorMsg);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Błąd przy usuwaniu administratora: $e')),
-        );
-      }
+      _showError('Brak połączenia z serwerem');
     }
+  }
+
+  Future<void> _deleteAdmin(int id, String email) async {
+    if (!isSuperAdmin) return _noPermission();
+    if (email == currentUserEmail) {
+      _showError('Nie możesz usunąć samego siebie!');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Usunąć administratora?'),
+        content: Text('Usunąć $email?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Anuluj')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Usuń', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_apiBaseUrl/delete_admin.php'),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: {'id': id.toString()},
+      );
+
+      if (response.statusCode == 200 && json.decode(response.body)['success'] == true) {
+        _showSuccess('Administrator usunięty');
+        await _refreshAfterAction();
+      }
+    } catch (e) {
+      _showError('Błąd usuwania');
+    }
+  }
+
+  void _noPermission() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Brak uprawnień Admina Nadrzędnego')),
+    );
+  }
+
+  void _showSuccess(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
   @override
@@ -182,20 +227,16 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Zarządzaj administratorami')),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
+      appBar: AppBar(title: const Text('Zarządzanie administratorami')),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Panel dodawania
+                  if (isSuperAdmin)
                     Card(
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      color: colorScheme.surfaceContainerHighest,
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -203,177 +244,106 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
                             Expanded(
                               child: TextField(
                                 controller: _emailController,
-                                decoration: InputDecoration(
-                                  labelText:
-                                      'Adres e-mail nowego administratora',
-                                  prefixIcon: const Icon(Icons.email_outlined),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Nowy administrator (email)',
+                                  prefixIcon: Icon(Icons.person_add),
                                 ),
-                                keyboardType: TextInputType.emailAddress,
-                                onSubmitted: (value) {
-                                  addUser(value.trim());
-                                },
+                                onSubmitted: (v) => _addAdmin(v.trim()),
                               ),
                             ),
                             const SizedBox(width: 12),
                             FilledButton.icon(
-                              onPressed:
-                                  () => addUser(_emailController.text.trim()),
+                              onPressed: () => _addAdmin(_emailController.text.trim()),
                               icon: const Icon(Icons.add),
                               label: const Text('Dodaj'),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
                             ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    const Card(
+                      color: Colors.orange,
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.lock_outline),
+                            SizedBox(width: 12),
+                            Text('Tryb tylko do odczytu – brak uprawnień Admina Nadrzędnego'),
                           ],
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child:
-                          users.isEmpty
-                              ? Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.admin_panel_settings_outlined,
-                                      size: 48,
-                                      color: colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 16),
+
+                  Expanded(
+                    child: users.isEmpty
+                        ? const Center(child: Text('Brak administratorów'))
+                        : ListView.builder(
+                            itemCount: users.length,
+                            itemBuilder: (ctx, i) {
+                              final user = users[i];
+                              final String userEmail = user['email'];
+                              final int userId = int.parse(user['id'].toString());
+                              final bool isThisSuper = (user['SuperAdmin'] as int?) == 1;
+                              final bool isCurrentUser = userEmail == currentUserEmail;
+
+                              return Card(
+                                child: ListTile(
+                                  title: Text(
+                                    userEmail,
+                                    style: TextStyle(
+                                      fontWeight: isCurrentUser ? FontWeight.bold : null,
+                                      color: isCurrentUser ? colorScheme.primary : null,
                                     ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'Brak adminów do zarządzania.',
-                                      style: TextStyle(
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
+                                  ),
+                                  subtitle: isThisSuper
+                                      ? const Text('Administrator Nadrzędny', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))
+                                      : null,
+                                  trailing: isSuperAdmin
+                                      ? Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: Icon(
+                                                isThisSuper ? Icons.star : Icons.star_border,
+                                                color: Colors.amber,
+                                                size: 32,
+                                              ),
+                                              tooltip: isThisSuper
+                                                  ? 'Kliknij, aby odebrać status Admina Nadrzędnego'
+                                                  : 'Kliknij, aby nadać status Admina Nadrzędnego',
+                                              onPressed: (isThisSuper && isCurrentUser)
+                                                  ? null
+                                                  : () => _toggleSuperAdmin(userId, userEmail, isThisSuper),
+                                            ),
+                                            if (!isCurrentUser)
+                                              IconButton(
+                                                icon: const Icon(Icons.delete, color: Colors.red),
+                                                tooltip: 'Usuń administratora',
+                                                onPressed: () => _deleteAdmin(userId, userEmail),
+                                              )
+                                            else
+                                              const Icon(Icons.block, color: Colors.grey),
+                                          ],
+                                        )
+                                      : const Icon(Icons.visibility, color: Colors.grey),
                                 ),
-                              )
-                              : ListView.builder(
-                                padding: EdgeInsets.zero,
-                                itemCount: users.length,
-                                itemBuilder: (context, index) {
-                                  final user = users[index];
-                                  return ModernAdminRow(
-                                    email: user['email'],
-                                    onDelete:
-                                        () => _confirmDeleteAdmin(
-                                          context,
-                                          int.parse(user['id'].toString()),
-                                          user['email'],
-                                        ),
-                                  );
-                                },
-                              ),
-                    ),
-                  ],
-                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
+            ),
     );
   }
 
-  Future<void> _confirmDeleteAdmin(
-    BuildContext context,
-    int id,
-    String email,
-  ) async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final bool? confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        final screen = MediaQuery.of(context).size;
-        final isDesktop = screen.width > 600;
-
-        return Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: isDesktop ? 1000 : double.infinity,
-              minWidth: isDesktop ? 500 : 280,
-            ),
-            child: Material(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(28),
-              clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      size: 48,
-                      color: colorScheme.error,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Usunąć administratora?',
-                      style: theme.textTheme.titleLarge,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      email,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Tego działania nie można cofnąć.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Anuluj'),
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton.icon(
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('Usuń'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colorScheme.errorContainer,
-                            foregroundColor: colorScheme.onErrorContainer,
-                          ),
-                          onPressed: () => Navigator.pop(context, true),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    if (confirmed == true) {
-      deleteUser(id);
-    }
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
   }
 }

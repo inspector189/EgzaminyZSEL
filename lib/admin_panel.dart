@@ -14,7 +14,7 @@ class AdminPanelPage extends StatelessWidget {
     final adminTiles = [
       AdminTileData(
         icon: Icons.people,
-        label: 'Zarządzaj administratorami',
+        label: 'Administratorzy',
         onTap: () {
           Navigator.push(
             context,
