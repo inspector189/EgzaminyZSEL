@@ -185,7 +185,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                       children: [
                         Expanded(
                           child: InkWell(
-                            hoverColor:  colorScheme.secondary.withValues(alpha: 0.05),
+                            hoverColor: colorScheme.secondary.withValues(
+                              alpha: 0.05,
+                            ),
                             borderRadius: BorderRadius.circular(14),
                             onTap: () async {
                               final picked = await showDatePicker(
@@ -236,7 +238,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
 
                         Expanded(
                           child: InkWell(
-                            hoverColor:  colorScheme.secondary.withValues(alpha: 0.05),
+                            hoverColor: colorScheme.secondary.withValues(
+                              alpha: 0.05,
+                            ),
                             borderRadius: BorderRadius.circular(14),
                             onTap: () async {
                               final picked = await showDatePicker(
@@ -373,7 +377,80 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         ),
                       );
                     }),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 4),
+                    Card(
+                      elevation: 3,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Raport statystyk użytkowników',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.titleSmall!.copyWith(
+                                  color: colorScheme.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Material(
+                                color: colorScheme.primaryContainer.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  hoverColor: colorScheme.secondary.withValues(
+                                    alpha: 0.25,
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) => ReportSelectionPage(
+                                              data: filteredResults,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 32,
+                                      vertical: 16,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.description,
+                                          color: colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          'Wykonaj raport PDF',
+                                          style: theme.textTheme.titleMedium!
+                                              .copyWith(
+                                                color: colorScheme.primary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Icon(
@@ -385,55 +462,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         const _SectionTitle('Statystyki według kwalifikacji'),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Center(
-                      child: InkWell(
-                        hoverColor:  colorScheme.secondary.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => ReportSelectionPage(
-                                    data: filteredResults,
-                                  ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 40,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: colorScheme.secondary,
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.description,
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Zrób raport',
-                                style: theme.textTheme.titleMedium!.copyWith(
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     ...qualifications.entries.map((entry) {
                       final q = entry.key.toUpperCase();
                       final qStats = calculateStats(entry.value);
