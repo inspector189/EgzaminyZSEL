@@ -15,6 +15,10 @@ import 'utils/zoomable_image.dart';
 
 const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
+const double _minImageHeight = 100;
+const double _maxImageHeight = 500;
+
+
 enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
 
 class EgzaminView extends StatefulWidget {
@@ -318,17 +322,37 @@ class _EgzaminViewState extends State<EgzaminView> {
           children: [
             Text(text, style: const TextStyle(fontSize: 15)),
             ...images.map(
-              (url) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: buildZoomableImage(context, url),
+            (url) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: _minImageHeight,
+                    maxHeight: _maxImageHeight,
+                  ),
+                  child: buildZoomableImage(context, url),
+                ),
               ),
             ),
+          ),
+
+
+
             ...videos.map(
               (url) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: InlineVideoPlayer(url: url),
+                child: Center(
+                  child: SizedBox(
+                    height: 400,
+                    child: InlineVideoPlayer(
+                      url: url,
+                      height: 400,
+                    ),
+                  ),
+                ),
               ),
             ),
+
           ],
         ),
       ),
@@ -397,17 +421,36 @@ class _EgzaminViewState extends State<EgzaminView> {
             const SizedBox(height: 8),
             Text(pytanieText, style: const TextStyle(fontSize: 16)),
             ...pytanieImages.map(
-              (url) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: buildZoomableImage(context, url),
+            (url) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: _minImageHeight,
+                    maxHeight: _maxImageHeight,
+                  ),
+                  child: buildZoomableImage(context, url),
+                ),
               ),
             ),
+          ),
+
+
             ...pytanieVideos.map(
-              (url) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: InlineVideoPlayer(url: url),
+            (url) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: SizedBox(
+                  height: 400,
+                  child: InlineVideoPlayer(
+                    url: url,
+                    height: 400,
+                  ),
+                ),
               ),
             ),
+          ),
+
             const SizedBox(height: 12),
             ...['A', 'B', 'C', 'D'].map((litera) {
               final key = 'odp${'ABCD'.indexOf(litera) + 1}';

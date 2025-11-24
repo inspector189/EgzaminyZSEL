@@ -444,8 +444,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       }
 
       // 4) Wysokość (parsujemy na unescapowanym HTML)
-      _imageHeightPx = _parseTagHeightPx(unescapedHtml);
-      _imageHeightCtrl.text = _imageHeightPx?.toString() ?? '';
+      _imageHeightPx = null;
+      _imageHeightCtrl.clear();
 
       // 5) Reszta pól
       final cleaned = _stripStyleAndImage(rawHtml);
@@ -858,7 +858,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       return;
     }
     if (!mounted) return;
-    final h = _imageHeightPx?.toDouble();
+    const double h = 400;
     showDialog(
       context: context,
       builder: (context) {
@@ -1197,20 +1197,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   int _displayCount = 20;
   bool _isLoadingMore = false;
 
-  Widget _renderHtml(
+    Widget _renderHtml(
     String text, {
     List<String>? images,
     List<String>? videos,
   }) {
-    // Szukanie wysokości z <img>
-    final heightPx = () {
-      final reg = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false);
-      final match = reg.firstMatch(text);
-      if (match != null) {
-        return double.tryParse(match.group(1)!);
-      }
-      return null;
-    }();
+    const double minImageHeight = 100;
+    const double maxImageHeight = 500;
+    const double videoHeight = 400;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1220,19 +1214,35 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           (url) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Center(
-              child: Image.network(url, fit: BoxFit.contain, height: heightPx),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: minImageHeight,
+                  maxHeight: maxImageHeight,
+                ),
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
           ),
         ),
         ...?videos?.map(
           (url) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: InlineVideoPlayer(url: url, height: 400)),
+            child: Center(
+              child: InlineVideoPlayer(
+                url: url,
+                height: videoHeight,
+              ),
+            ),
           ),
         ),
       ],
     );
   }
+
+
 
   Widget _buildBadge(BuildContext context, dynamic q) {
     final theme = Theme.of(context);
@@ -1486,8 +1496,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                             ),
                           ],
                         ),
-                      const SizedBox(height: 8),
-                      _heightFieldRow(),
+                      //const SizedBox(height: 8),
+                      //_heightFieldRow(),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
@@ -1747,7 +1757,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  Widget _heightFieldRow() {
+  /*Widget _heightFieldRow() {
     if (_uploadedImageUrl != null || _imageBytes != null) {
       return Row(
         children: [
@@ -1776,7 +1786,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       return Row();
     }
   }
-
+*/
   Widget _buildList() {
     final items = _filteredQuestions;
     final int displayCount = _displayCount.clamp(0, items.length);
@@ -1795,239 +1805,276 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final id = int.tryParse(q['id']?.toString() ?? '');
-    final answers =
-        ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-          final odp = q['odp${e.key + 1}']?.toString() ?? '';
-          final body = _unescapeLtGt(
-            odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
-          );
-          return Container(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ElevatedButton(
-              onPressed: null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colorScheme.surface,
-                foregroundColor: colorScheme.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 2,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                alignment: Alignment.centerLeft,
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              child: _renderHtml('${e.value}. $body'),
-            ),
-          );
-        }).toList();
+Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+  final extras = theme.extension<ExtraColors>()!;
+  final id = int.tryParse(q['id']?.toString() ?? '');
+  final poprawna = (q['poprawna']?.toString().toUpperCase() ?? 'A');
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  'Pytanie (ID: $id)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                const Spacer(),
-                _buildBadge(context, q),
-              ],
+  // domyślny kolor czcionki dla niepoprawnych odpowiedzi
+  final defaultTextColor =
+      theme.brightness == Brightness.light ? Colors.black : Colors.white;
+
+  final answers = ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+    final letter = e.value; // A/B/C/D
+    final isCorrect = letter == poprawna;
+
+    final odp = q['odp${e.key + 1}']?.toString() ?? '';
+    final body = _unescapeLtGt(
+      odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: IgnorePointer(
+        ignoring: true, // wygląd przycisku, ale bez klikalności
+        child: ElevatedButton(
+          onPressed: () {},
+          style: ElevatedButton.styleFrom(
+            // tło
+            backgroundColor:
+                isCorrect ? extras.correct : colorScheme.surface,
+            // kolor czcionki
+            foregroundColor:
+                isCorrect ? Colors.black : defaultTextColor,
+            // bez obramowania
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: _renderHtml(
-                    q['pytanie']?.toString() ?? '',
-                    images: (q['images'] as List?)?.cast<String>(),
-                    videos: (q['videos'] as List?)?.cast<String>(),
-                  ),
-                ),
-              ],
+            elevation: 2,
+            padding: const EdgeInsets.symmetric(
+              vertical: 12,
+              horizontal: 16,
             ),
-            const SizedBox(height: 10),
-            ...answers,
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                TextButton.icon(
-                  onPressed: () => _openForEdit(q),
-                  icon: Icon(Icons.edit, color: colorScheme.primary),
-                  label: const Text('Edytuj'),
-                ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: id == null ? null : () => _resetTrudnoscOne(id),
-                  icon: Icon(Icons.restart_alt, color: colorScheme.primary),
-                  label: const Text('Restartuj trudność'),
-                ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed:
-                      id == null
-                          ? null
-                          : () async {
-                            final ok =
-                                await showDialog<bool>(
-                                  context: context,
-                                  builder:
-                                      (dialogCtx) => AlertDialog(
-                                        title: const Text('Usuń pytanie'),
-                                        content: Text(
-                                          'Na pewno chcesz usunąć pytanie ID $id?',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed:
-                                                () => Navigator.pop(
-                                                  dialogCtx,
-                                                  false,
-                                                ),
-                                            child: const Text('Anuluj'),
-                                          ),
-                                          FilledButton(
-                                            onPressed:
-                                                () => Navigator.pop(
-                                                  dialogCtx,
-                                                  true,
-                                                ),
-                                            child: const Text('Usuń'),
-                                          ),
-                                        ],
-                                      ),
-                                ) ??
-                                false;
-                            if (!mounted) return;
-                            if (ok) await _deleteQuestion(id);
-                          },
-                  icon: Icon(Icons.delete_outline, color: colorScheme.primary),
-                  label: const Text('Usuń'),
-                ),
-              ],
-            ),
-          ],
+            alignment: Alignment.centerLeft,
+            minimumSize: const Size(double.infinity, 48),
+          ),
+          child: _renderHtml('$letter. $body'),
         ),
+      ),
+    );
+  }).toList();
+
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 8),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Pytanie (ID: $id)',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const Spacer(),
+              _buildBadge(context, q),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: _renderHtml(
+                  q['pytanie']?.toString() ?? '',
+                  images: (q['images'] as List?)?.cast<String>(),
+                  videos: (q['videos'] as List?)?.cast<String>(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...answers,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => _openForEdit(q),
+                icon: Icon(Icons.edit, color: colorScheme.primary),
+                label: const Text('Edytuj'),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: id == null ? null : () => _resetTrudnoscOne(id),
+                icon: Icon(Icons.restart_alt, color: colorScheme.primary),
+                label: const Text('Restartuj trudność'),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: id == null
+                    ? null
+                    : () async {
+                        final ok = await showDialog<bool>(
+                              context: context,
+                              builder: (dialogCtx) => AlertDialog(
+                                title: const Text('Usuń pytanie'),
+                                content: Text(
+                                  'Na pewno chcesz usunąć pytanie ID $id?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogCtx, false),
+                                    child: const Text('Anuluj'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogCtx, true),
+                                    child: const Text('Usuń'),
+                                  ),
+                                ],
+                              ),
+                            ) ??
+                            false;
+                        if (!mounted) return;
+                        if (ok) await _deleteQuestion(id);
+                      },
+                icon: Icon(Icons.delete_outline, color: colorScheme.primary),
+                label: const Text('Usuń'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Widget _buildLivePreview(BuildContext context) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+  final extras = theme.extension<ExtraColors>()!;
+
+  // domyślny kolor czcionki dla niepoprawnych odpowiedzi
+  final defaultTextColor =
+      theme.brightness == Brightness.light ? Colors.black : Colors.white;
+
+    Widget? mediaWidget;
+  if (_mediaKind == MediaKind.image) {
+    String? imgSrc;
+    if (_uploadedImageUrl != null && _uploadedImageUrl!.isNotEmpty) {
+      imgSrc = _uploadedImageUrl!;
+    } else if (_imageCtrl.text.trim().isNotEmpty) {
+      imgSrc = _imageCtrl.text.trim();
+    } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
+      final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
+      final mime = ext == 'jpg' ? 'jpeg' : ext;
+      imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
+    }
+
+    if (imgSrc != null) {
+      mediaWidget = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: 100,
+              maxHeight: 500,
+            ),
+            child: Image.network(
+              imgSrc,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      );
+    }
+  } else if (_mediaKind == MediaKind.video && _uploadedVideoUrl != null) {
+    mediaWidget = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: InlineVideoPlayer(
+        url: _uploadedVideoUrl!,
+        height: 400,
       ),
     );
   }
 
-  Widget _buildLivePreview(BuildContext context) {
-    final theme = Theme.of(context);
-    Widget? mediaWidget;
-    if (_mediaKind == MediaKind.image) {
-      String? imgSrc;
-      if (_uploadedImageUrl != null && _uploadedImageUrl!.isNotEmpty) {
-        imgSrc = _uploadedImageUrl!;
-      } else if (_imageCtrl.text.trim().isNotEmpty) {
-        imgSrc = _imageCtrl.text.trim();
-      } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
-        final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
-        final mime = ext == 'jpg' ? 'jpeg' : ext;
-        imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
-      }
-      if (imgSrc != null) {
-        mediaWidget = Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Image.network(
-            imgSrc,
-            height: _imageHeightPx?.toDouble(),
-            fit: BoxFit.contain,
-          ),
-        );
-      }
-    } else if (_mediaKind == MediaKind.video && _uploadedVideoUrl != null) {
-      mediaWidget = Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: InlineVideoPlayer(
-          url: _uploadedVideoUrl!,
-          height: _imageHeightPx?.toDouble(),
-        ),
-      );
-    }
-    final answers =
-        ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-          final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
-          final body = textCtrl.text.trim();
-          return Container(
-            margin: const EdgeInsets.only(top: 6),
-            child: ElevatedButton(
-              onPressed: null,
-              style: ElevatedButton.styleFrom(
-                alignment: Alignment.centerLeft,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                elevation: 2,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-              ),
-              child: _renderHtml('${e.value}. $body'),
-            ),
-          );
-        }).toList();
 
-    return Stack(
-      children: [
-        ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text('Podgląd pytania', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _renderHtml(_contentCtrl.text.trim()),
-                    if (mediaWidget != null) mediaWidget,
-                    ...answers,
-                    if (_opisPoprawneCtrl.text.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: _renderHtml(_opisPoprawneCtrl.text.trim()),
-                      ),
-                    if (_opisNiepoprawneCtrl.text.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: _renderHtml(_opisNiepoprawneCtrl.text.trim()),
-                      ),
-                  ],
-                ),
+  final answers = ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+    final letter = e.value;
+    final isCorrect = letter == _correct;
+
+    final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
+    final body = textCtrl.text.trim();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      child: IgnorePointer(
+        ignoring: true,
+        child: ElevatedButton(
+          onPressed: () {},
+          style: ElevatedButton.styleFrom(
+            backgroundColor:
+                isCorrect ? extras.correct : colorScheme.surface,
+            foregroundColor:
+                isCorrect ? Colors.black : defaultTextColor,
+            alignment: Alignment.centerLeft,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 2,
+            padding: const EdgeInsets.symmetric(
+              vertical: 12,
+              horizontal: 16,
+            ),
+          ),
+          child: _renderHtml('$letter. $body'),
+        ),
+      ),
+    );
+  }).toList();
+
+  return Stack(
+    children: [
+      ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('Podgląd pytania', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _renderHtml(_contentCtrl.text.trim()),
+                  if (mediaWidget != null) mediaWidget,
+                  ...answers,
+                  if (_opisPoprawneCtrl.text.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: _renderHtml(_opisPoprawneCtrl.text.trim()),
+                    ),
+                  if (_opisNiepoprawneCtrl.text.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: _renderHtml(_opisNiepoprawneCtrl.text.trim()),
+                    ),
+                ],
               ),
             ),
-          ],
-        ),
-        Positioned(
-          top: 8,
-          right: 8,
-          child: IconButton(
-            tooltip: 'Zamknij podgląd',
-            icon: const Icon(Icons.close),
-            onPressed: () => setState(() => _showPreview = false),
           ),
+        ],
+      ),
+      Positioned(
+        top: 8,
+        right: 8,
+        child: IconButton(
+          tooltip: 'Zamknij podgląd',
+          icon: const Icon(Icons.close),
+          onPressed: () => setState(() => _showPreview = false),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
+
 }
 
 Widget _buildShimmerCard(BuildContext context) {
