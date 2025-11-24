@@ -84,7 +84,7 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              initialValue: selectedQualification,
+              value: selectedQualification,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'Wybierz kwalifikację',

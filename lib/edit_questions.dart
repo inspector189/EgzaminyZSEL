@@ -17,6 +17,8 @@ const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
 enum MediaKind { none, image, video }
 
+enum AnswerKind { text, image }
+
 class EditQuestionsPage extends StatefulWidget {
   const EditQuestionsPage({super.key, required this.qualification});
   final String qualification;
@@ -188,7 +190,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   final TextEditingController _textSearchCtrl = TextEditingController();
   final ScrollController _leftPanelScroll = ScrollController();
 
-  int? editingId;
+    int? editingId;
   final TextEditingController _imageCtrl = TextEditingController();
   final TextEditingController _contentCtrl = TextEditingController();
   final TextEditingController _odp1Ctrl = TextEditingController();
@@ -210,6 +212,32 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   String? _videoName;
   String? _uploadedVideoUrl;
   String? _uploadedVideoFilename;
+
+  // --- nowe: tryb odpowiedzi tekst/obrazek + dane obrazków ABCD ---
+  AnswerKind _odp1Kind = AnswerKind.text;
+  AnswerKind _odp2Kind = AnswerKind.text;
+  AnswerKind _odp3Kind = AnswerKind.text;
+  AnswerKind _odp4Kind = AnswerKind.text;
+
+  Uint8List? _odp1ImageBytes;
+  String? _odp1ImageName;
+  String? _odp1UploadedImageUrl;
+  String? _odp1UploadedImageFilename;
+
+  Uint8List? _odp2ImageBytes;
+  String? _odp2ImageName;
+  String? _odp2UploadedImageUrl;
+  String? _odp2UploadedImageFilename;
+
+  Uint8List? _odp3ImageBytes;
+  String? _odp3ImageName;
+  String? _odp3UploadedImageUrl;
+  String? _odp3UploadedImageFilename;
+
+  Uint8List? _odp4ImageBytes;
+  String? _odp4ImageName;
+  String? _odp4UploadedImageUrl;
+  String? _odp4UploadedImageFilename;
 
   bool _isUploading = false;
   bool _showPreview = false;
@@ -302,6 +330,15 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final res = await http.get(url);
     if (res.statusCode == 200 && res.body.isNotEmpty) {
       final decoded = json.decode(res.body);
+      for (final q in decoded) {
+        if (q['pytanie'] is String) {
+          q['pytanie'] = q['pytanie'].toString().replaceAll(
+            RegExp('<img[^>]*>', caseSensitive: false),
+            '',
+          );
+        }
+      }
+
       if (decoded is List) return decoded;
       throw 'Nieprawidłowy format danych pytań';
     }
@@ -350,7 +387,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     setState(() => searchText = value.trim());
   }
 
-  void _startNewQuestion() {
+    void _startNewQuestion() {
     _showPreview = false;
     setState(() {
       editingId = null;
@@ -363,23 +400,94 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _opisPoprawneCtrl.clear();
       _opisNiepoprawneCtrl.clear();
       _correct = 'A';
+
       _imageBytes = null;
       _imageName = null;
       _uploadedImageUrl = null;
       _uploadedImageFilename = null;
+
       _videoBytes = null;
       _videoName = null;
       _uploadedVideoUrl = null;
       _uploadedVideoFilename = null;
+
       _mediaKind = MediaKind.none;
       _isUploading = false;
       _imageHeightPx = null;
       _imageHeightCtrl.clear();
+
+      // odpowiedzi A–D zresetowane do trybu tekstowego
+      _odp1Kind = AnswerKind.text;
+      _odp2Kind = AnswerKind.text;
+      _odp3Kind = AnswerKind.text;
+      _odp4Kind = AnswerKind.text;
+
+      _odp1ImageBytes = null;
+      _odp1ImageName = null;
+      _odp1UploadedImageUrl = null;
+      _odp1UploadedImageFilename = null;
+
+      _odp2ImageBytes = null;
+      _odp2ImageName = null;
+      _odp2UploadedImageUrl = null;
+      _odp2UploadedImageFilename = null;
+
+      _odp3ImageBytes = null;
+      _odp3ImageName = null;
+      _odp3UploadedImageUrl = null;
+      _odp3UploadedImageFilename = null;
+
+      _odp4ImageBytes = null;
+      _odp4ImageName = null;
+      _odp4UploadedImageUrl = null;
+      _odp4UploadedImageFilename = null;
+
       _disposeLocalTempVideo();
     });
   }
+  void _setupAnswerKindFromRaw(String? raw, int index) {
+    final html = _unescapeLtGt(raw ?? '');
+    final hasImg = html.toLowerCase().contains('<img');
+    final imgUrl = _extractFirstImageSrcSmart(html);
 
-  void _openForEdit(Map<String, dynamic> q) {
+    switch (index) {
+      case 1:
+        _odp1Kind = hasImg ? AnswerKind.image : AnswerKind.text;
+        _odp1UploadedImageUrl = imgUrl;
+        _odp1UploadedImageFilename =
+            imgUrl != null ? _filenameFromUrl(imgUrl) : null;
+        _odp1ImageBytes = null;
+        _odp1ImageName = null;
+        break;
+      case 2:
+        _odp2Kind = hasImg ? AnswerKind.image : AnswerKind.text;
+        _odp2UploadedImageUrl = imgUrl;
+        _odp2UploadedImageFilename =
+            imgUrl != null ? _filenameFromUrl(imgUrl) : null;
+        _odp2ImageBytes = null;
+        _odp2ImageName = null;
+        break;
+      case 3:
+        _odp3Kind = hasImg ? AnswerKind.image : AnswerKind.text;
+        _odp3UploadedImageUrl = imgUrl;
+        _odp3UploadedImageFilename =
+            imgUrl != null ? _filenameFromUrl(imgUrl) : null;
+        _odp3ImageBytes = null;
+        _odp3ImageName = null;
+        break;
+      case 4:
+        _odp4Kind = hasImg ? AnswerKind.image : AnswerKind.text;
+        _odp4UploadedImageUrl = imgUrl;
+        _odp4UploadedImageFilename =
+            imgUrl != null ? _filenameFromUrl(imgUrl) : null;
+        _odp4ImageBytes = null;
+        _odp4ImageName = null;
+        break;
+    }
+  }
+
+
+    void _openForEdit(Map<String, dynamic> q) {
     setState(() {
       editingId = int.tryParse(q['id']?.toString() ?? '');
 
@@ -456,6 +564,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _odp3Ctrl.text = _answerToUi(q['odp3']?.toString());
       _odp4Ctrl.text = _answerToUi(q['odp4']?.toString());
 
+      // ustaw tryb odpowiedzi (tekst/obrazek) na podstawie HTML
+      _setupAnswerKindFromRaw(q['odp1']?.toString(), 1);
+      _setupAnswerKindFromRaw(q['odp2']?.toString(), 2);
+      _setupAnswerKindFromRaw(q['odp3']?.toString(), 3);
+      _setupAnswerKindFromRaw(q['odp4']?.toString(), 4);
+
       _opisPoprawneCtrl.text = q['opisPoprawne']?.toString() ?? '';
       _opisNiepoprawneCtrl.text = q['opisNiepoprawne']?.toString() ?? '';
 
@@ -463,6 +577,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _correct = ['A', 'B', 'C', 'D'].contains(poprawna) ? poprawna : 'A';
     });
   }
+
 
   int? _parseTagHeightPx(String html) {
     final i1 = html.toLowerCase().indexOf('<img');
@@ -792,6 +907,151 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       );
     }
   }
+  Future<void> _pickAnswerImage(int index) async {
+    try {
+      final typeGroup = const XTypeGroup(
+        label: 'images',
+        extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+      );
+      final XFile? file = await openFile(acceptedTypeGroups: [typeGroup]);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+
+      setState(() {
+        switch (index) {
+          case 1:
+            _odp1Kind = AnswerKind.image;
+            _odp1ImageBytes = bytes;
+            _odp1ImageName = file.name;
+            _odp1UploadedImageUrl = null;
+            _odp1UploadedImageFilename = null;
+            break;
+          case 2:
+            _odp2Kind = AnswerKind.image;
+            _odp2ImageBytes = bytes;
+            _odp2ImageName = file.name;
+            _odp2UploadedImageUrl = null;
+            _odp2UploadedImageFilename = null;
+            break;
+          case 3:
+            _odp3Kind = AnswerKind.image;
+            _odp3ImageBytes = bytes;
+            _odp3ImageName = file.name;
+            _odp3UploadedImageUrl = null;
+            _odp3UploadedImageFilename = null;
+            break;
+          case 4:
+            _odp4Kind = AnswerKind.image;
+            _odp4ImageBytes = bytes;
+            _odp4ImageName = file.name;
+            _odp4UploadedImageUrl = null;
+            _odp4UploadedImageFilename = null;
+            break;
+        }
+      });
+      _refreshIfPreview(immediate: true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się otworzyć obrazka odpowiedzi: $e')),
+      );
+    }
+  }
+
+  Future<void> _uploadAnswerImage(int index) async {
+    Uint8List? bytes;
+    String? name;
+
+    switch (index) {
+      case 1:
+        bytes = _odp1ImageBytes;
+        name = _odp1ImageName;
+        break;
+      case 2:
+        bytes = _odp2ImageBytes;
+        name = _odp2ImageName;
+        break;
+      case 3:
+        bytes = _odp3ImageBytes;
+        name = _odp3ImageName;
+        break;
+      case 4:
+        bytes = _odp4ImageBytes;
+        name = _odp4ImageName;
+        break;
+    }
+
+    if (bytes == null || name == null) return;
+
+    setState(() => _isUploading = true);
+    try {
+      final uri = Uri.parse(
+        'https://egzaminy.zsel.edu.pl/egzaminy/upload_image_next.php',
+      );
+      String ext = name.split('.').last.toLowerCase();
+      if (ext.isEmpty) ext = 'jpg';
+      final mediaType = http_parser.MediaType(
+        'image',
+        ext == 'jpg' ? 'jpeg' : ext,
+      );
+      final req = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $_apiKey'
+        ..headers['X-API-Key'] = _apiKey
+        ..headers['Accept'] = 'application/json'
+        ..fields['kwalifikacja'] = _sanitizedTable()
+        ..fields['egzamin'] = _sanitizedTable()
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            bytes,
+            filename: name,
+            contentType: mediaType,
+          ),
+        );
+
+      final res = await http.Response.fromStream(await req.send());
+      if (res.statusCode != 200) {
+        throw 'Upload HTTP ${res.statusCode}: ${res.body}';
+      }
+      final data = jsonDecode(res.body);
+      if (data['ok'] != true || data['url'] == null) {
+        throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
+      }
+
+      setState(() {
+        final url = data['url'] as String;
+        final filename =
+            (data['filename'] as String?) ?? _filenameFromUrl(url);
+
+        switch (index) {
+          case 1:
+            _odp1UploadedImageUrl = url;
+            _odp1UploadedImageFilename = filename;
+            break;
+          case 2:
+            _odp2UploadedImageUrl = url;
+            _odp2UploadedImageFilename = filename;
+            break;
+          case 3:
+            _odp3UploadedImageUrl = url;
+            _odp3UploadedImageFilename = filename;
+            break;
+          case 4:
+            _odp4UploadedImageUrl = url;
+            _odp4UploadedImageFilename = filename;
+            break;
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd uploadu obrazka odpowiedzi: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
 
   Future<void> _uploadVideo() async {
     if (_videoBytes == null || _videoName == null) return;
@@ -916,20 +1176,61 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     _refreshIfPreview(immediate: true);
   }
 
-  Future<void> _saveQuestion() async {
+    Future<void> _saveQuestion() async {
     final pyt = _contentCtrl.text.trim();
-    final a = _odp1Ctrl.text.trim();
-    final b = _odp2Ctrl.text.trim();
-    final c = _odp3Ctrl.text.trim();
-    final d = _odp4Ctrl.text.trim();
-    if (pyt.isEmpty || a.isEmpty || b.isEmpty || c.isEmpty || d.isEmpty) {
+
+    String _ansText(int i) =>
+        [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][i].text.trim();
+
+    AnswerKind _ansKind(int i) =>
+        [_odp1Kind, _odp2Kind, _odp3Kind, _odp4Kind][i];
+
+    bool _hasImageForIndex(int i) {
+      switch (i) {
+        case 0:
+          return _odp1ImageBytes != null || _odp1UploadedImageUrl != null;
+        case 1:
+          return _odp2ImageBytes != null || _odp2UploadedImageUrl != null;
+        case 2:
+          return _odp3ImageBytes != null || _odp3UploadedImageUrl != null;
+        default:
+          return _odp4ImageBytes != null || _odp4UploadedImageUrl != null;
+      }
+    }
+
+    if (pyt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Uzupełnij treść i wszystkie odpowiedzi.'),
-        ),
+        const SnackBar(content: Text('Uzupełnij treść pytania.')),
       );
       return;
     }
+
+    final letters = ['A', 'B', 'C', 'D'];
+    for (int i = 0; i < 4; i++) {
+      if (_ansKind(i) == AnswerKind.text) {
+        if (_ansText(i).isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Uzupełnij tekst odpowiedzi ${letters[i]}.'),
+            ),
+          );
+          return;
+        }
+      } else {
+        if (!_hasImageForIndex(i)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Wybierz obrazek dla odpowiedzi ${letters[i]} lub przełącz na tekst.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    // multimedia pytania
     if (_mediaKind == MediaKind.image &&
         _uploadedImageUrl == null &&
         _imageBytes != null &&
@@ -944,18 +1245,98 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       await _uploadVideo();
       if (_uploadedVideoUrl == null) return;
     }
+
+    // upload obrazków odpowiedzi, jeśli jeszcze nie wrzucone
+    for (int idx = 1; idx <= 4; idx++) {
+      AnswerKind kind;
+      Uint8List? bytes;
+      String? url;
+
+      switch (idx) {
+        case 1:
+          kind = _odp1Kind;
+          bytes = _odp1ImageBytes;
+          url = _odp1UploadedImageUrl;
+          break;
+        case 2:
+          kind = _odp2Kind;
+          bytes = _odp2ImageBytes;
+          url = _odp2UploadedImageUrl;
+          break;
+        case 3:
+          kind = _odp3Kind;
+          bytes = _odp3ImageBytes;
+          url = _odp3UploadedImageUrl;
+          break;
+        default:
+          kind = _odp4Kind;
+          bytes = _odp4ImageBytes;
+          url = _odp4UploadedImageUrl;
+      }
+
+      if (kind == AnswerKind.image &&
+          url == null &&
+          bytes != null &&
+          bytes.isNotEmpty) {
+        await _uploadAnswerImage(idx);
+        switch (idx) {
+          case 1:
+            if (_odp1UploadedImageUrl == null) return;
+            break;
+          case 2:
+            if (_odp2UploadedImageUrl == null) return;
+            break;
+          case 3:
+            if (_odp3UploadedImageUrl == null) return;
+            break;
+          case 4:
+            if (_odp4UploadedImageUrl == null) return;
+            break;
+        }
+      }
+    }
+
     final payload = <String, dynamic>{
       'egzamin': _sanitizedTable(),
       'pytanie': pyt,
-      'odp1': a,
-      'odp2': b,
-      'odp3': c,
-      'odp4': d,
       'poprawna': _correct,
       'opisPoprawne': _opisPoprawneCtrl.text.trim(),
       'opisNiepoprawne': _opisNiepoprawneCtrl.text.trim(),
       if (editingId != null) 'id': editingId,
     };
+
+    // odpowiedzi A–D
+    for (int i = 0; i < 4; i++) {
+      final text = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][i].text.trim();
+      final kind = [_odp1Kind, _odp2Kind, _odp3Kind, _odp4Kind][i];
+
+      String? filename;
+      switch (i) {
+        case 0:
+          filename = _odp1UploadedImageFilename;
+          break;
+        case 1:
+          filename = _odp2UploadedImageFilename;
+          break;
+        case 2:
+          filename = _odp3UploadedImageFilename;
+          break;
+        case 3:
+          filename = _odp4UploadedImageFilename;
+          break;
+      }
+
+      if (kind == AnswerKind.text) {
+        payload['odp${i + 1}'] = text;
+      } else {
+        if (filename != null && filename.isNotEmpty) {
+          payload['odp${i + 1}_img_filename'] = filename;
+        }
+        // tekst jako opis/alt
+        payload['odp${i + 1}'] = text;
+      }
+    }
+
     if (_mediaKind == MediaKind.image) {
       payload['img_filename'] =
           _uploadedImageFilename ?? _filenameFromUrl(_imageCtrl.text.trim());
@@ -968,6 +1349,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         payload['video_height'] = _imageHeightPx;
       }
     }
+
     try {
       final res = await http.post(
         Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/add_question.php'),
@@ -1008,6 +1390,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       ).showSnackBar(SnackBar(content: Text('Błąd zapisu: $e')));
     }
   }
+
 
   Future<void> _deleteQuestion(int id) async {
     try {
@@ -1197,51 +1580,71 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   int _displayCount = 20;
   bool _isLoadingMore = false;
 
-    Widget _renderHtml(
-    String text, {
-    List<String>? images,
-    List<String>? videos,
-  }) {
-    const double minImageHeight = 100;
-    const double maxImageHeight = 500;
-    const double videoHeight = 400;
+        Widget _renderHtml(
+  String text, {
+  List<String>? images,
+  List<String>? videos,
+  bool extractInlineImages = true,
+  double minImageHeight = 100,
+  double maxImageHeight = 500,
+}) {
+  const double videoHeight = 400;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(text, style: const TextStyle(fontSize: 16)),
-        ...?images?.map(
-          (url) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minHeight: minImageHeight,
-                  maxHeight: maxImageHeight,
-                ),
-                child: Image.network(
-                  url,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ),
-        ),
-        ...?videos?.map(
-          (url) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: InlineVideoPlayer(
-                url: url,
-                height: videoHeight,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+  // odkoduj &lt; &gt;
+  String html = _unescapeLtGt(text);
+  final List<String> allImages = [...?images];
+
+  // tylko jeśli chcemy wyciągać <img> z samego tekstu
+  if (extractInlineImages) {
+    final imgFromBody = _extractFirstImageSrcSmart(html);
+    if (imgFromBody != null) {
+      allImages.add(imgFromBody);
+      html = html.replaceAll(
+        RegExp('<img[^>]*>', caseSensitive: false),
+        '',
+      );
+    }
   }
 
+  // proste "odcięcie" znaczników HTML
+  String plain = html.replaceAll(RegExp('<[^>]+>'), '').trim();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (plain.isNotEmpty)
+        Text(plain, style: const TextStyle(fontSize: 16)),
+      ...allImages.map(
+        (url) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: minImageHeight,
+                maxHeight: maxImageHeight,
+              ),
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      ),
+      ...?videos?.map(
+        (url) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Center(
+            child: InlineVideoPlayer(
+              url: url,
+              height: videoHeight,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
 
   Widget _buildBadge(BuildContext context, dynamic q) {
@@ -1327,6 +1730,148 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           Expanded(child: rightList),
         ],
       ),
+    );
+  }
+  Widget _buildAnswerEditor(int index, String label) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final ctrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][index];
+    final letter = ['A', 'B', 'C', 'D'][index];
+
+    AnswerKind kind;
+    String? fileLabel;
+    bool hasImage = false;
+
+    switch (index) {
+      case 0:
+        kind = _odp1Kind;
+        fileLabel = _odp1UploadedImageUrl ?? _odp1ImageName;
+        hasImage = _odp1ImageBytes != null || _odp1UploadedImageUrl != null;
+        break;
+      case 1:
+        kind = _odp2Kind;
+        fileLabel = _odp2UploadedImageUrl ?? _odp2ImageName;
+        hasImage = _odp2ImageBytes != null || _odp2UploadedImageUrl != null;
+        break;
+      case 2:
+        kind = _odp3Kind;
+        fileLabel = _odp3UploadedImageUrl ?? _odp3ImageName;
+        hasImage = _odp3ImageBytes != null || _odp3UploadedImageUrl != null;
+        break;
+      default:
+        kind = _odp4Kind;
+        fileLabel = _odp4UploadedImageUrl ?? _odp4ImageName;
+        hasImage = _odp4ImageBytes != null || _odp4UploadedImageUrl != null;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(label),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('Tekst'),
+              selected: kind == AnswerKind.text,
+              onSelected: (_) {
+                setState(() {
+                  switch (index) {
+                    case 0:
+                      _odp1Kind = AnswerKind.text;
+                      break;
+                    case 1:
+                      _odp2Kind = AnswerKind.text;
+                      break;
+                    case 2:
+                      _odp3Kind = AnswerKind.text;
+                      break;
+                    case 3:
+                      _odp4Kind = AnswerKind.text;
+                      break;
+                  }
+                });
+              },
+            ),
+            const SizedBox(width: 6),
+            ChoiceChip(
+              label: const Text('Obrazek'),
+              selected: kind == AnswerKind.image,
+              onSelected: (_) {
+                setState(() {
+                  switch (index) {
+                    case 0:
+                      _odp1Kind = AnswerKind.image;
+                      break;
+                    case 1:
+                      _odp2Kind = AnswerKind.image;
+                      break;
+                    case 2:
+                      _odp3Kind = AnswerKind.image;
+                      break;
+                    case 3:
+                      _odp4Kind = AnswerKind.image;
+                      break;
+                  }
+                });
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (kind == AnswerKind.text)
+          TextField(
+            controller: ctrl,
+            onChanged: (_) => _refreshTextPreview(),
+            decoration: InputDecoration(
+              labelText: 'Odpowiedź $letter (tekst)',
+              border: const OutlineInputBorder(),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: colorScheme.primary),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: colorScheme.secondary,
+                  width: 2.0,
+                ),
+              ),
+              isDense: true,
+            ),
+          )
+        else
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _pickAnswerImage(index + 1),
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Wybierz obrazek'),
+                  ),
+                  const SizedBox(width: 8),
+                  if (hasImage)
+                    Expanded(
+                      child: Text(
+                        fileLabel ?? '',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: ctrl,
+                onChanged: (_) => _refreshTextPreview(),
+                decoration: const InputDecoration(
+                  labelText: 'Opis / alt (opcjonalnie)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 
@@ -1632,87 +2177,20 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 maxLines: 4,
                 minLines: 3,
               ),
-              const SizedBox(height: 24),
+                            const SizedBox(height: 24),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextField(
-                    controller: _odp1Ctrl,
-                    onChanged: (_) => _refreshTextPreview(),
-                    decoration: InputDecoration(
-                      labelText: 'Odpowiedź A',
-                      border: OutlineInputBorder(),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: colorScheme.primary),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: colorScheme.secondary,
-                          width: 2.0,
-                        ),
-                      ),
-                      isDense: true,
-                    ),
-                  ),
+                  _buildAnswerEditor(0, 'Odpowiedź A'),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _odp2Ctrl,
-                    onChanged: (_) => _refreshTextPreview(),
-                    decoration: InputDecoration(
-                      labelText: 'Odpowiedź B',
-                      border: OutlineInputBorder(),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: colorScheme.primary),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: colorScheme.secondary,
-                          width: 2.0,
-                        ),
-                      ),
-                      isDense: true,
-                    ),
-                  ),
+                  _buildAnswerEditor(1, 'Odpowiedź B'),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _odp3Ctrl,
-                    onChanged: (_) => _refreshTextPreview(),
-                    decoration: InputDecoration(
-                      labelText: 'Odpowiedź C',
-                      border: OutlineInputBorder(),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: colorScheme.primary),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: colorScheme.secondary,
-                          width: 2.0,
-                        ),
-                      ),
-                      isDense: true,
-                    ),
-                  ),
+                  _buildAnswerEditor(2, 'Odpowiedź C'),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _odp4Ctrl,
-                    onChanged: (_) => _refreshTextPreview(),
-                    decoration: InputDecoration(
-                      labelText: 'Odpowiedź D',
-                      border: OutlineInputBorder(),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: colorScheme.primary),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: colorScheme.secondary,
-                          width: 2.0,
-                        ),
-                      ),
-                      isDense: true,
-                    ),
-                  ),
+                  _buildAnswerEditor(3, 'Odpowiedź D'),
                 ],
               ),
+
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1804,8 +2282,33 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       },
     );
   }
+  Widget _buildAnswerImage({String? url, Uint8List? bytes}) {
+  if (url == null || url.isEmpty) {
+    if (bytes == null || bytes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+  }
 
-Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
+  Widget img;
+  if (url != null && url.isNotEmpty) {
+    img = Image.network(url, fit: BoxFit.contain);
+  } else {
+    img = Image.memory(bytes!, fit: BoxFit.contain);
+  }
+
+  return Align(
+    alignment: Alignment.centerLeft, // obrazek przy lewej krawędzi
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(
+        minHeight: 50,
+        maxHeight: 200, // <--- limit wysokości odpowiedzi
+      ),
+      child: img,
+    ),
+  );
+}
+
+  Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
   final extras = theme.extension<ExtraColors>()!;
@@ -1816,14 +2319,48 @@ Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
   final defaultTextColor =
       theme.brightness == Brightness.light ? Colors.black : Colors.white;
 
+  // --- NOWE: przygotuj listę obrazków TYLKO dla treści pytania ---
+
+  // 1) surowa lista obrazków zwrócona przez backend
+  final rawImages =
+      (q['images'] is List) ? (q['images'] as List).cast<String>() : <String>[];
+
+  // 2) zbierz URL-e obrazków, które pojawiają się w odpowiedziach A–D
+  final Set<String> answerImageUrls = {};
+  for (int i = 1; i <= 4; i++) {
+    final odpRaw = q['odp$i']?.toString() ?? '';
+    final odpHtml = _unescapeLtGt(odpRaw);
+    final img = _extractFirstImageSrcSmart(odpHtml);
+    if (img != null && img.isNotEmpty) {
+      answerImageUrls.add(img);
+    }
+  }
+
+  // 3) z listy obrazków pytania usuń te, które są użyte w odpowiedziach
+  final questionImages =
+      rawImages.where((url) => !answerImageUrls.contains(url)).toList();
+
+  // --- budowanie odpowiedzi A–D (tekst + ewentualny obrazek) ---
   final answers = ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-    final letter = e.value; // A/B/C/D
+    final index = e.key;      // 0..3
+    final letter = e.value;   // A/B/C/D
     final isCorrect = letter == poprawna;
 
-    final odp = q['odp${e.key + 1}']?.toString() ?? '';
-    final body = _unescapeLtGt(
-      odp.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
+    final odpRaw = q['odp${index + 1}']?.toString() ?? '';
+    final odpHtml = _unescapeLtGt(
+      odpRaw.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
     );
+
+    // wyciągamy <img> z odpowiedzi (jeśli w HTML-u się pojawia)
+    final imgFromBody = _extractFirstImageSrcSmart(odpHtml);
+    String odpTextOnly = odpHtml;
+    if (imgFromBody != null) {
+      odpTextOnly = odpHtml.replaceAll(
+        RegExp('<img[^>]*>', caseSensitive: false),
+        '',
+      );
+    }
+    final odpPlain = odpTextOnly.replaceAll(RegExp('<[^>]+>'), '').trim();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -1832,13 +2369,10 @@ Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
         child: ElevatedButton(
           onPressed: () {},
           style: ElevatedButton.styleFrom(
-            // tło
             backgroundColor:
                 isCorrect ? extras.correct : colorScheme.surface,
-            // kolor czcionki
             foregroundColor:
                 isCorrect ? Colors.black : defaultTextColor,
-            // bez obramowania
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -1850,7 +2384,33 @@ Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
             alignment: Alignment.centerLeft,
             minimumSize: const Size(double.infinity, 48),
           ),
-          child: _renderHtml('$letter. $body'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // literka + tekst
+              if (odpPlain.isNotEmpty)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$letter. '),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        odpPlain,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Text('$letter.'),
+              // obrazek odpowiedzi (max 200px)
+              if (imgFromBody != null) ...[
+                const SizedBox(height: 8),
+                _buildAnswerImage(url: imgFromBody),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -1883,8 +2443,13 @@ Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
               Expanded(
                 child: _renderHtml(
                   q['pytanie']?.toString() ?? '',
-                  images: (q['images'] as List?)?.cast<String>(),
+                  images: questionImages, // <--- TYLKO obrazki pytania
                   videos: (q['videos'] as List?)?.cast<String>(),
+                  // dla treści pytania nie wyciągamy inline <img> z HTML,
+                  // polegamy na tablicy images
+                  extractInlineImages: false,
+                  minImageHeight: 100,
+                  maxImageHeight: 500,
                 ),
               ),
             ],
@@ -1932,8 +2497,8 @@ Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
                               ),
                             ) ??
                             false;
-                        if (!mounted) return;
-                        if (ok) await _deleteQuestion(id);
+                        if (!context.mounted) return;
+                        if (ok) await _deleteQuestion(id!);
                       },
                 icon: Icon(Icons.delete_outline, color: colorScheme.primary),
                 label: const Text('Usuń'),
@@ -1946,135 +2511,194 @@ Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
   );
 }
 
-  Widget _buildLivePreview(BuildContext context) {
-  final theme = Theme.of(context);
-  final colorScheme = theme.colorScheme;
-  final extras = theme.extension<ExtraColors>()!;
 
-  // domyślny kolor czcionki dla niepoprawnych odpowiedzi
-  final defaultTextColor =
-      theme.brightness == Brightness.light ? Colors.black : Colors.white;
+    Widget _buildLivePreview(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final extras = theme.extension<ExtraColors>()!;
+
+    // domyślny kolor czcionki dla niepoprawnych odpowiedzi
+    final defaultTextColor =
+        theme.brightness == Brightness.light ? Colors.black : Colors.white;
 
     Widget? mediaWidget;
-  if (_mediaKind == MediaKind.image) {
-    String? imgSrc;
-    if (_uploadedImageUrl != null && _uploadedImageUrl!.isNotEmpty) {
-      imgSrc = _uploadedImageUrl!;
-    } else if (_imageCtrl.text.trim().isNotEmpty) {
-      imgSrc = _imageCtrl.text.trim();
-    } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
-      final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
-      final mime = ext == 'jpg' ? 'jpeg' : ext;
-      imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
-    }
+    if (_mediaKind == MediaKind.image) {
+      String? imgSrc;
+      if (_uploadedImageUrl != null && _uploadedImageUrl!.isNotEmpty) {
+        imgSrc = _uploadedImageUrl!;
+      } else if (_imageCtrl.text.trim().isNotEmpty) {
+        imgSrc = _imageCtrl.text.trim();
+      } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
+        final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
+        final mime = ext == 'jpg' ? 'jpeg' : ext;
+        imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
+      }
 
-    if (imgSrc != null) {
-      mediaWidget = Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minHeight: 100,
-              maxHeight: 500,
-            ),
-            child: Image.network(
-              imgSrc,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-      );
-    }
-  } else if (_mediaKind == MediaKind.video && _uploadedVideoUrl != null) {
-    mediaWidget = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: InlineVideoPlayer(
-        url: _uploadedVideoUrl!,
-        height: 400,
-      ),
-    );
-  }
-
-
-  final answers = ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-    final letter = e.value;
-    final isCorrect = letter == _correct;
-
-    final textCtrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][e.key];
-    final body = textCtrl.text.trim();
-
-    return Container(
-      margin: const EdgeInsets.only(top: 6),
-      child: IgnorePointer(
-        ignoring: true,
-        child: ElevatedButton(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor:
-                isCorrect ? extras.correct : colorScheme.surface,
-            foregroundColor:
-                isCorrect ? Colors.black : defaultTextColor,
-            alignment: Alignment.centerLeft,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            elevation: 2,
-            padding: const EdgeInsets.symmetric(
-              vertical: 12,
-              horizontal: 16,
-            ),
-          ),
-          child: _renderHtml('$letter. $body'),
-        ),
-      ),
-    );
-  }).toList();
-
-  return Stack(
-    children: [
-      ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text('Podgląd pytania', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _renderHtml(_contentCtrl.text.trim()),
-                  if (mediaWidget != null) mediaWidget,
-                  ...answers,
-                  if (_opisPoprawneCtrl.text.trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: _renderHtml(_opisPoprawneCtrl.text.trim()),
-                    ),
-                  if (_opisNiepoprawneCtrl.text.trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: _renderHtml(_opisNiepoprawneCtrl.text.trim()),
-                    ),
-                ],
+      if (imgSrc != null) {
+        mediaWidget = Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: 100,
+                maxHeight: 500,
+              ),
+              child: Image.network(
+                imgSrc,
+                fit: BoxFit.contain,
               ),
             ),
           ),
-        ],
-      ),
-      Positioned(
-        top: 8,
-        right: 8,
-        child: IconButton(
-          tooltip: 'Zamknij podgląd',
-          icon: const Icon(Icons.close),
-          onPressed: () => setState(() => _showPreview = false),
+        );
+      }
+    } else if (_mediaKind == MediaKind.video && _uploadedVideoUrl != null) {
+      mediaWidget = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: InlineVideoPlayer(
+          url: _uploadedVideoUrl!,
+          height: 400,
         ),
-      ),
-    ],
-  );
-}
+      );
+    }
 
+    // podgląd odpowiedzi A–D (tekst / obrazek)
+    final answers = ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
+      final index = e.key;
+      final letter = e.value;
+      final isCorrect = letter == _correct;
+
+      final ctrl = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][index];
+      final kind = [_odp1Kind, _odp2Kind, _odp3Kind, _odp4Kind][index];
+      final body = ctrl.text.trim();
+
+      String? url;
+      Uint8List? bytes;
+      switch (index) {
+        case 0:
+          url = _odp1UploadedImageUrl;
+          bytes = _odp1ImageBytes;
+          break;
+        case 1:
+          url = _odp2UploadedImageUrl;
+          bytes = _odp2ImageBytes;
+          break;
+        case 2:
+          url = _odp3UploadedImageUrl;
+          bytes = _odp3ImageBytes;
+          break;
+        case 3:
+          url = _odp4UploadedImageUrl;
+          bytes = _odp4ImageBytes;
+          break;
+      }
+
+      Widget child;
+
+      if (kind == AnswerKind.text) {
+        child = Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$letter. '),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                body,
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        );
+      } else {
+        child = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$letter.'),
+            if (body.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                body,
+                style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+              ),
+            ],
+            const SizedBox(height: 8),
+            _buildAnswerImage(url: url, bytes: bytes),
+          ],
+        );
+      }
+
+      return Container(
+        margin: const EdgeInsets.only(top: 6),
+        child: IgnorePointer(
+          ignoring: true,
+          child: ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  isCorrect ? extras.correct : colorScheme.surface,
+              foregroundColor:
+                  isCorrect ? Colors.black : defaultTextColor,
+              alignment: Alignment.centerLeft,
+              shape: RoundedRectangleBorder(
+                borderRadius: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ).borderRadius,
+              ),
+              elevation: 2,
+              padding: const EdgeInsets.symmetric(
+                vertical: 12,
+                horizontal: 16,
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      );
+    }).toList();
+
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Podgląd pytania', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _renderHtml(_contentCtrl.text.trim()),
+                    if (mediaWidget != null) mediaWidget,
+                    ...answers,
+                    if (_opisPoprawneCtrl.text.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _renderHtml(_opisPoprawneCtrl.text.trim()),
+                      ),
+                    if (_opisNiepoprawneCtrl.text.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: _renderHtml(_opisNiepoprawneCtrl.text.trim()),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            tooltip: 'Zamknij podgląd',
+            icon: const Icon(Icons.close),
+            onPressed: () => setState(() => _showPreview = false),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 Widget _buildShimmerCard(BuildContext context) {
