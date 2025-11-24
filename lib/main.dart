@@ -20,6 +20,7 @@ import 'qualification_page.dart';
 import 'statistics.dart';
 import 'theme_manager.dart';
 import 'utils/http_service.dart';
+import 'utils/quotes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,29 +111,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    final quotes = [
-      '„Nie uczysz się dla szkoły, lecz dla siebie.” - Seneka',
-      '„Nauka to potęgi klucz.” - Ignacy Krasicki',
-      '„Człowiek uczy się przez całe życie.”',
-      '„Wiedza to potęga.”',
-      '„Im więcej wiem, tym więcej wiem, że nic nie wiem.” - Sokrates',
-      '„Uczyć się to odkrywać to, co już wiesz. Działać to pokazywać, że to wiesz.” - Richard Bach',
-      '„Uczenie się jest jak wiosłowanie pod prąd - gdy przestajesz, cofasz się.” - Edward Benjamin Britten',
-      '„Kiedy uczymy innych, uczymy się podwójnie.” - Joseph Joubert',
-      '„Inwestycja w wiedzę zawsze przynosi największe zyski.” - Benjamin Franklin',
-      '„Nie ma większej siły niż wiedza i nie ma większej wolności niż edukacja.” - Malcolm X',
-      '„Edukacja jest najpotężniejszą bronią, której możesz użyć, aby zmienić świat.” - Nelson Mandela',
-      '„Nauka bez myślenia jest bezużyteczna. Myślenie bez nauki - niebezpieczne.” - Konfucjusz',
-      '„Błąd jest dowodem na to, że próbujesz.” - Jennifer Lim',
-      '„Ciekawość jest początkiem mądrości.” - Sokrates',
-      '„Uczymy się nie dla szkoły, lecz dla życia.” - Seneka Młodszy',
-      '„Sukces to suma niewielkiego wysiłku powtarzanego dzień po dniu.” - Robert Collier',
-      '„Edukacja to nie wypełnianie wiadra, lecz rozpalanie ognia.” - William Butler Yeats',
-      '„Nie musisz być wielki, by zacząć, ale musisz zacząć, by być wielki.” - Zig Ziglar',
-      '„Każdy mistrz kiedyś był początkującym.” - Robin Sharma',
-      '„Ucz się tak, jakbyś miał żyć wiecznie.” - Gandhi',
-      '„Ucz się, ucz, bo nauka to potęgi klucz, a kto ma dużo kluczy... zostaje woźnym.” - Ludowa mądrość z przestrogą',
-    ];
     selectedQuote = quotes[Random().nextInt(quotes.length)];
     Future.microtask(_checkLoginState);
   }
@@ -171,7 +149,9 @@ class _MyHomePageState extends State<MyHomePage> {
     _isVerifyingEmail = true;
 
     try {
-      final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/verify-email.php');
+      final url = Uri.parse(
+        'https://egzaminy.zsel.edu.pl/egzaminy/verify-email.php',
+      );
       final response = await HttpService.postJson(url, {'email': email});
 
       if (response != null && response.statusCode == 200) {
@@ -348,9 +328,9 @@ class _MyHomePageState extends State<MyHomePage> {
       case 'Informatyk':
         return ['INF 03', 'INF 02'];
       case 'Elektryk':
-        return ['ELE.05', 'ELM.02', 'ELE.02', 'E.08'];
+        return ['ELE.05', 'ELM.02', 'ELE.02'];
       case 'Elektronik':
-        return ['ELM.05', 'E.06', 'ELM.02', 'EE.22'];
+        return ['ELM.05', 'ELM.02'];
       case 'Teleinformatyk':
         return ['INF.08', 'INF.07'];
       case 'Automatyk':
@@ -791,45 +771,33 @@ class HomeContent extends StatelessWidget {
         ]),
         _buildGrid('💻 Technik Informatyk', [
           QuestionTile(
-            icon: Icons.code,
-            code: 'INF.03',
-            label: 'programowanie i aplikacje',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
             icon: Icons.memory,
             code: 'INF.02',
             label: 'sprzęt, systemy i sieci',
             onTap: onQualificationTap,
           ),
-        ]),
-        _buildGrid('🌐 Technik Teleinformatyk', [
           QuestionTile(
-            icon: Icons.security,
-            code: 'INF.08',
-            label: 'usługi sieciowe i bezpieczeństwo',
+            icon: Icons.code,
+            code: 'INF.03',
+            label: 'programowanie i aplikacje',
             onTap: onQualificationTap,
           ),
+        ]),
+        _buildGrid('🌐 Technik Teleinformatyk', [
           QuestionTile(
             icon: Icons.network_check,
             code: 'INF.07',
             label: 'systemy i urządzenia sieciowe',
             onTap: onQualificationTap,
           ),
+          QuestionTile(
+            icon: Icons.security,
+            code: 'INF.08',
+            label: 'usługi sieciowe i bezpieczeństwo',
+            onTap: onQualificationTap,
+          ),
         ]),
         _buildGrid('🧑‍🔧 Technik Elektronik', [
-          QuestionTile(
-            icon: Icons.devices_other,
-            code: 'E.06',
-            label: 'montaż urządzeń elektronicznych',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
-            icon: Icons.bolt,
-            code: 'EE.22',
-            label: 'eksploatacja instalacji elektrycznych',
-            onTap: onQualificationTap,
-          ),
           QuestionTile(
             icon: Icons.analytics,
             code: 'ELM.02',
@@ -845,21 +813,15 @@ class HomeContent extends StatelessWidget {
         ]),
         _buildGrid('🧑‍🏭 Technik Elektryk', [
           QuestionTile(
-            icon: Icons.precision_manufacturing,
-            code: 'ELE.05',
-            label: 'eksploatacja maszyn i urządzeń',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
             icon: Icons.electrical_services,
             code: 'ELE.02',
             label: 'układy elektryczne',
             onTap: onQualificationTap,
           ),
           QuestionTile(
-            icon: Icons.cable,
-            code: 'E.08',
-            label: 'sieci lokalne i konfiguracja',
+            icon: Icons.precision_manufacturing,
+            code: 'ELE.05',
+            label: 'eksploatacja maszyn i urządzeń',
             onTap: onQualificationTap,
           ),
         ]),
@@ -874,12 +836,6 @@ class HomeContent extends StatelessWidget {
             icon: Icons.settings_input_component,
             code: 'ELM.04',
             label: 'układy automatyki',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
-            icon: Icons.electrical_services,
-            code: 'EE.18',
-            label: '(opcjonalne)',
             onTap: onQualificationTap,
           ),
         ]),
