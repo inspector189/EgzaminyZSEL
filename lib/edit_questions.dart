@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:html_unescape/html_unescape.dart';
 import 'dart:typed_data';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -28,23 +29,34 @@ class EditQuestionsPage extends StatefulWidget {
 }
 
 class _EditQuestionsPageState extends State<EditQuestionsPage> {
+  // obrazki powiązane z TREŚCIĄ pytania (max 5)
+final List<String> _questionImageFilenames = [];
+
+   final _unescape = HtmlUnescape();
+  String _clean(String? s) => _unescape.convert(s?.toString() ?? '');
   String _lastPreviewSignature = '';
 
   String _currentMediaSignature() {
-    final kind = _mediaKind.name;
-    final imgUrl = (_uploadedImageUrl ?? _imageCtrl.text.trim());
-    final imgBytesSig =
-        (_imageBytes != null && _imageBytes!.isNotEmpty)
-            ? '${_imageName ?? ''}|${_imageBytes!.length}'
-            : '';
-    final vidUrl = _uploadedVideoUrl ?? '';
-    final vidBytesSig =
-        (_videoBytes != null && _videoBytes!.isNotEmpty)
-            ? '${_videoName ?? ''}|${_videoBytes!.length}'
-            : '';
-    final height = _imageHeightPx?.toString() ?? '';
-    return [kind, imgUrl, imgBytesSig, vidUrl, vidBytesSig, height].join('::');
-  }
+  final kind = _mediaKind.name;
+
+  final imgListSig = _questionImageFilenames.join('|');
+
+  final imgBytesSig =
+      (_imageBytes != null && _imageBytes!.isNotEmpty)
+          ? '${_imageName ?? ''}|${_imageBytes!.length}'
+          : '';
+
+  final vidUrl = _uploadedVideoUrl ?? '';
+  final vidBytesSig =
+      (_videoBytes != null && _videoBytes!.isNotEmpty)
+          ? '${_videoName ?? ''}|${_videoBytes!.length}'
+          : '';
+
+  final height = _imageHeightPx?.toString() ?? '';
+
+  return [kind, imgListSig, imgBytesSig, vidUrl, vidBytesSig, height].join('::');
+}
+
 
   String? _tempVideoPath;
   String? _webBlobUrl;
@@ -399,6 +411,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _odp4Ctrl.clear();
       _opisPoprawneCtrl.clear();
       _opisNiepoprawneCtrl.clear();
+      _questionImageFilenames.clear();
       _correct = 'A';
 
       _imageBytes = null;
@@ -494,39 +507,52 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       final rawHtml = q['pytanie']?.toString() ?? '';
       final unescapedHtml = _unescapeLtGt(rawHtml);
 
-      // 1) Spróbuj z tablic w JSON (jeśli są)
+            // 1) MULTIMEDIA z tablic w JSON
+      final rawImages =
+          (q['images'] is List) ? (q['images'] as List).cast<String>() : <String>[];
+      final rawVideos =
+          (q['videos'] is List) ? (q['videos'] as List).cast<String>() : <String>[];
+
+      // 2) Spróbuj wyciągnąć multimedia z HTML, gdy tablice puste
       String? vidUrl =
-          (q['videos'] is List && (q['videos'] as List).isNotEmpty)
-              ? q['videos'][0]?.toString()
-              : null;
-      String? imgUrl =
-          (q['images'] is List && (q['images'] as List).isNotEmpty)
-              ? q['images'][0]?.toString()
-              : null;
+          rawVideos.isNotEmpty ? rawVideos.first : _extractFirstVideoSrcSmart(unescapedHtml);
 
-      // 2) Jeśli brak w tablicach – spróbuj z HTML
-      vidUrl ??= _extractFirstVideoSrcSmart(unescapedHtml);
-      imgUrl ??= _extractFirstImageSrcSmart(unescapedHtml);
+      // w pytaniu może być kilka obrazków → bierzemy maks 5
+      final List<String> questionImages = List<String>.from(rawImages.take(5));
 
-      // 3) Ustaw multimedia i wyczyść przeciwne bufory
+      // 3) Ustaw multimedia pytania
+      _questionImageFilenames
+        ..clear()
+        ..addAll(
+          questionImages
+              .map((u) => _filenameFromUrl(u))
+              .whereType<String>(),
+        );
+
       if (vidUrl != null && vidUrl.isNotEmpty) {
         _mediaKind = MediaKind.video;
 
         _uploadedVideoUrl = vidUrl;
         _uploadedVideoFilename = _filenameFromUrl(vidUrl);
 
-        // wyczyść obraz
+        // wyczyść obrazki
         _imageBytes = null;
         _imageName = null;
         _uploadedImageUrl = null;
         _uploadedImageFilename = null;
         _imageCtrl.clear();
-      } else if (imgUrl != null && imgUrl.isNotEmpty) {
+      } else if (_questionImageFilenames.isNotEmpty) {
         _mediaKind = MediaKind.image;
 
-        _uploadedImageUrl = imgUrl;
-        _uploadedImageFilename = _filenameFromUrl(imgUrl);
-        _imageCtrl.text = imgUrl;
+        // do podglądu weź pierwszy URL
+        final firstUrl = questionImages.isNotEmpty ? questionImages.first : null;
+        _uploadedImageUrl = firstUrl;
+        _uploadedImageFilename =
+            firstUrl != null ? _filenameFromUrl(firstUrl) : _questionImageFilenames.first;
+
+        _imageBytes = null;
+        _imageName = null;
+        _imageCtrl.clear();
 
         // wyczyść wideo
         _videoBytes = null;
@@ -536,6 +562,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _disposeLocalTempVideo();
       } else {
         _mediaKind = MediaKind.none;
+
+        _questionImageFilenames.clear();
 
         // wyczyść oba
         _imageBytes = null;
@@ -550,6 +578,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _uploadedVideoFilename = null;
         _disposeLocalTempVideo();
       }
+
 
       // 4) Wysokość (parsujemy na unescapowanym HTML)
       _imageHeightPx = null;
@@ -687,6 +716,43 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       return null;
     }
   }
+Future<void> _pickAndUploadQuestionImage() async {
+  if (_questionImageFilenames.length >= 5) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Możesz dodać maksymalnie 5 obrazków do treści pytania.')),
+      );
+    }
+    return;
+  }
+
+  try {
+    final typeGroup = const XTypeGroup(
+      label: 'images',
+      extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+    );
+    final XFile? file = await openFile(acceptedTypeGroups: [typeGroup]);
+    if (file == null) return;
+
+    final bytes = await file.readAsBytes();
+    setState(() {
+      _mediaKind = MediaKind.image;
+      _imageBytes = bytes;
+      _imageName = file.name;
+      _uploadedImageUrl = null;
+      _uploadedImageFilename = null;
+    });
+
+    await _uploadImage(addToQuestionList: true);
+    _refreshIfPreview(immediate: true);
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nie udało się otworzyć/wysłać obrazka: $e')),
+      );
+    }
+  }
+}
 
   Future<void> _pickImage() async {
     try {
@@ -716,7 +782,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }
   }
 
-  Future<void> _uploadImage() async {
+  Future<void> _uploadImage({bool addToQuestionList = false}) async {
+
     if (_imageBytes == null || _imageName == null) return;
     setState(() => _isUploading = true);
     _refreshIfPreview(immediate: true);
@@ -760,6 +827,21 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             _filenameFromUrl(_uploadedImageUrl!);
         _mediaKind = MediaKind.image;
       });
+            setState(() {
+        _uploadedImageUrl = data['url'] as String;
+        _uploadedImageFilename =
+            (data['filename'] as String?) ?? _filenameFromUrl(_uploadedImageUrl!);
+        _mediaKind = MediaKind.image;
+
+        if (addToQuestionList) {
+          if (_questionImageFilenames.length < 5 &&
+              _uploadedImageFilename != null &&
+              _uploadedImageFilename!.isNotEmpty) {
+            _questionImageFilenames.add(_uploadedImageFilename!);
+          }
+        }
+      });
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -772,19 +854,58 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   void _previewImage() {
-    final url = _uploadedImageUrl ?? _imageCtrl.text.trim();
-    if (url.isNotEmpty) {
-      _showImageDialogUrl(url);
-      return;
-    }
-    if (_imageBytes != null && _imageBytes!.isNotEmpty) {
-      _showImageDialogBytes(_imageBytes!);
-      return;
-    }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Brak obrazka do podglądu.')));
+  // jeśli mamy listę obrazków pytania – pokaż je wszystkie
+  if (_mediaKind == MediaKind.image && _questionImageFilenames.isNotEmpty) {
+    final kvalPath = _sanitizedTable();
+    final urls = _questionImageFilenames.map((fname) {
+      return 'https://egzaminy.zsel.edu.pl/egzaminy/$kvalPath/obrazy/$fname';
+    }).toList();
+
+    _showImagesDialog(urls);
+    return;
   }
+
+  // stary fallback – pojedynczy URL / bytes
+  final url = _uploadedImageUrl ?? _imageCtrl.text.trim();
+  if (url.isNotEmpty) {
+    _showImageDialogUrl(url);
+    return;
+  }
+  if (_imageBytes != null && _imageBytes!.isNotEmpty) {
+    _showImageDialogBytes(_imageBytes!);
+    return;
+  }
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Brak obrazka do podglądu.')),
+  );
+}
+void _showImagesDialog(List<String> imageUrls) {
+  // dla jednego obrazka użyj istniejącej logiki
+  if (imageUrls.length == 1) {
+    _showImageDialogUrl(imageUrls.first);
+    return;
+  }
+
+  _showImageDialogBody(
+    context,
+    builder: (screen) {
+      return PageView.builder(
+        itemCount: imageUrls.length,
+        itemBuilder: (context, index) {
+          final url = imageUrls[index];
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Image.network(
+              url,
+              height: _imageHeightPx?.toDouble(),
+              fit: BoxFit.contain,
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   void _showImageDialogUrl(String imageUrl) {
     _showImageDialogBody(
@@ -1159,22 +1280,24 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   void _removeMedia() {
-    setState(() {
-      _imageBytes = null;
-      _imageName = null;
-      _uploadedImageUrl = null;
-      _uploadedImageFilename = null;
-      _imageCtrl.clear();
-      _videoBytes = null;
-      _videoName = null;
-      _uploadedVideoUrl = null;
-      _uploadedVideoFilename = null;
-      _mediaKind = MediaKind.none;
-      _isUploading = false;
-      _disposeLocalTempVideo();
-    });
-    _refreshIfPreview(immediate: true);
-  }
+  setState(() {
+    _imageBytes = null;
+    _imageName = null;
+    _uploadedImageUrl = null;
+    _uploadedImageFilename = null;
+    _imageCtrl.clear();
+    _videoBytes = null;
+    _videoName = null;
+    _uploadedVideoUrl = null;
+    _uploadedVideoFilename = null;
+    _mediaKind = MediaKind.none;
+    _isUploading = false;
+    _questionImageFilenames.clear(); // <--- DODANE
+    _disposeLocalTempVideo();
+  });
+  _refreshIfPreview(immediate: true);
+}
+
 
     Future<void> _saveQuestion() async {
     final pyt = _contentCtrl.text.trim();
@@ -1231,13 +1354,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }
 
     // multimedia pytania
-    if (_mediaKind == MediaKind.image &&
-        _uploadedImageUrl == null &&
+        if (_mediaKind == MediaKind.image &&
+        _questionImageFilenames.isEmpty &&
         _imageBytes != null &&
         _imageBytes!.isNotEmpty) {
-      await _uploadImage();
-      if (_uploadedImageUrl == null) return;
+      await _uploadImage(addToQuestionList: true);
+      if (_questionImageFilenames.isEmpty) return;
     }
+
     if (_mediaKind == MediaKind.video &&
         _uploadedVideoUrl == null &&
         _videoBytes != null &&
@@ -1337,9 +1461,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       }
     }
 
-    if (_mediaKind == MediaKind.image) {
-      payload['img_filename'] =
-          _uploadedImageFilename ?? _filenameFromUrl(_imageCtrl.text.trim());
+        if (_mediaKind == MediaKind.image && _questionImageFilenames.isNotEmpty) {
+      payload['question_images'] = _questionImageFilenames;
+      // dodatkowo dla zgodności – pierwszy obrazek jako img_filename
+      payload['img_filename'] = _questionImageFilenames.first;
+
       if (_imageHeightPx != null && _imageHeightPx! > 0) {
         payload['img_height'] = _imageHeightPx;
       }
@@ -1349,6 +1475,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         payload['video_height'] = _imageHeightPx;
       }
     }
+
 
     try {
       final res = await http.post(
@@ -1584,37 +1711,26 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   String text, {
   List<String>? images,
   List<String>? videos,
-  bool extractInlineImages = true,
+  bool extractInlineImages = true, // możesz to już olać, ale zostawiam sygnaturę
   double minImageHeight = 100,
   double maxImageHeight = 500,
 }) {
   const double videoHeight = 400;
 
-  // odkoduj &lt; &gt;
-  String html = _unescapeLtGt(text);
-  final List<String> allImages = [...?images];
-
-  // tylko jeśli chcemy wyciągać <img> z samego tekstu
-  if (extractInlineImages) {
-    final imgFromBody = _extractFirstImageSrcSmart(html);
-    if (imgFromBody != null) {
-      allImages.add(imgFromBody);
-      html = html.replaceAll(
-        RegExp('<img[^>]*>', caseSensitive: false),
-        '',
-      );
-    }
-  }
-
-  // proste "odcięcie" znaczników HTML
-  String plain = html.replaceAll(RegExp('<[^>]+>'), '').trim();
+  // dokładnie jak w EgzaminView: odkoduj cały HTML
+  final plain = _clean(text);
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       if (plain.isNotEmpty)
-        Text(plain, style: const TextStyle(fontSize: 16)),
-      ...allImages.map(
+        Text(
+          plain,
+          style: const TextStyle(fontSize: 16),
+        ),
+
+      // OBRAZKI (z tablicy images – tak jak w EgzaminView z *_images)
+      ...?images?.map(
         (url) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Center(
@@ -1631,6 +1747,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           ),
         ),
       ),
+
+      // WIDEO (tak samo)
       ...?videos?.map(
         (url) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1645,6 +1763,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     ],
   );
 }
+
 
 
   Widget _buildBadge(BuildContext context, dynamic q) {
@@ -2010,110 +2129,132 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    if (_mediaKind == MediaKind.image) ...[
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _pickImage,
-                            icon: const Icon(Icons.upload_file),
-                            label: const Text('Wybierz obrazek'),
-                          ),
-                          const SizedBox(width: 8),
-                          if (_isUploading)
-                            const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      if (_uploadedImageUrl != null || _imageName != null)
-                        Row(
-                          children: [
-                            const Icon(Icons.image, size: 16),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                _uploadedImageUrl ?? _imageName ?? '',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      //const SizedBox(height: 8),
-                      //_heightFieldRow(),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (_uploadedImageUrl != null || _imageBytes != null)
-                            TextButton.icon(
-                              onPressed: _removeMedia,
-                              icon: const Icon(Icons.delete_outline),
-                              label: const Text('Usuń'),
-                            ),
-                          if (_uploadedImageUrl != null || _imageBytes != null)
-                            OutlinedButton.icon(
-                              onPressed: _previewImage,
-                              icon: const Icon(Icons.visibility),
-                              label: const Text('Podgląd'),
-                            ),
-                        ],
-                      ),
-                    ] else if (_mediaKind == MediaKind.video) ...[
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _pickVideo,
-                            icon: const Icon(Icons.upload_file),
-                            label: const Text('Wybierz film (mp4/webm/ogg)'),
-                          ),
-                          const SizedBox(width: 8),
-                          if (_isUploading)
-                            const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      if (_uploadedVideoUrl != null || _videoName != null)
-                        Row(
-                          children: [
-                            const Icon(Icons.movie, size: 16),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                _uploadedVideoUrl ?? _videoName ?? '',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (_uploadedVideoUrl != null || _videoBytes != null)
-                            TextButton.icon(
-                              onPressed: _removeMedia,
-                              icon: const Icon(Icons.delete_outline),
-                              label: const Text('Usuń'),
-                            ),
-                          if (_uploadedVideoUrl != null || _videoBytes != null)
-                            OutlinedButton.icon(
-                              onPressed: _previewVideo,
-                              icon: const Icon(Icons.visibility),
-                              label: const Text('Podgląd'),
-                            ),
-                        ],
-                      ),
-                    ] else
-                      const Text('Nie dodajesz multimediów do pytania.'),
+
+if (_mediaKind == MediaKind.image) ...[
+  // --- obrazki do treści pytania (max 5) ---
+  Row(
+    children: [
+      ElevatedButton.icon(
+        onPressed: _pickAndUploadQuestionImage,
+        icon: const Icon(Icons.upload_file),
+        label: const Text('Dodaj obrazek (max 5)'),
+      ),
+      const SizedBox(width: 8),
+      if (_isUploading)
+        const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+    ],
+  ),
+  const SizedBox(height: 6),
+  if (_questionImageFilenames.isNotEmpty)
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Obrazki pytania (${_questionImageFilenames.length}/5):',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onPrimary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        ..._questionImageFilenames.asMap().entries.map((e) {
+          final idx = e.key;
+          final name = e.value;
+          return Row(
+            children: [
+              const Icon(Icons.image, size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  name,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Usuń ten obrazek',
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: () {
+                  setState(() {
+                    _questionImageFilenames.removeAt(idx);
+                    if (_questionImageFilenames.isEmpty) {
+                      _uploadedImageUrl = null;
+                      _uploadedImageFilename = null;
+                    }
+                  });
+                  _refreshIfPreview(immediate: true);
+                },
+              ),
+            ],
+          );
+        }),
+      ],
+    ),
+  const SizedBox(height: 8),
+  Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: [
+    if (_questionImageFilenames.isNotEmpty)
+      TextButton.icon(
+        onPressed: _removeMedia,
+        icon: const Icon(Icons.delete_outline),
+        label: const Text('Usuń wszystkie'),
+      ),
+  ],
+),
+
+] else if (_mediaKind == MediaKind.video) ...[
+  Row(
+    children: [
+      ElevatedButton.icon(
+        onPressed: _pickVideo,
+        icon: const Icon(Icons.upload_file),
+        label: const Text('Wybierz film (mp4/webm/ogg)'),
+      ),
+      const SizedBox(width: 8),
+      if (_isUploading)
+        const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+    ],
+  ),
+  const SizedBox(height: 6),
+  if (_uploadedVideoUrl != null || _videoName != null)
+    Row(
+      children: [
+        const Icon(Icons.movie, size: 16),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            _uploadedVideoUrl ?? _videoName ?? '',
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
+  const SizedBox(height: 8),
+  Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: [
+    if (_uploadedVideoUrl != null || _videoBytes != null)
+      TextButton.icon(
+        onPressed: _removeMedia,
+        icon: const Icon(Icons.delete_outline),
+        label: const Text('Usuń'),
+      ),
+  ],
+),
+
+] else
+  const Text('Nie dodajesz multimediów do pytania.'),
+
                   ],
                 ),
               ),
@@ -2360,7 +2501,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         '',
       );
     }
-    final odpPlain = odpTextOnly.replaceAll(RegExp('<[^>]+>'), '').trim();
+    final odpPlain = odpTextOnly.trim();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -2521,37 +2662,74 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final defaultTextColor =
         theme.brightness == Brightness.light ? Colors.black : Colors.white;
 
-    Widget? mediaWidget;
-    if (_mediaKind == MediaKind.image) {
-      String? imgSrc;
-      if (_uploadedImageUrl != null && _uploadedImageUrl!.isNotEmpty) {
-        imgSrc = _uploadedImageUrl!;
-      } else if (_imageCtrl.text.trim().isNotEmpty) {
-        imgSrc = _imageCtrl.text.trim();
-      } else if (_imageBytes != null && _imageBytes!.isNotEmpty) {
-        final ext = (_imageName ?? 'png').split('.').last.toLowerCase();
-        final mime = ext == 'jpg' ? 'jpeg' : ext;
-        imgSrc = 'data:image/$mime;base64,${base64Encode(_imageBytes!)}';
-      }
-
-      if (imgSrc != null) {
-        mediaWidget = Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minHeight: 100,
-                maxHeight: 500,
-              ),
-              child: Image.network(
-                imgSrc,
-                fit: BoxFit.contain,
+        Widget? mediaWidget;
+    if (_mediaKind == MediaKind.image && _questionImageFilenames.isNotEmpty) {
+      final kvalPath = _sanitizedTable();
+      mediaWidget = Column(
+        children: _questionImageFilenames.map((fname) {
+          final url =
+              'https://egzaminy.zsel.edu.pl/egzaminy/$kvalPath/obrazy/$fname';
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: 100,
+                  maxHeight: 500,
+                ),
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
+          );
+        }).toList(),
+      );
+    } else if (_mediaKind == MediaKind.video) {
+  Widget player;
+
+  if (_uploadedVideoUrl != null) {
+    // wideo już na serwerze
+    player = InlineVideoPlayer(
+      url: _uploadedVideoUrl!,
+      height: 400,
+    );
+  } else if (_videoBytes != null && _videoBytes!.isNotEmpty) {
+    // wideo lokalne – użyj blob/temp
+    return FutureBuilder<String?>(
+      future: _ensureLocalTempVideo(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: InlineVideoPlayer(
+            url: kIsWeb ? null : null,   // Desktop/Mobile - używamy filePath
+            filePath: kIsWeb ? null : snapshot.data,
+            blobUrl: kIsWeb ? snapshot.data : null,
+            height: 400,
           ),
         );
-      }
-    } else if (_mediaKind == MediaKind.video && _uploadedVideoUrl != null) {
+      },
+    );
+  } else {
+    player = const SizedBox.shrink();
+  }
+
+  mediaWidget = Padding(
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: player,
+  );
+}
+
+ else if (_mediaKind == MediaKind.video && _uploadedVideoUrl != null) {
       mediaWidget = Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: InlineVideoPlayer(
