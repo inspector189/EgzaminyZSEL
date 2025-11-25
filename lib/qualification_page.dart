@@ -69,7 +69,7 @@ class QualificationPage extends StatelessWidget {
       ),
       QuestionTile(
         icon: Icons.library_books,
-        code: 'Baza wszystkich odpowiedzi',
+        code: 'Baza wszystkich pytań',
         label: 'Przeglądaj wszystkie pytania',
         showCount: false,
         onTap: (_) {

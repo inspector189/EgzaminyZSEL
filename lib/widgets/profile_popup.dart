@@ -162,6 +162,7 @@ class _ProfilePopupState extends State<ProfilePopup>
                                       text: 'Personalizacja',
                                       onTap: widget.onOpenPersonalisation,
                                     ),
+                                    if(!widget.isAdmin)
                                     _ProfileMenuRow(
                                       icon: Icons.bar_chart,
                                       text: 'Statystyki',
