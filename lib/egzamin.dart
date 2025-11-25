@@ -728,7 +728,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       'wybrane_odpowiedzi': selectedAnswers,
     };
 
-    final uri = Uri.parse('https://interpage.pl/egzaminy/save_exam.php');
+    final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/save_exam.php');
     final response = await http.post(
       uri,
       headers: {
