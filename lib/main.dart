@@ -759,13 +759,13 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.code,
             code: 'INF.03',
-            label: 'programowanie i aplikacje',
+            label: 'strony internetowe i bazy danych',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.router,
             code: 'INF.04',
-            label: 'administrowanie siecią',
+            label: 'programowanie aplikacji',
             onTap: onQualificationTap,
           ),
         ]),
@@ -779,7 +779,7 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.code,
             code: 'INF.03',
-            label: 'programowanie i aplikacje',
+            label: 'strony internetowe i bazy danych',
             onTap: onQualificationTap,
           ),
         ]),
@@ -793,7 +793,7 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.security,
             code: 'INF.08',
-            label: 'usługi sieciowe i bezpieczeństwo',
+            label: 'sieci rozległe',
             onTap: onQualificationTap,
           ),
         ]),
@@ -829,13 +829,13 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.build_circle,
             code: 'ELM.01',
-            label: 'montaż automatyki przemysłowej',
+            label: 'obsługa automatyki przemysłowej',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.settings_input_component,
             code: 'ELM.04',
-            label: 'układy automatyki',
+            label: 'eksploatacja układów automatyki',
             onTap: onQualificationTap,
           ),
         ]),
