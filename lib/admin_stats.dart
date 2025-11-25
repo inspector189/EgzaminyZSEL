@@ -45,6 +45,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': 'Bearer $_apiKey',
         },
+        body: {
+          'api_token': _apiKey,
+        }
       );
       if (kDebugMode) {
         debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
@@ -657,6 +660,31 @@ class _QualificationTile extends StatelessWidget {
     required this.scoreFormatter,
     required this.fmtDuration,
   });
+  Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/podgladEgzaminu.php'),
+      body: {
+        'api_token': _apiKey,
+        'exam_id': examId.toString(),
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return {
+          'questions': List<dynamic>.from(data['questions']),
+          'selectedAnswers': (data['selectedAnswers'] as List).cast<String?>(),
+        };
+      }
+    }
+    print('PHP error: ${response.body}');
+  } catch (e) {
+    print('Błąd: $e');
+  }
+  return null;
+}
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -710,10 +738,7 @@ class _QualificationTile extends StatelessWidget {
                   : int.tryParse('${exam['czas_trwania_sec'] ?? ''}'),
             );
             final tryb = (exam['tryb'] ?? exam['mode'] ?? '') as String;
-            final int examId =
-                exam['id'] is int
-                    ? exam['id'] as int
-                    : int.tryParse(exam['id']?.toString() ?? '') ?? 0;
+            final int examId = int.tryParse('${exam['id'] ?? '0'}') ?? 0;
 
             return _ExamTile(
               date: date.split(' ').first,
@@ -721,37 +746,25 @@ class _QualificationTile extends StatelessWidget {
               czas: czas,
               tryb: tryb,
               examId: examId,
-              onPreview:
-                  examId == 0
-                      ? null
-                      : () async {
-                        final details = await fetchExamDetailsFull(examId);
-                        if (!context.mounted) return;
-
-                        if (details != null) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => EgzaminPodgladView(
-                                    questions:
-                                        details['questions'] as List<dynamic>,
-                                    selectedAnswers:
-                                        (details['selectedAnswers']
-                                                as List<dynamic>)
-                                            .cast<String?>(),
-                                  ),
-                            ),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Nie udało się wczytać podglądu egzaminu',
-                              ),
-                            ),
-                          );
-                        }
-                      },
+              onPreview: examId <= 0 ? null : () async {
+              final details = await fetchExamDetailsFull(examId);
+              if (!context.mounted) return;
+              if (details != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EgzaminPodgladView(
+                      questions: details['questions'],
+                      selectedAnswers: details['selectedAnswers'],
+                    ),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Nie udało się wczytać podglądu')),
+                );
+              }
+            },
             );
           }),
         Divider(thickness: 1, height: 8, color: colorScheme.primary),

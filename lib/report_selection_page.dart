@@ -324,26 +324,3 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
   }
 }
 
-Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
-  try {
-    final response = await http.post(
-      Uri.parse('https://interpage.pl/egzaminy/get_exam_full.php'),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {'api_token': _apiKey, 'exam_id': examId.toString()},
-    );
-
-    if (response.statusCode == 200) {
-      final jsonData = json.decode(response.body);
-      return {
-        'questions': jsonData['questions'],
-        'selectedAnswers':
-            (jsonData['selectedAnswers'] as List).cast<String?>(),
-      };
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      debugPrint("Błąd fetchExamDetailsFull: $e");
-    }
-  }
-  return null;
-}

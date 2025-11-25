@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app/widgets/question_tile.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'report_selection_page.dart';
 import 'egzamin_podglad.dart';
+import 'admin_stats.dart';
 
 const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
@@ -508,4 +509,29 @@ class LastExamRow extends StatelessWidget {
       ),
     );
   }
+    Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/podgladEgzaminu.php'),
+      body: {
+        'api_token': _apiKey,
+        'exam_id': examId.toString(),
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return {
+          'questions': List<dynamic>.from(data['questions']),
+          'selectedAnswers': (data['selectedAnswers'] as List).cast<String?>(),
+        };
+      }
+    }
+    print('PHP error: ${response.body}');
+  } catch (e) {
+    print('Błąd: $e');
+  }
+  return null;
+}
 }
