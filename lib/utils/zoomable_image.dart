@@ -17,9 +17,20 @@ import 'package:flutter/material.dart'
         Image,
         InteractiveViewer,
         FadeTransition,
-        showGeneralDialog;
+        Colors,            
+        Navigator,          
+        Padding,           
+        ClipRRect,        
+        Transform,      
+        Duration,        
+        Material,  
+        CircularProgressIndicator;
+
+import 'package:flutter/widgets.dart';
 import 'package:flutter_app/app_themes.dart' show ExtraColors;
 import 'package:shimmer/shimmer.dart' show Shimmer;
+
+const double imageZoomScale = 1.75;
 
 Widget buildZoomableImage(BuildContext context, String url) {
   return LayoutBuilder(
@@ -74,18 +85,79 @@ void _showZoomedImage(BuildContext context, String url) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Close',
-    pageBuilder:
-        (c, a1, a2) => Center(
-          child: InteractiveViewer(
-            panEnabled: true,
-            minScale: 1.0,
-            maxScale: 5.0,
-            child: Image.network(url, fit: BoxFit.contain),
-          ),
-        ),
-    transitionBuilder:
-        (c, a1, a2, child) => FadeTransition(opacity: a1, child: child),
-    transitionDuration: const Duration(milliseconds: 300),
+    barrierLabel: 'Zamknij',
+    barrierColor: Colors.black.withOpacity(0.92),
+    transitionDuration: const Duration(milliseconds: 220),
+    pageBuilder: (context, _, __) {
+      return _ZoomedImageViewer(imageUrl: url);
+    },
+    transitionBuilder: (context, animation, _, child) {
+      return FadeTransition(opacity: animation, child: child);
+    },
   );
+}
+class _ZoomedImageViewer extends StatelessWidget {
+  final String imageUrl;
+
+  const _ZoomedImageViewer({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final double targetWidth = size.width * imageZoomScale;
+    final double targetHeight = size.height * imageZoomScale;
+
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          Center(
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.contain,
+                  width: targetWidth,
+                  height: targetHeight,
+                  placeholder: (_, __) => Container(
+                    width: targetWidth,
+                    height: targetHeight,
+                    color: const Color(0xFF111111),
+                    child: const Center(
+                      child: CircularProgressIndicator(color: Colors.white70),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    width: targetWidth,
+                    height: targetHeight,
+                    color: const Color(0xFF111111),
+                    child: const Icon(Icons.error, color: Colors.white70, size: 60),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 16,
+            right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 32),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
