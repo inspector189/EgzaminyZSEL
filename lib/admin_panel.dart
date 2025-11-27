@@ -3,6 +3,7 @@ import "questions_panel.dart";
 import 'widgets/admin_tiles.dart';
 import 'admin_stats.dart';
 import 'manage_admins.dart';
+import 'CreatingTestsAndReportsPage.dart';
 
 class AdminPanelPage extends StatelessWidget {
   const AdminPanelPage({super.key});
@@ -39,6 +40,17 @@ class AdminPanelPage extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => QuestionStatsPage()),
+          );
+        },
+      ),
+      AdminTileData(
+        icon: Icons.play_circle_fill, 
+        label: 'Przeprowadź test',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CreatingTestsAndReportsPage()),
+            
           );
         },
       ),

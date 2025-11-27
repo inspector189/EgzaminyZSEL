@@ -1,0 +1,811 @@
+import 'dart:convert';
+import 'dart:js_interop';
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:universal_html/js_util.dart' as js_util;
+import 'package:web/web.dart' as web;
+import 'package:html_unescape/html_unescape.dart';
+import 'dart:js_interop' as js_interop;
+import 'TestCreatorPage.dart';
+import 'utils/video_player.dart';
+
+const String publishedTestsUrl = 'https://egzaminy.zsel.edu.pl/egzaminy/publishedTests.php';
+const String apiToken = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+// =============================
+// WIDGET Z OBRAZKAMI
+// =============================
+ class RichQuestionWidget extends StatelessWidget {
+  final Map<String, dynamic> question;
+  final int number;
+  final bool showAnswers;
+  final String qualification;
+
+  const RichQuestionWidget({
+    super.key,
+    required this.question,
+    required this.number,
+    this.showAnswers = true,
+    required this.qualification,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final unescape = HtmlUnescape();
+    final pytanieText = unescape.convert(question['pytanie_text'] ?? '');
+    final pytanieImages = (question['pytanie_images'] as List?)?.cast<String>() ?? [];
+    final pytanieVideos = (question['pytanie_videos'] as List?)?.cast<String>() ?? [];
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$number. $pytanieText', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+
+            // Obrazki pytania
+            ...pytanieImages.map((url) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Center(
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  height: 220,
+                  loadingBuilder: (_, child, __) => child,
+                  errorBuilder: (_, __, ___) => const Text('Błąd obrazka'),
+                ),
+              ),
+            )),
+          ...pytanieVideos.map((url) => InlineVideoPlayer(
+            url: url,
+            height: 240,
+          )),
+
+
+            if (showAnswers) ...[
+              const SizedBox(height: 12),
+              ...[1, 2, 3, 4].map((idx) {
+                final text = unescape.convert(question['odp${idx}_text'] ?? '').trim();
+                final images = (question['odp${idx}_images'] as List?)?.cast<String>() ?? [];
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Teraz tylko sama treść – litera A/B/C/D jest już w tekście!
+                      Text(text, style: const TextStyle(fontSize: 15)),
+                      ...images.map((url) => Padding(
+                        padding: const EdgeInsets.only(top: 8, left: 20),
+                        child: Image.network(
+                          url,
+                          width: 300,
+                          height: 150,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Text('Błąd obrazka'),
+                        ),
+                      )),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+bool isValidQualification(String? qual) {
+  if (qual == null) return false;
+  final trimmed = qual.trim().toLowerCase();
+  return RegExp(r'^[a-z]{3}\d{2}$').hasMatch(trimmed);
+}
+
+class CreatingTestsAndReportsPage extends StatefulWidget {
+  const CreatingTestsAndReportsPage({super.key});
+
+  @override
+  State<CreatingTestsAndReportsPage> createState() => _CreatingTestsAndReportsPageState();
+}
+
+class _CreatingTestsAndReportsPageState extends State<CreatingTestsAndReportsPage>
+    with TickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final createdTestsTab = context.findAncestorStateOfType<_CreatedTestsTabState>();
+    createdTestsTab?._loadTests();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Tworzenie i zarządzanie testami')),
+      body: Column(
+        children: [
+          Material(
+            color: colorScheme.surface,
+            elevation: 4,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: colorScheme.primary,
+              unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
+              indicatorColor: colorScheme.primary,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              tabs: const [
+                Tab(icon: Icon(Icons.list_alt), text: 'Utworzone testy', iconMargin: EdgeInsets.only(bottom: 4)),
+                Tab(icon: Icon(Icons.add_circle_outline), text: 'Stwórz nowy test', iconMargin: EdgeInsets.only(bottom: 4)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: const [
+                CreatedTestsTab(),
+                CreateNewTestTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================== PODGLĄD TESTU ====================
+class TestPreviewPage extends StatelessWidget {
+  final Map<String, dynamic> test;
+  final VoidCallback onPublish;
+  const TestPreviewPage({super.key, required this.test, required this.onPublish});
+
+  @override Widget build(BuildContext context) {
+    final questions = List<Map<String, dynamic>>.from(test['questions']);
+    final qual = test['qualification'] as String;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(test['name']), actions: [
+        IconButton(icon: const Icon(Icons.publish, color: Colors.green), tooltip: 'Publikuj', onPressed: () { onPublish(); Navigator.pop(context); }),
+      ]),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: questions.length,
+        itemBuilder: (context, i) => RichQuestionWidget(
+          question: questions[i],
+          number: i + 1,
+          qualification: qual,
+        ),
+      ),
+    );
+  }
+}
+// ==================== ZAKŁADKA: UTWORZONE TESTY ====================
+class CreatedTestsTab extends StatefulWidget { const CreatedTestsTab({super.key}); @override State<CreatedTestsTab> createState() => _CreatedTestsTabState(); }
+
+class _CreatedTestsTabState extends State<CreatedTestsTab> {
+  List<Map<String, dynamic>> savedTests = [];
+
+  @override void initState() { super.initState(); _loadTests(); }
+bool isLoadingResults = false; 
+Future<void> _loadTests() async {
+    final prefs = await SharedPreferences.getInstance();
+    final localData = prefs.getString('saved_tests');
+
+    List<Map<String, dynamic>> localTests = [];
+    if (localData != null) {
+      localTests = List<Map<String, dynamic>>.from(json.decode(localData));
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(publishedTestsUrl),
+        headers: {'Authorization': 'Bearer $apiToken'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> serverTests = json.decode(response.body);
+        final serverMaps = serverTests.cast<Map<String, dynamic>>();
+
+        final Map<String, Map<String, dynamic>> merged = {};
+
+        for (final t in localTests) {
+          final key = '${t['name']}||${t['qualification']}||${t['author']}';
+          merged[key] = t..['results'] ??= []; // zapewnij pole results
+        }
+
+        for (final t in serverMaps) {
+          final key = '${t['name']}||${t['qualification']}||${t['author']}';
+          merged[key] = t..['results'] ??= [];
+        }
+
+        setState(() {
+          savedTests = merged.values.toList();
+        });
+
+        await prefs.setString('saved_tests', json.encode(savedTests));
+
+        // Po załadowaniu testów – pobierz wyniki z serwera
+        _loadAllResults();
+      }
+    } catch (e) {
+      setState(() => savedTests = localTests);
+    }
+  }
+
+  Future<void> _loadAllResults() async {
+    if (isLoadingResults) return;
+    setState(() => isLoadingResults = true);
+
+    for (int i = 0; i < savedTests.length; i++) {
+      final test = savedTests[i];
+      final testKey = '${test['name']}||${test['author']}||${test['qualification']}';
+
+      try {
+        final response = await http.post(
+          Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/getPublishedResults.php'),
+          headers: {
+            'Authorization': 'Bearer $apiToken',
+            'Content-Type': 'application/json',
+          },
+          body: json.encode({'test_key': testKey}),
+        );
+
+        if (response.statusCode == 200) {
+          final List<dynamic> results = json.decode(response.body);
+          setState(() {
+            savedTests[i]['results'] = results;
+          });
+        }
+      } catch (e) {
+        // cicho – brak wyników lub błąd połączenia
+      }
+    }
+
+    setState(() => isLoadingResults = false);
+  }
+
+Future<void> _deleteTest(int index) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Usunąć test?'),
+      content: Text('Czy na pewno chcesz usunąć "${savedTests[index]['name']}"?\n\nTest zostanie usunięty także z serwera (jeśli jest opublikowany).'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Anuluj')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Usuń', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+
+  if (confirm != true) return;
+
+  final testToDelete = savedTests[index];
+
+  // 1. Usuń z serwera (jeśli jest opublikowany)
+  await _deleteTestFromServer(testToDelete);
+
+  // 2. Usuń lokalnie
+  setState(() => savedTests.removeAt(index));
+
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('saved_tests', json.encode(savedTests));
+
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Test usunięty lokalnie i z serwera'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+Future<void> _deleteTestFromServer(Map<String, dynamic> test) async {
+  try {
+    final response = await http.post(
+      Uri.parse(publishedTestsUrl), // https://egzaminy.zsel.edu.pl/egzaminy/publishedTests.php
+      headers: {
+        'Authorization': 'Bearer $apiToken',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode({
+        'action': 'delete',           // nowa akcja
+        'test': test,                 // cały test (name, qualification, author, itd.)
+      }),
+    );
+
+    // Jeśli serwer zwróci 200 – sukces, nic nie robimy
+    if (response.statusCode == 200) {
+      debugPrint('Test usunięty z serwera');
+      return;
+    } else {
+      debugPrint('Serwer zwrócił błąd: ${response.statusCode} ${response.body}');
+    }
+  } catch (e) {
+    debugPrint('Błąd połączenia przy usuwaniu z serwera: $e');
+    // Nie rzucamy wyjątku – i tak usuwamy lokalnie
+  }
+}
+void _publishTest(int index) async {
+  final test = savedTests[index];
+  final bool willPublish = !(test['published'] ?? false);
+
+  setState(() {
+    test['published'] = willPublish;
+  });
+
+  // Zapis lokalny (cache)
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('saved_tests', json.encode(savedTests));
+
+  // Wysyłka na serwer
+  try {
+      await http.post(
+        Uri.parse(publishedTestsUrl),
+        headers: {
+          'Authorization': 'Bearer $apiToken',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'action': willPublish ? 'publish' : 'unpublish',
+          'test': test,
+        }),
+      );
+  } catch (e) {
+    // Jeśli nie udało się wysłać – przywróć stan
+    setState(() {
+      test['published'] = !willPublish;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Brak internetu – publikacja zostanie zsynchronizowana później')),
+    );
+    return;
+  }
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(willPublish ? 'Test opublikowany dla wszystkich!' : 'Test wycofany z publikacji'),
+      backgroundColor: willPublish ? Colors.green : Colors.orange,
+    ),
+  );
+}
+
+  web.Blob _createBlob(Uint8List bytes) => web.Blob([bytes.buffer.toJS].toJS, web.BlobPropertyBag(type: 'application/pdf'));
+
+bool _testContainsVideo(Map<String, dynamic> test) {
+  final questions = test['questions'] as List<dynamic>;
+  for (var q in questions) {
+    // film przy pytaniu
+    final pytanieVideos = (q['pytanie_videos'] as List?)?.cast<String>() ?? [];
+    if (pytanieVideos.isNotEmpty) return true;
+
+    // filmy przy odpowiedziach
+    for (int i = 1; i <= 4; i++) {
+      final odpVideos = (q['odp${i}_videos'] as List?)?.cast<String>() ?? [];
+      if (odpVideos.isNotEmpty) return true;
+    }
+  }
+  return false;
+}
+
+  Future<void> _printTest(Map<String, dynamic> test) async {
+    if (_testContainsVideo(test)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ten test zawiera filmy – nie można wygenerować PDF'),
+        backgroundColor: Colors.orange,
+        duration: Duration(seconds: 4),
+      ),
+    );
+    return;
+  }
+  final questions = List<Map<String, dynamic>>.from(test['questions']);
+  final pdf = pw.Document();
+  final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
+  final ttf = pw.Font.ttf(fontData);
+  final qual = test['qualification'] as String;
+
+  // Pomocnicza funkcja do pobierania obrazków
+List<String> getImages(Map<String, dynamic> q, String prefix) {
+  if (prefix.isEmpty) {
+    return (q['pytanie_images'] as List?)?.cast<String>() ?? [];
+  }
+  return (q['odp${prefix}_images'] as List?)?.cast<String>() ?? [];
+}
+
+  final header = pw.Padding(
+    padding: const pw.EdgeInsets.only(bottom: 20),
+    child: pw.Column(
+      children: [        
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Row(children: [
+              pw.Text('Imię i nazwisko:', style: pw.TextStyle(font: ttf, fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(width: 10),
+              pw.Container(width: 250, child: pw.Text('__________________________________', style: pw.TextStyle(font: ttf, fontSize: 14))),
+              pw.SizedBox(width: 40),
+              pw.Text('Klasa:', style: pw.TextStyle(font: ttf, fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(width: 10),
+              pw.Container(width: 80, child: pw.Text('______', style: pw.TextStyle(font: ttf, fontSize: 14))),
+            ]),
+          ],
+        ),
+
+        pw.SizedBox(height: 12),
+
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Row(children: [
+              pw.Text('Nr w dzienniku:', style: pw.TextStyle(font: ttf, fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(width: 10),
+              pw.Container(width: 60, child: pw.Text('________', style: pw.TextStyle(font: ttf, fontSize: 14))),
+            ]),
+            pw.Row(children: [
+              pw.Text('Punkty:', style: pw.TextStyle(font: ttf, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(width: 12),
+              pw.Text('____', style: pw.TextStyle(font: ttf, fontSize: 18)),
+              pw.Text(' / 40', style: pw.TextStyle(font: ttf, fontSize: 16)),
+            ]),
+          ],
+        ),
+
+        pw.SizedBox(height: 15),
+        pw.Divider(thickness: 1.5),
+        pw.SizedBox(height: 10),
+      ],
+    ),
+  );
+
+  final List<pw.Widget> pages = [];
+
+  for (var e in questions.asMap().entries) {
+    final i = e.key + 1;
+    final q = e.value;
+    final pytanieText = (q['pytanie_text'] ?? '').toString().trim();
+    final pytanieImages = getImages(q, '');
+
+    final List<pw.Widget> children = [
+      pw.Text('$i. $pytanieText', style: pw.TextStyle(font: ttf, fontSize: 12, fontWeight: pw.FontWeight.bold)),
+      pw.SizedBox(height: 10),
+    ];
+
+    // Dodaj obrazki pytania
+for (final url in pytanieImages) {
+  try {
+    final resp = await http.get(Uri.parse(url));
+    if (resp.statusCode == 200) {
+      children.add(
+        pw.Center(
+          child: pw.SizedBox(
+            width: 460,
+            height: 300,
+            child: pw.Image(
+              pw.MemoryImage(resp.bodyBytes),
+              fit: pw.BoxFit.contain,
+            ),
+          ),
+        ),
+      );
+      children.add(pw.SizedBox(height: 12));
+    }
+  } catch (_) {}
+}
+
+    // Odpowiedzi A B C D
+for (int idx = 1; idx <= 4; idx++) {
+  final text = (q['odp${idx}_text'] ?? '').toString().trim();
+  final images = (q['odp${idx}_images'] as List?)?.cast<String>() ?? [];
+
+  children.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(left: 20, top: 8, bottom: 4),
+          child: pw.Text(
+            text,
+            style: pw.TextStyle(font: ttf, fontSize: 11.5),
+          ),
+        ),
+      );
+
+      for (final url in images) {
+    try {
+      final resp = await http.get(Uri.parse(url));
+      if (resp.statusCode == 200) {
+        children.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 34, top: 8),
+            child: pw.SizedBox(
+              width: 380,
+              height: 220,
+              child: pw.Image(
+                pw.MemoryImage(resp.bodyBytes),
+                fit: pw.BoxFit.contain,
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+  children.add(pw.SizedBox(height: 10));
+}
+
+    pages.add(pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 32),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: children),
+    ));
+  }
+
+  pdf.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.only(left: 50, right: 50, top: 40, bottom: 60),
+    header: (ctx) => ctx.pageNumber == 1 ? header : pw.SizedBox(),
+    footer: (ctx) => pw.Container(
+      alignment: pw.Alignment.center,
+      margin: const pw.EdgeInsets.only(top: 20),
+      child: pw.Text('Strona ${ctx.pageNumber} / ${ctx.pagesCount}', style: pw.TextStyle(font: ttf, fontSize: 11, color: PdfColors.grey700)),
+    ),
+    build: (_) => pages,
+  ));
+
+  final bytes = await pdf.save();
+  final filename = 'test_${test['name'].replaceAll(' ', '_')}.pdf';
+
+  if (kIsWeb) {
+    final blob = _createBlob(bytes);
+    final url = web.URL.createObjectURL(blob);
+    web.window.open(url, '_blank');
+    Future.delayed(const Duration(seconds: 10), () => web.URL.revokeObjectURL(url));
+  } else {
+    await Printing.sharePdf(bytes: bytes, filename: filename);
+  }
+}
+
+  @override
+  Widget build(BuildContext context) {
+    if (savedTests.isEmpty) {
+      return const Center(
+        child: Text('Brak utworzonych testów', style: TextStyle(fontSize: 18)),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadTests();
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: savedTests.length,
+        itemBuilder: (context, i) {
+          final t = savedTests[i];
+          final results = (t['results'] as List<dynamic>?) ?? [];
+          final isPublished = t['published'] == true;
+
+          // Sortuj wyniki od najnowszego
+          final sortedResults = results
+            ..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
+
+          return Card(
+            elevation: 6,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            child: ExpansionTile(
+              initiallyExpanded: false,
+              leading: CircleAvatar(
+                radius: 24,
+                backgroundColor: isPublished ? Colors.green.shade600 : Colors.grey.shade600,
+                child: Icon(isPublished ? Icons.public : Icons.lock_outline, color: Colors.white),
+              ),
+              title: Text(
+                t['name'],
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Kwalifikacja: ${t['qualification'].toUpperCase()} • Autor: ${t['author']}'),
+                  Text('${t['questions'].length} pytań • Utworzono: ${_formatDate(t['createdAt'])}'),
+                  if (results.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Wyników: ${results.length} • Średnia: ${(results.map((r) => r['score'] as num).reduce((a, b) => a + b) / results.length).toStringAsFixed(1)}%',
+                      style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ],
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(icon: const Icon(Icons.visibility, color: Colors.blue), tooltip: 'Podgląd', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TestPreviewPage(test: t, onPublish: () => _publishTest(i))))),
+                  IconButton(icon: const Icon(Icons.print), tooltip: 'Drukuj', onPressed: () => _printTest(t)),
+                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Usuń', onPressed: () => _deleteTest(i)),
+                  IconButton(
+                    icon: Icon(isPublished ? Icons.public : Icons.public_off, color: isPublished ? Colors.green : Colors.grey[700]),
+                    tooltip: isPublished ? 'Wycofaj' : 'Opublikuj',
+                    onPressed: () => _publishTest(i),
+                  ),
+                ],
+              ),
+              children: [
+                if (results.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('Brak wyników', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    itemCount: sortedResults.length,
+                    itemBuilder: (context, j) {
+                      final r = sortedResults[j];
+                      final score = (r['score'] as num).toDouble();
+                      final userName = r['userName'] as String? ?? 'Anonimowy uczeń';
+                      final date = _formatDate(r['date'] as String);
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        leading: CircleAvatar(
+                          radius: 22,
+                          backgroundColor: score >= 75
+                              ? Colors.green
+                              : score >= 50
+                                  ? Colors.orange
+                                  : Colors.red,
+                          child: Text(
+                            '${score.toStringAsFixed(0)}%',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                        title: Text(userName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(date),
+                        trailing: Text(
+                          '${r['duration_sec'] ~/ 60} min',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                        ),
+                      );
+                    },
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatDate(String isoDate) {
+    try {
+      final date = DateTime.parse(isoDate);
+      return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return isoDate;
+    }
+  }
+}
+
+// ==================== ZAKŁADKA: STWÓRZ NOWY TEST ====================
+class CreateNewTestTab extends StatefulWidget {
+  const CreateNewTestTab({super.key});
+  @override
+  State<CreateNewTestTab> createState() => _CreateNewTestTabState();
+}
+
+class _CreateNewTestTabState extends State<CreateNewTestTab> {
+  String? selectedQualification;
+  List<String> qualifications = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQualificationsFromServer();
+  }
+
+  Future<void> _loadQualificationsFromServer() async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/egzaminy_wyniki_post.php'),
+        headers: {'Authorization': 'Bearer $apiToken', 'Content-Type': 'application/json'},
+        body: json.encode({}),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> allData = json.decode(response.body);
+        final Set<String> quals = {};
+        for (final exam in allData) {
+          final q = (exam['kwalifikacja'] ?? '').toString().trim().replaceAll(' ', '').toLowerCase();
+          if (isValidQualification(q)) quals.add(q);
+        }
+        setState(() {
+          qualifications = quals.toList()..sort();
+          isLoading = false;
+        });
+      } else {
+        setState(() => isLoading = false);
+      }
+    } catch (e) {
+      setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) return const Center(child: CircularProgressIndicator());
+    if (qualifications.isEmpty) {
+      return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Brak dostępnych kwalifikacji.\nUpewnij się, że ktoś już zdawał egzaminy.', textAlign: TextAlign.center)));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          DropdownButtonFormField<String>(
+            value: selectedQualification,
+            isExpanded: true,
+            dropdownColor: Theme.of(context).colorScheme.surface,
+            menuMaxHeight: 400,
+            decoration: const InputDecoration(labelText: 'Wybierz kwalifikację', border: OutlineInputBorder()),
+            items: qualifications.map((q) => DropdownMenuItem(value: q, child: Text(q.toUpperCase(), style: const TextStyle(fontSize: 16)))).toList(),
+            onChanged: (v) => setState(() => selectedQualification = v),
+          ),
+          const SizedBox(height: 40),
+          if (selectedQualification != null) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.shuffle),
+                  label: const Text('Losowe 40 pytań'),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TestCreatorPage(qualification: selectedQualification!, mode: TestCreationMode.random))),
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.handyman),
+                  label: const Text('Ręczny dobór pytań'),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TestCreatorPage(qualification: selectedQualification!, mode: TestCreationMode.manual))),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'egzamin.dart';
 import 'edit_questions.dart';
 import 'widgets/question_tile.dart';
+import 'published_test_page.dart';
 
 class QualificationPage extends StatelessWidget {
   const QualificationPage({
@@ -89,8 +90,21 @@ class QualificationPage extends StatelessWidget {
           );
         },
       ),
+      QuestionTile(
+        icon: Icons.assignment_turned_in,
+        code: 'Testy z zestawu',
+        label: 'Opublikowane zestawy pytań',
+        showCount: false,
+        onTap: (_) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PublishedTestsPage(qualification: qualification),
+            ),
+          );
+        },
+      )
     ];
-
     if (isAdmin) {
       tiles.add(
         QuestionTile(

@@ -19,21 +19,26 @@ const double _minImageHeight = 100;
 const double _maxImageHeight = 500;
 
 
-enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie }
+enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie, zTestu }
 
 class EgzaminView extends StatefulWidget {
   final TrybEgzaminu tryb;
   final String kwalifikacja;
   final bool returnToHome;
   final String? userName;
+  final Map<String, dynamic>? testData;
 
   const EgzaminView({
     super.key,
     required this.tryb,
     required this.kwalifikacja,
     required this.returnToHome,
-    this.userName,
-  });
+    this.userName, 
+    this.testData,
+  }) : assert(
+         tryb != TrybEgzaminu.zTestu || testData != null,
+         'testData must be provided for TrybEgzaminu.zTestu',
+       );
 
   @override
   State<EgzaminView> createState() => _EgzaminViewState();
@@ -133,6 +138,64 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Future<void> fetchQuestions() async {
+  final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+  final testData = args?['testData'] as Map<String, dynamic>?;
+
+    if (testData != null) {
+    // ==========================
+    // TEST NAUCZYCIELA – pobierz pytania z published_tests
+    // ==========================
+    final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/published_tests.php');
+    try {
+      final response = await http.get(uri); // GET, bo uczeń nie potrzebuje tokena
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final List<dynamic> allPublished = json.decode(response.body);
+
+        // Znajdź test o dokładnie tych parametrach
+        final matching = allPublished.firstWhere(
+          (t) =>
+              t['name'] == testData['name'] &&
+              t['author'] == testData['author'] &&
+              t['qualification'] == testData['qualification'],
+          orElse: () => null,
+        );
+
+        if (matching != null) {
+          final List<dynamic> fetchedQuestions = List.from(matching['test_json'] ?? []);
+
+          for (var q in fetchedQuestions) {
+            q['pytanie_text'] = _clean(q['pytanie']);
+            q['pytanie_images'] = (q['images'] as List?)?.cast<String>() ?? [];
+            q['pytanie_videos'] = (q['videos'] as List?)?.cast<String>() ?? [];
+
+            for (int i = 1; i <= 4; i++) {
+              final key = 'odp$i';
+              q['${key}_text'] = _clean(q[key]);
+              q['${key}_images'] = (q['${key}_images'] as List?)?.cast<String>() ?? [];
+              q['${key}_videos'] = (q['${key}_videos'] as List?)?.cast<String>() ?? [];
+            }
+          }
+
+          if (mounted) {
+            setState(() {
+              questions = fetchedQuestions;
+              selectedAnswers = List.filled(fetchedQuestions.length, null);
+              isLoading = false;
+              _visibleCount = 30.clamp(0, fetchedQuestions.length);
+            });
+          }
+          _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
+          startTime = DateTime.now();
+          _startTimer();
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint("Pobranie pytań nauczyciela nie powiodło się: $e");
+    }
+  } else {
+    // ==========================
+    // Normalny egzamin – losuj pytania
+    // ==========================
     final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
     final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/$kwalifikacja.php');
     try {
@@ -152,6 +215,13 @@ class _EgzaminViewState extends State<EgzaminView> {
           case TrybEgzaminu.wszystkie:
             selected = allQuestions;
             break;
+          case TrybEgzaminu.zTestu:
+            if (widget.testData == null) {
+              throw Exception('Brak testData w trybie zTestu!');
+            }
+            selected = List.from(widget.testData!['questions'] ?? []);
+            break;
+
         }
 
         for (var q in selected) {
@@ -162,10 +232,8 @@ class _EgzaminViewState extends State<EgzaminView> {
           for (int i = 1; i <= 4; i++) {
             final key = 'odp$i';
             q['${key}_text'] = _clean(q[key]);
-            q['${key}_images'] =
-                (q['${key}_images'] as List?)?.cast<String>() ?? [];
-            q['${key}_videos'] =
-                (q['${key}_videos'] as List?)?.cast<String>() ?? [];
+            q['${key}_images'] = (q['${key}_images'] as List?)?.cast<String>() ?? [];
+            q['${key}_videos'] = (q['${key}_videos'] as List?)?.cast<String>() ?? [];
           }
         }
 
@@ -182,9 +250,11 @@ class _EgzaminViewState extends State<EgzaminView> {
         _startTimer();
       }
     } catch (e) {
-      if (kDebugMode) debugPrint("Pobranie nie powiodło się: $e");
+      if (kDebugMode) debugPrint("Pobranie pytań nie powiodło się: $e");
     }
   }
+}
+
 
   Future<void> sendResultToServer({
     required String kwalifikacja,
@@ -411,6 +481,15 @@ class _EgzaminViewState extends State<EgzaminView> {
                       color: colorScheme.primary,
                     ),
                   ),
+                  if (widget.tryb == TrybEgzaminu.zTestu)
+                  Text(
+                    'Pytanie ${index + 1}${q['id'] != null ? ' (ID: ${q['id']})' : ''}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: colorScheme.primary,
+                    ),
+                  ),
                 _buildDifficultyBadge(
                   context,
                   q['trudnosc']?.toDouble(),
@@ -573,7 +652,8 @@ class _EgzaminViewState extends State<EgzaminView> {
               ? _buildSingleQuestion(questions[current])
               : _buildLazyList(),
       bottomNavigationBar:
-          widget.tryb == TrybEgzaminu.czterdziesciPytan
+          (widget.tryb == TrybEgzaminu.czterdziesciPytan ||
+                      widget.tryb == TrybEgzaminu.zTestu)
               ? _buildFinishButton(context)
               : null,
     );
@@ -694,30 +774,75 @@ class _EgzaminViewState extends State<EgzaminView> {
     );
   }
 
-  Future<void> _finishExam() async {
-    setState(() => _isButtonDisabled = true);
+ Future<void> _finishExam() async {
+  setState(() => _isButtonDisabled = true);
 
-    int correct = 0;
-    for (int i = 0; i < questions.length; i++) {
-      if (selectedAnswers[i] == questions[i]['poprawna']) {
-        correct++;
-      }
+  int correct = 0;
+  for (int i = 0; i < questions.length; i++) {
+    if (selectedAnswers[i] == questions[i]['poprawna']) {
+      correct++;
     }
+  }
 
-    final percent = (correct / questions.length) * 100;
-    final endTime = DateTime.now();
-    final duration = endTime.difference(startTime).inSeconds;
-    final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString("userName") ?? "anonymous";
+  final percent = (correct / questions.length) * 100;
+  final endTime = DateTime.now();
+  final duration = endTime.difference(startTime).inSeconds;
+  final prefs = await SharedPreferences.getInstance();
+  final userName = prefs.getString("userName") ?? "anonymous";
 
-    final List<Map<String, dynamic>> pytaniaDoBazy = [];
-    for (var q in questions) {
-      pytaniaDoBazy.add({
-        'id': q['id'],
-        'pytanie': q['pytanie'],
-        'poprawna': q['poprawna'],
-      });
+  // ==============================
+  // Część wspólna – pytania do payload
+  // ==============================
+  final List<Map<String, dynamic>> pytaniaDoBazy = [];
+  for (var q in questions) {
+    pytaniaDoBazy.add({
+      'id': q['id'],
+      'pytanie': q['pytanie'],
+      'poprawna': q['poprawna'],
+    });
+  }
+
+  // ==============================
+  // Sprawdzenie, czy to test nauczyciela
+  // ==============================
+  final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+  final testData = args?['testData'] as Map<String, dynamic>?;
+
+  if (testData != null) {
+    // ==============================
+    // TEST NAUCZYCIELA – zapis do serwera
+    // ==============================
+    final testKey = '${testData['name']}||${testData['author']}||${testData['qualification']}';
+
+    final payload = {
+      'test_key': testKey,
+      'userName': userName,
+      'score': percent,
+      'date': endTime.toIso8601String(),
+      'duration_sec': duration,
+      'selectedAnswers': selectedAnswers,
+      'questions': pytaniaDoBazy,
+    };
+
+    final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/savePublishedResult.php');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode != 200 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Błąd zapisu wyniku testu nauczyciela: ${response.body}')),
+      );
     }
+  } else {
+    // ==============================
+    // EGZAMIN 40 PYTAŃ – wysyłka na serwer
+    // ==============================
     final Map<String, dynamic> payload = {
       'kwalifikacja': widget.kwalifikacja,
       'wynik': percent,
@@ -738,32 +863,33 @@ class _EgzaminViewState extends State<EgzaminView> {
       body: jsonEncode(payload),
     );
 
-    if (response.statusCode != 200) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd zapisu egzaminu: ${response.body}')),
-        );
-      }
-    }
-
-    setState(() => _isButtonDisabled = false);
-
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (_) => EgzaminWynikView(
-                correctAnswers: correct,
-                totalQuestions: questions.length,
-                questions: questions,
-                selectedAnswers: selectedAnswers,
-                returnToHome: true,
-              ),
-        ),
+    if (response.statusCode != 200 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Błąd zapisu egzaminu: ${response.body}')),
       );
     }
   }
+
+  // ==============================
+  // Widok wyniku końcowego
+  // ==============================
+  if (mounted) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EgzaminWynikView(
+          correctAnswers: correct,
+          totalQuestions: questions.length,
+          questions: questions,
+          selectedAnswers: selectedAnswers,
+          returnToHome: true,
+        ),
+      ),
+    );
+  }
+
+  setState(() => _isButtonDisabled = false);
+}
 
   void _losujNowePytanie() {
     if (questions.length <= 1) return;
