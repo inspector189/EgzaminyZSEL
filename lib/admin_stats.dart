@@ -23,6 +23,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   String searchQuery = '';
   DateTime? startDate;
   DateTime? endDate;
+  TimeOfDay? startTime;
+  TimeOfDay? endTime;
+  String? selectedQualification;
 
   @override
   void initState() {
@@ -117,23 +120,32 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     final worst = scores.reduce((a, b) => a < b ? a : b);
     return {'count': scores.length, 'avg': avg, 'best': best, 'worst': worst};
   }
-
+  String formatTimeOfDay24(TimeOfDay time) {
+    final h = time.hour.toString().padLeft(2, '0');
+    final m = time.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final filteredResults =
-        allResults.where((exam) {
-          final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
-          if (examDate == null) return false;
-          final afterStart =
-              startDate == null ||
-              examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
-          final beforeEnd =
-              endDate == null ||
-              examDate.isBefore(endDate!.add(const Duration(days: 1)));
-          return afterStart && beforeEnd;
-        }).toList();
+    final filteredResults = allResults.where((exam) {
+      final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
+      if (examDate == null) return false;
+
+      // Filtrowanie po dacie
+      final afterStartDate = startDate == null || examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
+      final beforeEndDate = endDate == null || examDate.isBefore(endDate!.add(const Duration(days: 1)));
+
+      // Filtrowanie po godzinie
+      final afterStartTime = startTime == null || examDate.hour >= startTime!.hour && examDate.minute >= startTime!.minute;
+      final beforeEndTime = endTime == null || examDate.hour <= endTime!.hour && examDate.minute <= endTime!.minute;
+
+      // Filtrowanie po kwalifikacji
+      final matchesQualification = selectedQualification == null || (exam['kwalifikacja'] ?? '').toString() == selectedQualification;
+
+      return afterStartDate && beforeEndDate && afterStartTime && beforeEndTime && matchesQualification;
+    }).toList();
     final users = _groupBy(
       filteredResults,
       (r) => (r['userID'] ?? '').toString().trim(),
@@ -235,6 +247,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                               ),
                             ),
                           ),
+                          
                         ),
 
                         const SizedBox(width: 8),
@@ -290,6 +303,87 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                           ),
                         ),
                       ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showTimePicker(
+                              context: context,
+                              initialTime: startTime ?? TimeOfDay(hour: 0, minute: 0),
+                              builder: (BuildContext context, Widget? child) {
+                                return MediaQuery(
+                                  data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+                                  child: child!,
+                                );
+                              },
+                              initialEntryMode: TimePickerEntryMode.input,
+                            );
+                            if (picked != null) setState(() => startTime = picked);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: colorScheme.secondary, width: 1),
+                              ),
+                              child: Text(
+                                startTime == null
+                                  ? 'Godzina od'
+                                  : 'Od: ${formatTimeOfDay24(startTime!)}',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime: endTime ?? TimeOfDay(hour: 23, minute: 59),
+                                builder: (BuildContext context, Widget? child)
+                                {
+                                  return MediaQuery(
+                                      data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true), 
+                                      child: child!,
+                                    );
+                                },
+                                initialEntryMode: TimePickerEntryMode.input,
+                              );
+                              if (picked != null) setState(() => endTime = picked);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: colorScheme.secondary, width: 1),
+                              ),
+                              child: Text(
+                                endTime == null
+                                  ? 'Godzina do'
+                                  : 'Do: ${formatTimeOfDay24(endTime!)}',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    DropdownButton<String>(
+                      value: selectedQualification,
+                      hint: const Text('Wybierz kwalifikację'),
+                      items: groupByQualification().keys.map((q) {
+                        return DropdownMenuItem(
+                          value: q,
+                          child: Text(q),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => selectedQualification = value);
+                      },
                     ),
                     const SizedBox(height: 8),
                     if (startDate != null || endDate != null)
