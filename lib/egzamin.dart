@@ -805,26 +805,25 @@ class _EgzaminViewState extends State<EgzaminView> {
   // ==============================
   // Sprawdzenie, czy to test nauczyciela
   // ==============================
-  final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-  final testData = args?['testData'] as Map<String, dynamic>?;
+
+  final testData = widget.testData;
 
   if (testData != null) {
-    // ==============================
-    // TEST NAUCZYCIELA – zapis do serwera
-    // ==============================
     final testKey = '${testData['name']}||${testData['author']}||${testData['qualification']}';
 
     final payload = {
-      'test_key': testKey,
       'userName': userName,
-      'score': percent,
-      'date': endTime.toIso8601String(),
-      'duration_sec': duration,
+      'test_key': testKey,
+      'score': percent,                    
+      'kwalifikacja': widget.kwalifikacja.replaceAll(' ', '').toLowerCase(),
+      'date': endTime.toIso8601String(),   
+      'duration_sec': duration,           
       'selectedAnswers': selectedAnswers,
       'questions': pytaniaDoBazy,
     };
 
     final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/savePublishedResult.php');
+
     final response = await http.post(
       uri,
       headers: {
@@ -832,8 +831,10 @@ class _EgzaminViewState extends State<EgzaminView> {
         'Content-Type': 'application/json',
       },
       body: jsonEncode(payload),
+      
     );
-
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body}");
     if (response.statusCode != 200 && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Błąd zapisu wyniku testu nauczyciela: ${response.body}')),

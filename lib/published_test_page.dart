@@ -58,7 +58,9 @@ void _loadPublishedTests() async {
       for (final t in [...localPublished, ...serverTests]) {
         final key = '${t['name']}||${t['qualification']}';
         if (t['questions'] != null && (t['questions'] as List).isNotEmpty) {
-          normalizeQualification(t['qualification']) == normalizeQualification(widget.qualification);
+          if (normalizeQualification(t['qualification']) != normalizeQualification(widget.qualification)) {
+            continue; 
+          }
           merged[key] = t;
         }
       }
@@ -104,19 +106,22 @@ Widget build(BuildContext context) {
                 );
                 return;
               }
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EgzaminView(
-                    tryb: TrybEgzaminu.zTestu, // only here
-                    kwalifikacja: test['qualification'],
-                    returnToHome: false,
-                    userName: null,
-                    testData: test, // pass full test only here
+              final shuffledTest = Map<String, dynamic>.from(test);
+                shuffledTest['questions'] = List<Map<String, dynamic>>.from(test['questions']).toList()..shuffle();
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EgzaminView(
+                      tryb: TrybEgzaminu.zTestu,
+                      kwalifikacja: test['qualification'],
+                      returnToHome: false,
+                      userName: null,
+                      testData: shuffledTest, // przekazujemy pytania w losowej kolejności
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
           ),
         );
       },

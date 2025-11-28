@@ -470,20 +470,20 @@ List<String> getImages(Map<String, dynamic> q, String prefix) {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Row(children: [
-              pw.Text('Nr w dzienniku:', style: pw.TextStyle(font: ttf, fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Nr w dzienniku:', style: pw.TextStyle(font: ttf, fontSize: 11, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(width: 10),
-              pw.Container(width: 60, child: pw.Text('________', style: pw.TextStyle(font: ttf, fontSize: 14))),
+              pw.Container(width: 60, child: pw.Text('________', style: pw.TextStyle(font: ttf, fontSize: 11))),
             ]),
             pw.Row(children: [
-              pw.Text('Punkty:', style: pw.TextStyle(font: ttf, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Punkty:', style: pw.TextStyle(font: ttf, fontSize: 11, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(width: 12),
-              pw.Text('____', style: pw.TextStyle(font: ttf, fontSize: 18)),
-              pw.Text(' / 40', style: pw.TextStyle(font: ttf, fontSize: 16)),
+              pw.Text('____', style: pw.TextStyle(font: ttf, fontSize: 11)),
+              pw.Text(' / 40', style: pw.TextStyle(font: ttf, fontSize: 11)),
             ]),
           ],
         ),
 
-        pw.SizedBox(height: 15),
+        pw.SizedBox(height: 10),
         pw.Divider(thickness: 1.5),
         pw.SizedBox(height: 10),
       ],
@@ -499,8 +499,8 @@ List<String> getImages(Map<String, dynamic> q, String prefix) {
     final pytanieImages = getImages(q, '');
 
     final List<pw.Widget> children = [
-      pw.Text('$i. $pytanieText', style: pw.TextStyle(font: ttf, fontSize: 12, fontWeight: pw.FontWeight.bold)),
-      pw.SizedBox(height: 10),
+      pw.Text('$i. $pytanieText', style: pw.TextStyle(font: ttf, fontSize: 10, fontWeight: pw.FontWeight.bold)),
+      pw.SizedBox(height: 5),
     ];
 
     // Dodaj obrazki pytania
@@ -520,7 +520,7 @@ for (final url in pytanieImages) {
           ),
         ),
       );
-      children.add(pw.SizedBox(height: 12));
+      children.add(pw.SizedBox(height: 11));
     }
   } catch (_) {}
 }
@@ -535,7 +535,7 @@ for (int idx = 1; idx <= 4; idx++) {
           padding: const pw.EdgeInsets.only(left: 20, top: 8, bottom: 4),
           child: pw.Text(
             text,
-            style: pw.TextStyle(font: ttf, fontSize: 11.5),
+            style: pw.TextStyle(font: ttf, fontSize: 11),
           ),
         ),
       );
@@ -560,11 +560,11 @@ for (int idx = 1; idx <= 4; idx++) {
       }
     } catch (_) {}
   }
-  children.add(pw.SizedBox(height: 10));
+  children.add(pw.SizedBox(height: 7));
 }
 
     pages.add(pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 32),
+      padding: const pw.EdgeInsets.only(bottom: 5),
       child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: children),
     ));
   }
@@ -575,7 +575,7 @@ for (int idx = 1; idx <= 4; idx++) {
     header: (ctx) => ctx.pageNumber == 1 ? header : pw.SizedBox(),
     footer: (ctx) => pw.Container(
       alignment: pw.Alignment.center,
-      margin: const pw.EdgeInsets.only(top: 20),
+      margin: const pw.EdgeInsets.only(top: 10),
       child: pw.Text('Strona ${ctx.pageNumber} / ${ctx.pagesCount}', style: pw.TextStyle(font: ttf, fontSize: 11, color: PdfColors.grey700)),
     ),
     build: (_) => pages,
@@ -658,6 +658,11 @@ for (int idx = 1; idx <= 4; idx++) {
                     tooltip: isPublished ? 'Wycofaj' : 'Opublikuj',
                     onPressed: () => _publishTest(i),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.file_download, color: Colors.purple),
+                    tooltip: 'Zrób raport z wyników',
+                    onPressed: () => _generateReportPdf(t),
+                  ),
                 ],
               ),
               children: [
@@ -667,40 +672,7 @@ for (int idx = 1; idx <= 4; idx++) {
                     child: Text('Brak wyników', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
                   )
                 else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    itemCount: sortedResults.length,
-                    itemBuilder: (context, j) {
-                      final r = sortedResults[j];
-                      final score = (r['score'] as num).toDouble();
-                      final userName = r['userName'] as String? ?? 'Anonimowy uczeń';
-                      final date = _formatDate(r['date'] as String);
-
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                        leading: CircleAvatar(
-                          radius: 22,
-                          backgroundColor: score >= 75
-                              ? Colors.green
-                              : score >= 50
-                                  ? Colors.orange
-                                  : Colors.red,
-                          child: Text(
-                            '${score.toStringAsFixed(0)}%',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                        ),
-                        title: Text(userName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(date),
-                        trailing: Text(
-                          '${r['duration_sec'] ~/ 60} min',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                        ),
-                      );
-                    },
-                  ),
+                  ..._buildGroupedResults(sortedResults),
                 const SizedBox(height: 8),
               ],
             ),
@@ -709,13 +681,134 @@ for (int idx = 1; idx <= 4; idx++) {
       ),
     );
   }
+List<Widget> _buildGroupedResults(List<dynamic> results) {
+  // Grupuj po userName
+  final Map<String, List<dynamic>> grouped = {};
+  for (var r in results) {
+    final user = r['userName'] as String? ?? 'Nieznany';
+    grouped[user] = grouped[user] ?? [];
+    grouped[user]!.add(r);
+  }
 
+  final List<Widget> widgets = [];
+  grouped.forEach((user, userResults) {
+    // Posortuj wyniki użytkownika od najnowszego
+    userResults.sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
+    final latest = userResults.first;
+    final latestScore = (latest['score'] as num?)?.toDouble() ?? 0.0;
+    final latestDate = _formatDate(latest['date'] as String? ?? '');
+
+    widgets.add(
+      ExpansionTile(
+        title: Text('$user - $latestDate - ${latestScore.toStringAsFixed(0)}%'),
+        children: userResults.map((r) {
+          final score = (r['score'] as num?)?.toDouble() ?? 0.0;
+          final date = _formatDate(r['date'] as String? ?? '');
+          final durationSec = (r['duration_sec'] as num?)?.toInt() ?? 0;
+
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            leading: CircleAvatar(
+              radius: 22,
+              backgroundColor: score >= 75
+                  ? Colors.green
+                  : score >= 50
+                      ? Colors.orange
+                      : Colors.red,
+              child: Text(
+                '${score.toStringAsFixed(0)}%',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+            title: Text(user, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Data: $date', style: TextStyle(color: Colors.grey[700])),
+                Text('Czas trwania: $durationSec s', style: TextStyle(color: Colors.grey[700])),
+              ],
+            ),
+            trailing: Text('${score.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+          );
+        }).toList(),
+      ),
+    );
+  });
+
+  return widgets;
+}
   String _formatDate(String isoDate) {
     try {
       final date = DateTime.parse(isoDate);
       return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return isoDate;
+    }
+  }
+  Future<void> _generateReportPdf(Map<String, dynamic> test) async {
+    final results = (test['results'] as List<dynamic>?) ?? [];
+    if (results.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Brak wyników do raportu')),
+      );
+      return;
+    }
+
+    final pdf = pw.Document();
+    final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
+    final ttf = pw.Font.ttf(fontData);
+
+    // Grupuj po uczniu i weź tylko ostatni wynik
+    final Map<String, dynamic> lastResults = {};
+    for (var r in results) {
+      final user = r['userName'] as String? ?? 'Nieznany';
+      if (!lastResults.containsKey(user) || (r['date'] as String).compareTo(lastResults[user]['date']) > 0) {
+        lastResults[user] = r;
+      }
+    }
+
+    // Przygotuj dane do tabeli
+    final tableData = lastResults.entries.map((e) {
+      final r = e.value;
+      final score = (r['score'] as num?)?.toStringAsFixed(0) ?? '-';
+      final date = _formatDate(r['date'] as String? ?? '');
+      return [e.key, '$score%', date];
+    }).toList();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (context) => [
+          pw.Header(level: 0, child: pw.Center(child: pw.Text('Raport wyników - ${test['name']}', style: pw.TextStyle(font: ttf, fontSize: 24, fontWeight: pw.FontWeight.bold)))),
+          pw.SizedBox(height: 20),
+          pw.Text('Data generowania: ${DateTime.now().toLocal().toString().split(' ')[0]}', style: pw.TextStyle(font: ttf, fontSize: 12)),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Kwalifikacja: ${test['qualification'].toString().toUpperCase()}',
+            style: pw.TextStyle(font: ttf, fontSize: 14, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 20),
+          pw.TableHelper.fromTextArray(
+            headers: ['Użytkownik', 'Wynik ostatniego egzaminu', 'Data'],
+            data: tableData,
+            headerStyle: pw.TextStyle(font: ttf, fontWeight: pw.FontWeight.bold, fontSize: 12),
+            cellStyle: pw.TextStyle(font: ttf, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+
+    final bytes = await pdf.save();
+    final filename = 'raport_${test['name'].replaceAll(' ', '_')}.pdf';
+
+    if (kIsWeb) {
+      final blob = _createBlob(bytes);
+      final url = web.URL.createObjectURL(blob);
+      web.window.open(url, '_blank');
+      Future.delayed(const Duration(seconds: 5), () => web.URL.revokeObjectURL(url));
+    } else {
+      await Printing.sharePdf(bytes: bytes, filename: filename);
     }
   }
 }
