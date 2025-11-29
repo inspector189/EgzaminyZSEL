@@ -17,7 +17,7 @@ class PublishedTestsPage extends StatefulWidget {
 
 class _PublishedTestsPageState extends State<PublishedTestsPage> {
   List<Map<String, dynamic>> publishedTests = [];
-
+  bool isLoading = true;
   @override
   void initState() {
     super.initState();
@@ -29,7 +29,10 @@ String normalizeQualification(String q) {
       .toLowerCase();
 }
 void _loadPublishedTests() async {
-  setState(() => publishedTests = []); // reset i pokazanie loading
+  setState(() {
+    isLoading = true;
+    publishedTests = [];
+  }); // reset i pokazanie loading
 
   final prefs = await SharedPreferences.getInstance();
   List<Map<String, dynamic>> localPublished = [];
@@ -65,25 +68,48 @@ void _loadPublishedTests() async {
         }
       }
 
-      setState(() => publishedTests = merged.values.toList());
+      setState(() {
+        publishedTests = merged.values.toList();
+        isLoading = false;
+      });
     } else {
-      setState(() => publishedTests = localPublished);
+        setState(() {
+          publishedTests = localPublished;
+          isLoading = false;
+        });
+      }
+
+    } catch (_) {
+      setState(() {
+        publishedTests = localPublished;
+        isLoading = false;
+      });
     }
-  } catch (_) {
-    setState(() => publishedTests = localPublished);
-  }
 }
 
 
 
  @override
 Widget build(BuildContext context) {
-  if (publishedTests.isEmpty) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Testy z zestawu')),
-      body: const Center(child: CircularProgressIndicator()),
-    );
-  }
+    if (isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Testy z zestawu')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+
+    if (publishedTests.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Testy z zestawu')),
+        body: const Center(
+          child: Text(
+            'Brak testów w tej kwalifikacji',
+            style: TextStyle(fontSize: 18),
+          ),
+        ),
+      );
+    }
 
   return Scaffold(
     appBar: AppBar(title: const Text('Testy z zestawu')),
