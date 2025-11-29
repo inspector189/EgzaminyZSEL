@@ -334,7 +334,7 @@ class _MyHomePageState extends State<MyHomePage> {
       case 'Teleinformatyk':
         return ['INF.08', 'INF.07'];
       case 'Automatyk':
-        return ['ELM.04', 'ELM.01'];
+        return ['EE.17', 'EE.18'];
       default:
         return [];
     }
@@ -828,14 +828,14 @@ class HomeContent extends StatelessWidget {
         _buildGrid('🤖 Technik Automatyk', [
           QuestionTile(
             icon: Icons.build_circle,
-            code: 'ELM.01',
-            label: 'obsługa automatyki przemysłowej',
+            code: 'EE.17',
+            label: 'montaż i uruchamianie urządzeń automatyki przemysłowej',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.settings_input_component,
-            code: 'ELM.04',
-            label: 'eksploatacja układów automatyki',
+            code: 'EE.18',
+            label: 'przeglądy, konserwacja, diagnostyka i naprawa instalacji automatyki przemysłowej',
             onTap: onQualificationTap,
           ),
         ]),
