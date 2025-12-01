@@ -784,7 +784,6 @@ Future<void> _generateAnswerKeyPdf(Map<String, dynamic> test) async {
 
     answerRows.add([
       (i + 1).toString(),
-      id,
       correct,
     ]);
   }
@@ -808,14 +807,13 @@ Future<void> _generateAnswerKeyPdf(Map<String, dynamic> test) async {
         pw.SizedBox(height: 20),
 
         pw.TableHelper.fromTextArray(
-          headers: ["Nr pytania", "Pytanie ID", "Poprawna"],
+          headers: ["Nr pytania", "Poprawna"],
           data: answerRows,
           headerStyle: pw.TextStyle(font: ttf, fontSize: 12, fontWeight: pw.FontWeight.bold),
           cellStyle: pw.TextStyle(font: ttf, fontSize: 11),
           columnWidths: {
-            0: const pw.FlexColumnWidth(1),
-            1: const pw.FlexColumnWidth(2),
-            2: const pw.FlexColumnWidth(1),
+            0: const pw.FlexColumnWidth(0.5),
+            1: const pw.FlexColumnWidth(1),
           },
         )
       ],
