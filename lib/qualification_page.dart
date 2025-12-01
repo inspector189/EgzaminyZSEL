@@ -92,8 +92,8 @@ class QualificationPage extends StatelessWidget {
       ),
       QuestionTile(
         icon: Icons.assignment_turned_in,
-        code: 'Testy z zestawu',
-        label: 'Opublikowane zestawy pytań',
+        code: 'Testy z zestawu nauczyciela',
+        label: 'Opublikowane zestawy pytań przez nauczycieli',
         showCount: false,
         onTap: (_) {
           Navigator.push(

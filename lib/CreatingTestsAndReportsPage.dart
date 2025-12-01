@@ -663,6 +663,11 @@ for (int idx = 1; idx <= 4; idx++) {
                     tooltip: 'Zrób raport z wyników',
                     onPressed: () => _generateReportPdf(t),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.key, color: Colors.teal),
+                    tooltip: 'Klucz odpowiedzi',
+                    onPressed: () => _generateAnswerKeyPdf(t),
+                  ),
                 ],
               ),
               children: [
@@ -697,7 +702,6 @@ List<Widget> _buildGroupedResults(List<dynamic> results) {
     final latest = userResults.first;
     final latestScore = (latest['score'] as num?)?.toDouble() ?? 0.0;
     final latestDate = _formatDate(latest['date'] as String? ?? '');
-
     widgets.add(
       ExpansionTile(
         title: Text('$user - $latestDate - ${latestScore.toStringAsFixed(0)}%'),
@@ -705,7 +709,11 @@ List<Widget> _buildGroupedResults(List<dynamic> results) {
           final score = (r['score'] as num?)?.toDouble() ?? 0.0;
           final date = _formatDate(r['date'] as String? ?? '');
           final durationSec = (r['duration_sec'] as num?)?.toInt() ?? 0;
-
+          final duration = Duration(seconds: durationSec);
+          String twoDigits(int n) => n.toString().padLeft(2, '0');
+          final hours = twoDigits(duration.inHours);
+          final minutes = twoDigits(duration.inMinutes.remainder(60));
+          final seconds = twoDigits(duration.inSeconds.remainder(60));
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
             leading: CircleAvatar(
@@ -725,9 +733,10 @@ List<Widget> _buildGroupedResults(List<dynamic> results) {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Data: $date', style: TextStyle(color: Colors.grey[700])),
-                Text('Czas trwania: $durationSec s', style: TextStyle(color: Colors.grey[700])),
+                Text('Czas trwania: $hours:$minutes:$seconds', style: TextStyle(color: Colors.grey[700])),
               ],
             ),
+            
             trailing: Text('${score.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
           );
         }).toList(),
@@ -736,6 +745,94 @@ List<Widget> _buildGroupedResults(List<dynamic> results) {
   });
 
   return widgets;
+}
+Future<void> _generateAnswerKeyPdf(Map<String, dynamic> test) async {
+  final String qual = test['qualification'];
+  final questions = List<Map<String, dynamic>>.from(test['questions']);
+
+  // Pobierz poprawne odpowiedzi z kwalifikacji.php
+  final url = "https://egzaminy.zsel.edu.pl/egzaminy/$qual.php";
+
+  List<dynamic> fullDb = [];
+  try {
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      fullDb = json.decode(response.body);
+    } else {
+      throw Exception("Błąd połączenia: ${response.statusCode}");
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Nie można pobrać klucza odpowiedzi ($qual.php)")),
+    );
+    return;
+  }
+
+  // Tworzymy mapę ID → poprawna odpowiedź
+  final Map<String, String> answerMap = {};
+  for (final q in fullDb) {
+    answerMap[q['id'].toString()] = q['poprawna'].toString().trim().toUpperCase();
+  }
+
+  // Generujemy dane klucza
+  final List<List<String>> answerRows = [];
+  for (int i = 0; i < questions.length; i++) {
+    final q = questions[i];
+    final id = q['id'].toString();
+
+    final correct = answerMap[id] ?? "?";
+
+    answerRows.add([
+      (i + 1).toString(),
+      id,
+      correct,
+    ]);
+  }
+
+  // --- PDF ---
+  final pdf = pw.Document();
+  final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
+  final ttf = pw.Font.ttf(fontData);
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (context) => [
+        pw.Text(
+          "Klucz Odpowiedzi — ${test['name']}",
+          style: pw.TextStyle(font: ttf, fontWeight: pw.FontWeight.bold, fontSize: 24),
+        ),
+        pw.SizedBox(height: 20),
+        pw.Text("Kwalifikacja: ${qual.toUpperCase()}", style: pw.TextStyle(font: ttf, fontSize: 14)),
+        pw.SizedBox(height: 20),
+
+        pw.TableHelper.fromTextArray(
+          headers: ["Nr pytania", "Pytanie ID", "Poprawna"],
+          data: answerRows,
+          headerStyle: pw.TextStyle(font: ttf, fontSize: 12, fontWeight: pw.FontWeight.bold),
+          cellStyle: pw.TextStyle(font: ttf, fontSize: 11),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(1),
+            1: const pw.FlexColumnWidth(2),
+            2: const pw.FlexColumnWidth(1),
+          },
+        )
+      ],
+    ),
+  );
+
+  final bytes = await pdf.save();
+  final filename = "klucz_${test['name'].replaceAll(' ', '_')}.pdf";
+
+  if (kIsWeb) {
+    final blob = _createBlob(bytes);
+    final url = web.URL.createObjectURL(blob);
+    web.window.open(url, '_blank');
+    Future.delayed(const Duration(seconds: 5), () => web.URL.revokeObjectURL(url));
+  } else {
+    await Printing.sharePdf(bytes: bytes, filename: filename);
+  }
 }
   String _formatDate(String isoDate) {
     try {
