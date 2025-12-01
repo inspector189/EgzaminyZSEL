@@ -106,47 +106,90 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _userEmail;
   bool _isAdmin = false;
 
-  bool _isVerifyingEmail = false;
-
   @override
   void initState() {
     super.initState();
     selectedQuote = quotes[Random().nextInt(quotes.length)];
     Future.microtask(_checkLoginState);
   }
+Future<void> _syncWithServerSession() async {
+  // jeśli lokalnie nie ma zalogowanego usera – nic nie sprawdzamy
+  if (!_isLoggedIn || _userEmail == null) return;
+  if (!kIsWeb) return; // sesje masz tylko na webie
+
+  try {
+    final url = Uri.parse(
+      'https://egzaminy.zsel.edu.pl/egzaminy/session-status.php',
+    );
+
+    // Możesz użyć POST z pustym body
+    final response = await HttpService.postJson(url, {});
+
+    if (response == null) return;
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final ok = data['ok'] == true;
+
+      if (!ok) {
+        // backend mówi: brak poprawnej sesji → wyloguj lokalnie
+        await _signOut(showSnack: false);
+        if (kDebugMode) {
+          debugPrint('ℹ️ Sesja na serwerze nie istnieje – logout lokalny');
+        }
+      } else {
+        // opcjonalnie: zsynchronizuj isAdmin z backendem
+        final bool adminFromServer = data['isAdmin'] == true;
+        if (mounted) {
+          setState(() {
+            _isAdmin = adminFromServer;
+          });
+        }
+      }
+    } else if (response.statusCode == 401) {
+      // np. check_logged_user(true) zwrócił 401 – też wyloguj lokalnie
+      await _signOut(showSnack: false);
+      if (kDebugMode) {
+        debugPrint('ℹ️ 401 z session-status – logout lokalny');
+      }
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('❌ Błąd sprawdzania sesji na serwerze: $e');
+    }
+    // przy błędzie sieci nic nie ruszamy – user zostaje zalogowany lokalnie
+  }
+}
 
   Future<void> _checkLoginState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString('userName');
-    final userEmail = prefs.getString('userEmail');
+  final prefs = await SharedPreferences.getInstance();
+  final userName = prefs.getString('userName');
+  final userEmail = prefs.getString('userEmail');
+  final isAdmin = prefs.getBool('isAdmin') ?? false;
 
-    final bool isLoggedIn = userName != null && userEmail != null;
+  final bool isLoggedIn = userName != null && userEmail != null;
 
-    if (kDebugMode) {
-      debugPrint(
-        'ℹ️ Sprawdzanie statusu logowania: userName=$userName, userEmail=$userEmail',
-      );
-    }
-    setState(() {
-      _isLoggedIn = isLoggedIn;
-      _userName = isLoggedIn ? userName : null;
-      _userEmail = isLoggedIn ? userEmail : null;
-    });
-
-    if (_isLoggedIn && _userEmail != null) {
-      unawaited(_verifyEmail(_userEmail!));
-    }
-
-    if (kDebugMode) {
-      debugPrint(
-        '📥 Zweryfikowano parametry - Czy użytkownik jest zalogowany: _isLoggedIn=$_isLoggedIn, Czy użytkownik jest adminem: _isAdmin=$_isAdmin',
-      );
-    }
+  if (kDebugMode) {
+    debugPrint(
+      'ℹ️ Sprawdzanie statusu logowania: '
+      'userName=$userName, userEmail=$userEmail, isAdmin=$isAdmin',
+    );
   }
 
+  setState(() {
+    _isLoggedIn = isLoggedIn;
+    _userName = isLoggedIn ? userName : null;
+    _userEmail = isLoggedIn ? userEmail : null;
+    _isAdmin = isLoggedIn ? isAdmin : false;
+  });
+
+  // DODANE: sprawdzenie sesji na serwerze
+  await _syncWithServerSession();
+}
+
+
+
   Future<void> _verifyEmail(String email) async {
-    if (_isVerifyingEmail) return;
-    _isVerifyingEmail = true;
 
     try {
       final url = Uri.parse(
@@ -187,7 +230,6 @@ class _MyHomePageState extends State<MyHomePage> {
       }
       if (kDebugMode) debugPrint('❌ Błąd weryfikacji email: $e');
     } finally {
-      _isVerifyingEmail = false;
     }
   }
 
@@ -202,22 +244,43 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Future<void> _signOut() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('userName');
-    await prefs.remove('userEmail');
-    setState(() {
-      _isLoggedIn = false;
-      _userName = null;
-      _userEmail = null;
-      _isAdmin = false;
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Wylogowano')));
+Future<void> _signOut({bool showSnack = true}) async {
+  // 1. Spróbuj zabić sesję na backendzie
+  if (kIsWeb) {
+    try {
+      final url = Uri.parse(
+        'https://egzaminy.zsel.edu.pl/egzaminy/logout.php',
+      );
+      // ignorujemy odpowiedź – ważne, że request poleci
+      await HttpService.postJson(url, {});
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ Błąd przy wylogowaniu na backendzie: $e');
+      }
     }
   }
+
+  // 2. Wyczyść lokalne dane
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('userName');
+  await prefs.remove('userEmail');
+  await prefs.remove('isAdmin');
+
+  setState(() {
+    _isLoggedIn = false;
+    _userName = null;
+    _userEmail = null;
+    _isAdmin = false;
+  });
+
+  if (mounted && showSnack) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Wylogowano')),
+    );
+  }
+}
+
+
 
   OverlayEntry? _currentProfilePopup;
 
