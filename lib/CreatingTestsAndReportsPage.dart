@@ -1075,32 +1075,34 @@ class _CreateNewTestTabState extends State<CreateNewTestTab> {
     _loadQualificationsFromServer();
   }
 
-  Future<void> _loadQualificationsFromServer() async {
-    try {
-      final response = await http.post(
-        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/egzaminy_wyniki_post.php'),
-        headers: {'Authorization': 'Bearer $apiToken', 'Content-Type': 'application/json'},
-        body: json.encode({}),
-      );
+Future<void> _loadQualificationsFromServer() async {
+  try {
+    final response = await http.post(
+      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/qualifications.php'),
+      headers: {'Authorization': 'Bearer $apiToken', 'Content-Type': 'application/json'},
+      body: json.encode({}),
+    );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> allData = json.decode(response.body);
-        final Set<String> quals = {};
-        for (final exam in allData) {
-          final q = (exam['kwalifikacja'] ?? '').toString().trim().replaceAll(' ', '').toLowerCase();
-          if (isValidQualification(q)) quals.add(q);
-        }
-        setState(() {
-          qualifications = quals.toList()..sort();
-          isLoading = false;
-        });
-      } else {
-        setState(() => isLoading = false);
-      }
-    } catch (e) {
+    if (response.statusCode == 200) {
+      final List<dynamic> allData = json.decode(response.body);
+
+      final List<String> quals = allData.map<String>((exam) {
+        return (exam['qualification_code'] ?? '').toString().toLowerCase();
+      }).where((code) => code.isNotEmpty).toList();
+
+      quals.sort();
+
+      setState(() {
+        qualifications = quals;
+        isLoading = false;
+      });
+    } else {
       setState(() => isLoading = false);
     }
+  } catch (e) {
+    setState(() => isLoading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {

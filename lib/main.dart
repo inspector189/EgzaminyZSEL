@@ -397,7 +397,7 @@ Future<void> _signOut({bool showSnack = true}) async {
       case 'Teleinformatyk':
         return ['INF.08', 'INF.07'];
       case 'Automatyk':
-        return ['EE.17', 'EE.18'];
+        return ['ELM.01', 'ELM.04'];
       default:
         return [];
     }
@@ -455,6 +455,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                   (context) => QualificationPage(
                     qualification: value,
                     isAdmin: _isAdmin,
+                    isLoggedIn: _isLoggedIn,
                   ),
             ),
             ModalRoute.withName('/home'),
@@ -498,6 +499,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                   (context) => QualificationPage(
                     qualification: title,
                     isAdmin: _isAdmin,
+                    isLoggedIn: _isLoggedIn,
                   ),
             ),
           );
@@ -542,6 +544,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                                         (context) => QualificationPage(
                                           qualification: kwal,
                                           isAdmin: _isAdmin,
+                                          isLoggedIn: _isLoggedIn,
                                         ),
                                   ),
                                 );
@@ -563,6 +566,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                                         (context) => QualificationPage(
                                           qualification: kwal,
                                           isAdmin: _isAdmin,
+                                          isLoggedIn: _isLoggedIn,
                                         ),
                                   ),
                                 );
@@ -584,6 +588,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                                         (context) => QualificationPage(
                                           qualification: kwal,
                                           isAdmin: _isAdmin,
+                                          isLoggedIn: _isLoggedIn,
                                         ),
                                   ),
                                 );
@@ -605,6 +610,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                                         (context) => QualificationPage(
                                           qualification: kwal,
                                           isAdmin: _isAdmin,
+                                          isLoggedIn: _isLoggedIn,
                                         ),
                                   ),
                                 );
@@ -626,6 +632,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                                         (context) => QualificationPage(
                                           qualification: kwal,
                                           isAdmin: _isAdmin,
+                                          isLoggedIn: _isLoggedIn,
                                         ),
                                   ),
                                 );
@@ -647,6 +654,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                                         (context) => QualificationPage(
                                           qualification: kwal,
                                           isAdmin: _isAdmin,
+                                          isLoggedIn: _isLoggedIn,
                                         ),
                                   ),
                                 );
@@ -788,6 +796,7 @@ Future<void> _signOut({bool showSnack = true}) async {
                             (context) => QualificationPage(
                               qualification: qualification,
                               isAdmin: _isAdmin,
+                              isLoggedIn: _isLoggedIn,
                             ),
                       ),
                     );
@@ -891,13 +900,13 @@ class HomeContent extends StatelessWidget {
         _buildGrid('🤖 Technik Automatyk', [
           QuestionTile(
             icon: Icons.build_circle,
-            code: 'EE.17',
+            code: 'ELM.01',
             label: 'montaż i uruchamianie urządzeń automatyki przemysłowej',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.settings_input_component,
-            code: 'EE.18',
+            code: 'ELM.04',
             label: 'przeglądy, konserwacja, diagnostyka i naprawa instalacji automatyki przemysłowej',
             onTap: onQualificationTap,
           ),
