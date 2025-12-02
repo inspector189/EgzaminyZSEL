@@ -701,7 +701,7 @@ Widget _buildTestList(List<Map<String, dynamic>> tests) {
 
         final results = (t['results'] as List<dynamic>?) ?? [];
         final isPublished = t['published'] == true;
-
+        final canEdit = isSuperAdmin || t['author'] == currentUser;
         final sortedResults = results
           ..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
 
@@ -738,22 +738,22 @@ Widget _buildTestList(List<Map<String, dynamic>> tests) {
               children: [
                 IconButton(icon: const Icon(Icons.visibility, color: Colors.blue), tooltip: 'Podgląd', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TestPreviewPage(test: t, onPublish: () => _publishTest(realIndex))))),
                 IconButton(icon: const Icon(Icons.print), tooltip: 'Drukuj', onPressed: () => _printTest(t)),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  tooltip: 'Usuń',
-                  onPressed: (isSuperAdmin || t['author'] == currentUser)
-                      ? () => _deleteTest(realIndex)
-                      : null,
-                ),
+               if (canEdit)
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    tooltip: 'Usuń',
+                    onPressed: () => _deleteTest(realIndex),
+                  ),
 
-                IconButton(
-                  icon: Icon(isPublished ? Icons.public : Icons.public_off,
-                      color: isPublished ? Colors.green : Colors.grey[700]),
-                  tooltip: isPublished ? 'Wycofaj' : 'Opublikuj',
-                  onPressed: (isSuperAdmin || t['author'] == currentUser)
-                      ? () => _publishTest(realIndex)
-                      : null,
-                ),
+                if (canEdit)
+                  IconButton(
+                    icon: Icon(
+                      isPublished ? Icons.public : Icons.public_off,
+                      color: isPublished ? Colors.green : Colors.grey[700],
+                    ),
+                    tooltip: isPublished ? 'Wycofaj' : 'Opublikuj',
+                    onPressed: () => _publishTest(realIndex),
+                  ),
                 IconButton(
                   icon: const Icon(Icons.file_download, color: Colors.purple),
                   tooltip: 'Zrób raport z wyników',
