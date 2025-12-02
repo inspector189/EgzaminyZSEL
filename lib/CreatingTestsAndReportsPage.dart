@@ -840,72 +840,221 @@ Future<void> _generateAnswerKeyPdf(Map<String, dynamic> test) async {
       return isoDate;
     }
   }
+  
   Future<void> _generateReportPdf(Map<String, dynamic> test) async {
-    final results = (test['results'] as List<dynamic>?) ?? [];
-    if (results.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Brak wyników do raportu')),
-      );
-      return;
-    }
+  final results = (test['results'] as List<dynamic>?) ?? [];
+  if (results.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Brak wyników do raportu')),
+    );
+    return;
+  }
 
-    final pdf = pw.Document();
-    final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
-    final ttf = pw.Font.ttf(fontData);
+  final pdf = pw.Document();
+  final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
+  final ttf = pw.Font.ttf(fontData);
 
-    // Grupuj po uczniu i weź tylko ostatni wynik
-    final Map<String, dynamic> lastResults = {};
-    for (var r in results) {
-      final user = r['userName'] as String? ?? 'Nieznany';
-      if (!lastResults.containsKey(user) || (r['date'] as String).compareTo(lastResults[user]['date']) > 0) {
-        lastResults[user] = r;
+  // 🔹 Grupowanie: najpierw po UID (jeśli jest), inaczej po nazwie.
+  // Dla każdej grupy bierzemy TYLKO najnowszy wynik.
+  final Map<String, Map<String, dynamic>> lastResults = {};
+
+  for (var r in results) {
+    final name = (r['userName'] ?? 'Nieznany').toString();
+    final uid = (r['uid'] ?? r['UID'] ?? '').toString();
+    final key = uid.isNotEmpty ? uid : name;
+
+    final dateStr = (r['date'] ?? '').toString();
+
+    if (!lastResults.containsKey(key)) {
+      lastResults[key] = Map<String, dynamic>.from(r);
+    } else {
+      final existingDate = (lastResults[key]!['date'] ?? '').toString();
+      if (dateStr.compareTo(existingDate) > 0) {
+        lastResults[key] = Map<String, dynamic>.from(r);
       }
     }
-
-    // Przygotuj dane do tabeli
-    final tableData = lastResults.entries.map((e) {
-      final r = e.value;
-      final score = (r['score'] as num?)?.toStringAsFixed(0) ?? '-';
-      final date = _formatDate(r['date'] as String? ?? '');
-      return [e.key, '$score%', date];
-    }).toList();
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (context) => [
-          pw.Header(level: 0, child: pw.Center(child: pw.Text('Raport wyników - ${test['name']}', style: pw.TextStyle(font: ttf, fontSize: 24, fontWeight: pw.FontWeight.bold)))),
-          pw.SizedBox(height: 20),
-          pw.Text('Data generowania: ${DateTime.now().toLocal().toString().split(' ')[0]}', style: pw.TextStyle(font: ttf, fontSize: 12)),
-          pw.SizedBox(height: 12),
-          pw.Text(
-            'Kwalifikacja: ${test['qualification'].toString().toUpperCase()}',
-            style: pw.TextStyle(font: ttf, fontSize: 14, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 20),
-          pw.TableHelper.fromTextArray(
-            headers: ['Użytkownik', 'Wynik ostatniego egzaminu', 'Data'],
-            data: tableData,
-            headerStyle: pw.TextStyle(font: ttf, fontWeight: pw.FontWeight.bold, fontSize: 12),
-            cellStyle: pw.TextStyle(font: ttf, fontSize: 11),
-          ),
-        ],
-      ),
-    );
-
-    final bytes = await pdf.save();
-    final filename = 'raport_${test['name'].replaceAll(' ', '_')}.pdf';
-
-    if (kIsWeb) {
-      final blob = _createBlob(bytes);
-      final url = web.URL.createObjectURL(blob);
-      web.window.open(url, '_blank');
-      Future.delayed(const Duration(seconds: 5), () => web.URL.revokeObjectURL(url));
-    } else {
-      await Printing.sharePdf(bytes: bytes, filename: filename);
-    }
   }
+
+  // 🔹 Przygotuj wiersze: name, uid, score, date
+  final rows = lastResults.values.map((raw) {
+    final r = raw as Map<String, dynamic>;
+    final name = (r['userName'] ?? 'Nieznany').toString();
+    final uid = (r['uid'] ?? r['UID'] ?? '').toString();
+
+    final rawScore = r['score'];
+    num? scoreNum;
+    if (rawScore is num) {
+      scoreNum = rawScore;
+    } else {
+      scoreNum = num.tryParse(rawScore?.toString() ?? '');
+    }
+    final score = scoreNum != null ? scoreNum.toStringAsFixed(2) : '-';
+
+    final date = _formatDate((r['date'] ?? '').toString());
+
+    return {
+      'name': name,
+      'uid': uid,
+      'score': score,
+      'date': date,
+    };
+  }).toList();
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (context) => [
+        pw.Header(
+          level: 0,
+          child: pw.Center(
+            child: pw.Text(
+              'Raport wyników - ${test['name']}',
+              style: pw.TextStyle(
+                font: ttf,
+                fontSize: 24,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        pw.SizedBox(height: 20),
+        pw.Text(
+          'Data generowania: ${DateTime.now().toLocal().toString().split(' ')[0]}',
+          style: pw.TextStyle(font: ttf, fontSize: 12),
+        ),
+        pw.SizedBox(height: 12),
+        pw.Text(
+          'Kwalifikacja: ${test['qualification'].toString().toUpperCase()}',
+          style: pw.TextStyle(
+            font: ttf,
+            fontSize: 14,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+        pw.SizedBox(height: 20),
+
+        pw.Table(
+          border: pw.TableBorder.all(width: 0.5),
+          columnWidths: const {
+            0: pw.FlexColumnWidth(2),
+            1: pw.FlexColumnWidth(1),
+            2: pw.FlexColumnWidth(2),
+          },
+          children: [
+            // nagłówki
+            pw.TableRow(
+              children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text(
+                    'Użytkownik',
+                    style: pw.TextStyle(
+                      font: ttf,
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text(
+                    'Wynik ostatniego egzaminu (%)',
+                    style: pw.TextStyle(
+                      font: ttf,
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text(
+                    'Data',
+                    style: pw.TextStyle(
+                      font: ttf,
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // dane
+            ...rows.map((row) {
+              final name = row['name'] ?? '-';
+              final uid = row['uid'] ?? '';
+              final score = row['score'] ?? '-';
+              final date = row['date'] ?? '-';
+
+              return pw.TableRow(
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          name,
+                          style: pw.TextStyle(
+                            font: ttf,
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        if (uid.isNotEmpty)
+                          pw.Text(
+                            'UID: $uid',
+                            style: pw.TextStyle(
+                              font: ttf,
+                              fontSize: 9, // mniejsza czcionka
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(
+                      '$score%',
+                      style: pw.TextStyle(font: ttf, fontSize: 11),
+                    ),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(
+                      date,
+                      style: pw.TextStyle(font: ttf, fontSize: 11),
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  final bytes = await pdf.save();
+  final filename = 'raport_${test['name'].replaceAll(' ', '_')}.pdf';
+
+  if (kIsWeb) {
+    final blob = _createBlob(bytes);
+    final url = web.URL.createObjectURL(blob);
+    web.window.open(url, '_blank');
+    Future.delayed(
+      const Duration(seconds: 5),
+      () => web.URL.revokeObjectURL(url),
+    );
+  } else {
+    await Printing.sharePdf(bytes: bytes, filename: filename);
+  }
+}
+
+
+
 }
 
 // ==================== ZAKŁADKA: STWÓRZ NOWY TEST ====================
