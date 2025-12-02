@@ -214,9 +214,58 @@ class CreatedTestsTab extends StatefulWidget { const CreatedTestsTab({super.key}
 
 class _CreatedTestsTabState extends State<CreatedTestsTab> {
   List<Map<String, dynamic>> savedTests = [];
+  bool isLoadingResults = false; 
+  bool isSuperAdmin = false;
+    String currentUser = "";
+    final String _apiBaseUrl = 'https://egzaminy.zsel.edu.pl/egzaminy';
 
-  @override void initState() { super.initState(); _loadTests(); }
-bool isLoadingResults = false; 
+@override
+void initState() {
+  super.initState();
+  _loadCurrentUser();
+  _loadTests();
+  _loadUserRole();
+}
+
+Future<void> _loadCurrentUser() async {
+  final prefs = await SharedPreferences.getInstance();
+  currentUser = prefs.getString("userName") ?? ""; 
+  setState(() {});
+}
+
+Future<void> _loadUserRole() async {
+  final prefs = await SharedPreferences.getInstance();
+  final email = prefs.getString('userEmail');
+
+  if (email == null || email.isEmpty) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Brak danych logowania')),
+      );
+    }
+    return;
+  }
+
+  try {
+    final response = await http.post(
+      Uri.parse('$_apiBaseUrl/is_super_admin.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'email': email}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        isSuperAdmin = data['isSuperAdmin'] == true;
+      });
+
+      prefs.setBool("isSuperAdmin", isSuperAdmin);
+    }
+  } catch (e) {
+    if (kDebugMode) print('Błąd sprawdzania uprawnień: $e');
+  }
+}
+
 Future<void> _loadTests() async {
     final prefs = await SharedPreferences.getInstance();
     final localData = prefs.getString('saved_tests');
@@ -602,90 +651,138 @@ for (int idx = 1; idx <= 4; idx++) {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await _loadTests();
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: savedTests.length,
-        itemBuilder: (context, i) {
-          final t = savedTests[i];
-          final results = (t['results'] as List<dynamic>?) ?? [];
-          final isPublished = t['published'] == true;
-
-          // Sortuj wyniki od najnowszego
-          final sortedResults = results
-            ..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
-
-          return Card(
-            elevation: 6,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            child: ExpansionTile(
-              initiallyExpanded: false,
-              leading: CircleAvatar(
-                radius: 24,
-                backgroundColor: isPublished ? Colors.green.shade600 : Colors.grey.shade600,
-                child: Icon(isPublished ? Icons.public : Icons.lock_outline, color: Colors.white),
-              ),
-              title: Text(
-                t['name'],
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Kwalifikacja: ${t['qualification'].toUpperCase()} • Autor: ${t['author']}'),
-                  Text('${t['questions'].length} pytań • Utworzono: ${_formatDate(t['createdAt'])}'),
-                  if (results.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Wyników: ${results.length} • Średnia: ${(results.map((r) => r['score'] as num).reduce((a, b) => a + b) / results.length).toStringAsFixed(1)}%',
-                      style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(icon: const Icon(Icons.visibility, color: Colors.blue), tooltip: 'Podgląd', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TestPreviewPage(test: t, onPublish: () => _publishTest(i))))),
-                  IconButton(icon: const Icon(Icons.print), tooltip: 'Drukuj', onPressed: () => _printTest(t)),
-                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Usuń', onPressed: () => _deleteTest(i)),
-                  IconButton(
-                    icon: Icon(isPublished ? Icons.public : Icons.public_off, color: isPublished ? Colors.green : Colors.grey[700]),
-                    tooltip: isPublished ? 'Wycofaj' : 'Opublikuj',
-                    onPressed: () => _publishTest(i),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.file_download, color: Colors.purple),
-                    tooltip: 'Zrób raport z wyników',
-                    onPressed: () => _generateReportPdf(t),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.key, color: Colors.teal),
-                    tooltip: 'Klucz odpowiedzi',
-                    onPressed: () => _generateAnswerKeyPdf(t),
-                  ),
-                ],
-              ),
-              children: [
-                if (results.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('Brak wyników', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
-                  )
-                else
-                  ..._buildGroupedResults(sortedResults),
-                const SizedBox(height: 8),
+    return DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            const TabBar(
+              labelColor: Colors.blue,
+              unselectedLabelColor: Colors.grey,
+              tabs: [
+                Tab(text: "Moje testy"),
+                Tab(text: "Wszystkie testy"),
               ],
             ),
-          );
-        },
-      ),
+
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _buildTestList(
+                    savedTests.where((t) => t['author'] == currentUser).toList(),
+                  ),
+                  _buildTestList(savedTests),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+  }
+
+Widget _buildTestList(List<Map<String, dynamic>> tests) {
+  if (tests.isEmpty) {
+    return const Center(
+      child: Text('Brak testów', style: TextStyle(fontSize: 18)),
     );
   }
+
+  return RefreshIndicator(
+    onRefresh: () async {
+      await _loadTests();
+    },
+    child: ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: tests.length,
+      itemBuilder: (context, i) {
+        final t = tests[i];
+
+        // znajdź indeks w głównej liście savedTests
+        final realIndex = savedTests.indexOf(t);
+
+        final results = (t['results'] as List<dynamic>?) ?? [];
+        final isPublished = t['published'] == true;
+
+        final sortedResults = results
+          ..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
+
+        return Card(
+          elevation: 6,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          child: ExpansionTile(
+            leading: CircleAvatar(
+              radius: 24,
+              backgroundColor: isPublished ? Colors.green.shade600 : Colors.grey.shade600,
+              child: Icon(isPublished ? Icons.public : Icons.lock_outline, color: Colors.white),
+            ),
+            title: Text(
+              t['name'],
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Kwalifikacja: ${t['qualification'].toUpperCase()} • Autor: ${t['author']}'),
+                Text('${t['questions'].length} pytań • Utworzono: ${_formatDate(t['createdAt'])}'),
+                if (results.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Wyników: ${results.length} • Średnia: ${(results.map((r) => r['score'] as num).reduce((a, b) => a + b) / results.length).toStringAsFixed(1)}%',
+                    style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(icon: const Icon(Icons.visibility, color: Colors.blue), tooltip: 'Podgląd', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TestPreviewPage(test: t, onPublish: () => _publishTest(realIndex))))),
+                IconButton(icon: const Icon(Icons.print), tooltip: 'Drukuj', onPressed: () => _printTest(t)),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  tooltip: 'Usuń',
+                  onPressed: (isSuperAdmin || t['author'] == currentUser)
+                      ? () => _deleteTest(realIndex)
+                      : null,
+                ),
+
+                IconButton(
+                  icon: Icon(isPublished ? Icons.public : Icons.public_off,
+                      color: isPublished ? Colors.green : Colors.grey[700]),
+                  tooltip: isPublished ? 'Wycofaj' : 'Opublikuj',
+                  onPressed: (isSuperAdmin || t['author'] == currentUser)
+                      ? () => _publishTest(realIndex)
+                      : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.file_download, color: Colors.purple),
+                  tooltip: 'Zrób raport z wyników',
+                  onPressed: () => _generateReportPdf(t),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.key, color: Colors.teal),
+                  tooltip: 'Klucz odpowiedzi',
+                  onPressed: () => _generateAnswerKeyPdf(t),
+                ),
+              ],
+            ),
+            children: [
+              if (results.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('Brak wyników', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                )
+              else
+                ..._buildGroupedResults(sortedResults),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
 List<Widget> _buildGroupedResults(List<dynamic> results) {
   // Grupuj po userName
   final Map<String, List<dynamic>> grouped = {};
@@ -1075,34 +1172,32 @@ class _CreateNewTestTabState extends State<CreateNewTestTab> {
     _loadQualificationsFromServer();
   }
 
-Future<void> _loadQualificationsFromServer() async {
-  try {
-    final response = await http.post(
-      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/qualifications.php'),
-      headers: {'Authorization': 'Bearer $apiToken', 'Content-Type': 'application/json'},
-      body: json.encode({}),
-    );
+  Future<void> _loadQualificationsFromServer() async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/egzaminy_wyniki_post.php'),
+        headers: {'Authorization': 'Bearer $apiToken', 'Content-Type': 'application/json'},
+        body: json.encode({}),
+      );
 
-    if (response.statusCode == 200) {
-      final List<dynamic> allData = json.decode(response.body);
-
-      final List<String> quals = allData.map<String>((exam) {
-        return (exam['qualification_code'] ?? '').toString().toLowerCase();
-      }).where((code) => code.isNotEmpty).toList();
-
-      quals.sort();
-
-      setState(() {
-        qualifications = quals;
-        isLoading = false;
-      });
-    } else {
+      if (response.statusCode == 200) {
+        final List<dynamic> allData = json.decode(response.body);
+        final Set<String> quals = {};
+        for (final exam in allData) {
+          final q = (exam['kwalifikacja'] ?? '').toString().trim().replaceAll(' ', '').toLowerCase();
+          if (isValidQualification(q)) quals.add(q);
+        }
+        setState(() {
+          qualifications = quals.toList()..sort();
+          isLoading = false;
+        });
+      } else {
+        setState(() => isLoading = false);
+      }
+    } catch (e) {
       setState(() => isLoading = false);
     }
-  } catch (e) {
-    setState(() => isLoading = false);
   }
-}
 
   @override
   Widget build(BuildContext context) {
