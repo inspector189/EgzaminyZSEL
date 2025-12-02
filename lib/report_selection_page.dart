@@ -12,10 +12,18 @@ import 'package:web/web.dart' as web;
 
 const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
+String normalizeQualification(String? input) {
+  if (input == null || input.trim().isEmpty) return '';
+  final cleaned = input.trim().toLowerCase().replaceAll('.', '');
+  if (cleaned.length != 5) return '';
+  final letters = cleaned.substring(0, 3).toUpperCase();
+  final numbers = cleaned.substring(3);
+  if (!RegExp(r'^[a-zA-Z]{3}\d{2}$').hasMatch('$letters$numbers')) return '';
+  return '$letters.$numbers';
+}
+
 bool isValidQualification(String? qual) {
-  if (qual == null) return false;
-  final trimmed = qual.trim();
-  return RegExp(r'^[a-z]{3}\d{2}$').hasMatch(trimmed);
+  return normalizeQualification(qual).isNotEmpty;
 }
 
 class ReportSelectionPage extends StatefulWidget {
@@ -35,35 +43,36 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final qualifications =
-        widget.data
-            .map((e) => (e['kwalifikacja'] ?? '').toString().trim())
-            .where(isValidQualification)
-            .toSet()
-            .toList()
-          ..sort();
+    final Set<String> uniqueQuals = {};
+    for (final e in widget.data) {
+      final normalized = normalizeQualification(e['kwalifikacja']?.toString());
+      if (normalized.isNotEmpty) {
+        uniqueQuals.add(normalized);
+      }
+    }
+    final qualifications = uniqueQuals.toList()..sort();
+
     final Map<String, Map<String, List<dynamic>>> usersByQual = {};
     for (final qual in qualifications) {
-      final qualExams =
-          widget.data
-              .where((e) => e['kwalifikacja'].toString() == qual)
-              .toList();
+      final qualExams = widget.data.where((e) {
+        return normalizeQualification(e['kwalifikacja']?.toString()) == qual;
+      }).toList();
+
       final users = <String, List<dynamic>>{};
       for (final exam in qualExams) {
-        final user = (exam['userID'] ?? '').toString().trim();
-        final userKey =
-            user.isEmpty || user.toLowerCase() == 'anonymous'
-                ? 'Użytkownik anonimowy'
-                : user;
+        final userRaw = (exam['userID'] ?? '').toString().trim();
+        final userKey = userRaw.isEmpty || userRaw.toLowerCase() == 'anonymous'
+            ? 'Użytkownik anonimowy'
+            : userRaw;
+
         users.putIfAbsent(userKey, () => []).add(exam);
       }
       usersByQual[qual] = users;
     }
 
-    final currentUsers =
-        selectedQualification != null
-            ? usersByQual[selectedQualification] ?? {}
-            : {};
+   final currentUsers = selectedQualification != null
+        ? usersByQual[selectedQualification] ?? {}
+        : <String, List<dynamic>>{};
 
     return Scaffold(
       appBar: AppBar(
@@ -211,10 +220,9 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
   final ttf = pw.Font.ttf(fontData);
 
   // Filtro­wanie po kwalifikacji
-  final qualData = allData.where((e) {
-    final q = (e['kwalifikacja'] ?? '').toString().trim();
-    return isValidQualification(q) && q == qualification;
-  }).toList();
+final qualData = allData.where((e) {
+      return normalizeQualification(e['kwalifikacja']?.toString()) == qualification;
+    }).toList();
 
   // Zbieramy dane do tabeli: name, uid, lastScore, lastDate
   final List<Map<String, String>> rows = [];
