@@ -26,11 +26,18 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   TimeOfDay? startTime;
   TimeOfDay? endTime;
   String? selectedQualification;
+  bool _studentsExpanded = false;
 
   @override
   void initState() {
     super.initState();
     fetchAllStats();
+  }
+
+    void _expandStudents() {
+    setState(() {
+      _studentsExpanded = true;
+    });
   }
 
   Future<void> fetchAllStats() async {
@@ -228,8 +235,19 @@ Widget build(BuildContext context) {
                   padding: const EdgeInsets.all(16),
                   children: [
                     search_bar.SearchBar(
-                      onChanged: (value) => setState(() => searchQuery = value),
-                    ),
+                    onChanged: (value) => setState(() {
+                      searchQuery = value;
+                      if (value.isNotEmpty) {
+                        _studentsExpanded = true;
+                      }
+                    }),
+                    onTap: () {
+                      setState(() {
+                        _studentsExpanded = true; // ⬅ wysuń przy kliknięciu
+                      });
+                    },
+                  ),
+
                     const SizedBox(height: 24),
                     Row(
                       children: [
@@ -258,7 +276,10 @@ Widget build(BuildContext context) {
                                 lastDate: DateTime.now(),
                               );
                               if (picked != null) {
-                                setState(() => startDate = picked);
+                                setState(() {
+                                  startDate = picked;
+                                  _studentsExpanded = true; // 🔥 auto rozwijamy sekcję uczniów
+                                });
                               }
                             },
                             child: Container(
@@ -302,16 +323,20 @@ Widget build(BuildContext context) {
                                 .withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(14),
                             onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: endDate ?? DateTime.now(),
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime.now(),
-                              );
-                              if (picked != null) {
-                                setState(() => endDate = picked);
-                              }
-                            },
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: endDate ?? DateTime.now(), 
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                endDate = picked;
+                                _studentsExpanded = true;
+                              });
+                            }
+                          },
+
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 vertical: 14,
@@ -369,8 +394,12 @@ Widget build(BuildContext context) {
                                 initialEntryMode: TimePickerEntryMode.input,
                               );
                               if (picked != null) {
-                                setState(() => startTime = picked);
+                                setState(() {
+                                  startTime = picked;
+                                  _studentsExpanded = true; // 🔥
+                                });
                               }
+
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -413,8 +442,12 @@ Widget build(BuildContext context) {
                                 initialEntryMode: TimePickerEntryMode.input,
                               );
                               if (picked != null) {
-                                setState(() => endTime = picked);
+                                setState(() {
+                                  endTime = picked;
+                                  _studentsExpanded = true; // 🔥
+                                });
                               }
+
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -449,8 +482,12 @@ Widget build(BuildContext context) {
                         );
                       }).toList(),
                       onChanged: (value) {
-                        setState(() => selectedQualification = value);
-                      },
+                      setState(() {
+                        selectedQualification = value;
+                        _studentsExpanded = true; // 🔥
+                      });
+                    },
+
                     ),
                     const SizedBox(height: 8),
                     if (startDate != null || endDate != null)
@@ -464,80 +501,93 @@ Widget build(BuildContext context) {
                           ),
                         ),
                       ),
-                    if (filteredUsers.isEmpty)
-                      Center(
-                        child: Text(
-                          'Brak wyników dla tego użytkownika.',
-                          style: theme.textTheme.bodyMedium,
-                        ),
+                    ExpansionTile(
+                      key: ValueKey(_studentsExpanded),
+                      title: Text(
+                        
+                        'Uczniowie (${filteredUsers.length})',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                    // 🔹 NOWE mapowanie użytkowników
-                    // 🔹 NOWE mapowanie użytkowników
-                    ...filteredUsers.map((userData) {
-                      final String user = userData['name'] as String;
-                      final String uid = (userData['uid'] ?? '').toString();
+                      initiallyExpanded: _studentsExpanded,
+                      onExpansionChanged: (val) {
+                        setState(() => _studentsExpanded = val);
+                      },
+                      children: [
+                        if (filteredUsers.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text(
+                              'Brak wyników dla tego użytkownika.',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          )
+                        else
+                          ...filteredUsers.map((userData) {
+                            final String user = userData['name'] as String;
+                            final String uid = (userData['uid'] ?? '').toString();
 
-                      final exams = List<dynamic>.from(
-                        userData['exams'] as List,
-                      )..sort((a, b) {
-                          final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
-                          final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
-                          return db.compareTo(da);
-                        });
+                            final exams = List<dynamic>.from(
+                              userData['exams'] as List,
+                            )..sort((a, b) {
+                                final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
+                                final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
+                                return db.compareTo(da);
+                              });
 
-                      final userStats = calculateStats(exams);
+                            final userStats = calculateStats(exams);
 
-                      final Map<String, List<dynamic>> examsByQual = {};
-                      for (final exam in exams) {
-                        final qualRaw = (exam['kwalifikacja'] ?? '').toString().trim();
-                        if (isValidQualification(qualRaw)) {
-                          examsByQual.putIfAbsent(qualRaw, () => []).add(exam);
-                        }
-                      }
+                            final Map<String, List<dynamic>> examsByQual = {};
+                            for (final exam in exams) {
+                              final qualRaw = (exam['kwalifikacja'] ?? '').toString().trim();
+                              if (isValidQualification(qualRaw)) {
+                                examsByQual.putIfAbsent(qualRaw, () => []).add(exam);
+                              }
+                            }
 
-                      final visibleQualifications =
-                          examsByQual.entries.where((e) => e.value.isNotEmpty).toList();
+                            final visibleQualifications =
+                                examsByQual.entries.where((e) => e.value.isNotEmpty).toList();
 
-                      final isAnonymous =
-                          user == 'Użytkownik anonimowy' || user == 'anonymous';
+                            final isAnonymous =
+                                user == 'Użytkownik anonimowy' || user == 'anonymous';
 
-                      if (isAnonymous) {
-                        return _AnonymousUserCard(
-                          user: user,
-                          userStats: userStats,
-                        );
-                      }
+                            if (isAnonymous) {
+                              return _AnonymousUserCard(
+                                user: user,
+                                userStats: userStats,
+                              );
+                            }
 
-                      // 🔹 TU ZAOKRĄGLAMY "Ostatni" DO 2 MIEJSC
-                      final lastExam = exams.isNotEmpty ? exams.first : null;
-                      final dynamic lastRaw = lastExam?['wynik'];
+                            final lastExam = exams.isNotEmpty ? exams.first : null;
+                            final dynamic lastRaw = lastExam?['wynik'];
 
-                      String lastExamScore;
-                      if (lastRaw is num) {
-                        lastExamScore = lastRaw.toStringAsFixed(2);
-                      } else {
-                        final parsed = double.tryParse(lastRaw?.toString() ?? '');
-                        lastExamScore = parsed != null ? parsed.toStringAsFixed(2) : '-';
-                      }
+                            String lastExamScore;
+                            if (lastRaw is num) {
+                              lastExamScore = lastRaw.toStringAsFixed(2);
+                            } else {
+                              final parsed = double.tryParse(lastRaw?.toString() ?? '');
+                              lastExamScore = parsed != null ? parsed.toStringAsFixed(2) : '-';
+                            }
 
-                      final lastExamDate = lastExam?['data_czas']?.toString() ?? '-';
+                            final lastExamDate = lastExam?['data_czas']?.toString() ?? '-';
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: _UserExpansionTile(
-                          user: user,
-                          uid: uid,
-                          userStats: userStats,
-                          lastExamScore: lastExamScore, 
-                          lastExamDate: lastExamDate,
-                          qualifications: visibleQualifications,
-                          calculateStats: calculateStats,
-                          fmtDuration: _fmtDuration,
-                          startDate: startDate,
-                          endDate: endDate,
-                        ),
-                      );
-                    }),
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: _UserExpansionTile(
+                                user: user,
+                                uid: uid,
+                                userStats: userStats,
+                                lastExamScore: lastExamScore,
+                                lastExamDate: lastExamDate,
+                                qualifications: visibleQualifications,
+                                calculateStats: calculateStats,
+                                fmtDuration: _fmtDuration,
+                                startDate: startDate,
+                                endDate: endDate,
+                              ),
+                            );
+                          }).toList(),
+                      ],
+                    ),
 
                     const SizedBox(height: 4),
                     Card(

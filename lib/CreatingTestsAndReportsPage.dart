@@ -19,6 +19,7 @@ import 'TestCreatorPage.dart';
 import 'utils/video_player.dart';
 
 const String publishedTestsUrl = 'https://egzaminy.zsel.edu.pl/egzaminy/publishedTests.php';
+const String allTestsUrl = 'https://egzaminy.zsel.edu.pl/egzaminy/publishedTests_admin.php';
 const String apiToken = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 // =============================
 // WIDGET Z OBRAZKAMI
@@ -215,6 +216,7 @@ class CreatedTestsTab extends StatefulWidget { const CreatedTestsTab({super.key}
 class _CreatedTestsTabState extends State<CreatedTestsTab> {
   List<Map<String, dynamic>> savedTests = [];
   bool isLoadingResults = false; 
+  bool isLoadingTests = true; 
   bool isSuperAdmin = false;
     String currentUser = "";
     final String _apiBaseUrl = 'https://egzaminy.zsel.edu.pl/egzaminy';
@@ -267,49 +269,73 @@ Future<void> _loadUserRole() async {
 }
 
 Future<void> _loadTests() async {
-    final prefs = await SharedPreferences.getInstance();
-    final localData = prefs.getString('saved_tests');
+  final prefs = await SharedPreferences.getInstance();
 
-    List<Map<String, dynamic>> localTests = [];
-    if (localData != null) {
-      localTests = List<Map<String, dynamic>>.from(json.decode(localData));
-    }
+  setState(() => isLoadingTests = true); // 🔥 start ładowania
 
-    try {
-      final response = await http.get(
-        Uri.parse(publishedTestsUrl),
-        headers: {'Authorization': 'Bearer $apiToken'},
-      );
+  try {
+    // 1. Pobierz z serwera
+    final response = await http.get(
+      Uri.parse(allTestsUrl),
+      headers: {
+        'Authorization': 'Bearer $apiToken',
+      },
+    );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> serverTests = json.decode(response.body);
-        final serverMaps = serverTests.cast<Map<String, dynamic>>();
+    if (response.statusCode == 200) {
+      final List<dynamic> serverTests = json.decode(response.body);
+      final serverMaps = serverTests.cast<Map<String, dynamic>>();
 
-        final Map<String, Map<String, dynamic>> merged = {};
-
-        for (final t in localTests) {
-          final key = '${t['name']}||${t['qualification']}||${t['author']}';
-          merged[key] = t..['results'] ??= []; // zapewnij pole results
+      // Upewniamy się, że published jest bool
+      for (final t in serverMaps) {
+        final publishedVal = t['published'];
+        bool published = false;
+        if (publishedVal is bool) {
+          published = publishedVal;
+        } else if (publishedVal is num) {
+          published = publishedVal == 1;
+        } else if (publishedVal is String) {
+          published = publishedVal == '1' || publishedVal.toLowerCase() == 'true';
         }
+        t['published'] = published;
 
-        for (final t in serverMaps) {
-          final key = '${t['name']}||${t['qualification']}||${t['author']}';
-          merged[key] = t..['results'] ??= [];
-        }
-
-        setState(() {
-          savedTests = merged.values.toList();
-        });
-
-        await prefs.setString('saved_tests', json.encode(savedTests));
-
-        // Po załadowaniu testów – pobierz wyniki z serwera
-        _loadAllResults();
+        t['results'] ??= [];
       }
-    } catch (e) {
+
+      setState(() {
+        savedTests = serverMaps; // 🚫 tylko z serwera
+      });
+
+      await prefs.setString('saved_tests', json.encode(savedTests));
+      _loadAllResults();
+    } else {
+      // błąd serwera → fallback na cache
+      final localData = prefs.getString('saved_tests');
+      if (localData != null) {
+        final localTests = List<Map<String, dynamic>>.from(json.decode(localData));
+        setState(() => savedTests = localTests);
+      } else {
+        setState(() => savedTests = []);
+      }
+    }
+  } catch (e) {
+    // brak internetu → cache
+    final localData = prefs.getString('saved_tests');
+    if (localData != null) {
+      final localTests = List<Map<String, dynamic>>.from(json.decode(localData));
       setState(() => savedTests = localTests);
+    } else {
+      setState(() => savedTests = []);
+    }
+  } finally {
+    if (mounted) {
+      setState(() => isLoadingTests = false); 
     }
   }
+}
+
+
+
 
   Future<void> _loadAllResults() async {
     if (isLoadingResults) return;
@@ -375,7 +401,7 @@ Future<void> _deleteTest(int index) async {
   if (mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Test usunięty lokalnie i z serwera'),
+        content: Text('Test usunięty'),
         backgroundColor: Colors.red,
       ),
     );
@@ -644,40 +670,46 @@ for (int idx = 1; idx <= 4; idx++) {
 }
 
   @override
-  Widget build(BuildContext context) {
-    if (savedTests.isEmpty) {
-      return const Center(
-        child: Text('Brak utworzonych testów', style: TextStyle(fontSize: 18)),
-      );
-    }
+Widget build(BuildContext context) {
+  if (isLoadingTests) {
+    // 🔄 PHP jeszcze nie odpowiedział – pokazujemy loader
+    return const Center(child: CircularProgressIndicator());
+  }
 
-    return DefaultTabController(
-        length: 2,
-        child: Column(
-          children: [
-            const TabBar(
-              labelColor: Colors.blue,
-              unselectedLabelColor: Colors.grey,
-              tabs: [
-                Tab(text: "Moje testy"),
-                Tab(text: "Wszystkie testy"),
-              ],
-            ),
+  if (savedTests.isEmpty) {
+    // dopiero po zakończeniu ładowania i braku danych
+    return const Center(
+      child: Text('Brak utworzonych testów', style: TextStyle(fontSize: 18)),
+    );
+  }
 
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildTestList(
-                    savedTests.where((t) => t['author'] == currentUser).toList(),
-                  ),
-                  _buildTestList(savedTests),
-                ],
-              ),
-            ),
+  return DefaultTabController(
+    length: 2,
+    child: Column(
+      children: [
+        const TabBar(
+          labelColor: Colors.blue,
+          unselectedLabelColor: Colors.grey,
+          tabs: [
+            Tab(text: "Moje testy"),
+            Tab(text: "Wszystkie testy"),
           ],
         ),
-      );
-  }
+        Expanded(
+          child: TabBarView(
+            children: [
+              _buildTestList(
+                savedTests.where((t) => t['author'] == currentUser).toList(),
+              ),
+              _buildTestList(savedTests),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 
 Widget _buildTestList(List<Map<String, dynamic>> tests) {
   if (tests.isEmpty) {

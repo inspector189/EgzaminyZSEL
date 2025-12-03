@@ -146,22 +146,68 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
     }
   }
 
-  // Dodajemy nowy
-  allTests.add(newTest);
+  try {
+    final response = await http.post(
+      Uri.parse(publishedTestsUrl),
+      headers: {
+        'Authorization': 'Bearer $apiToken',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode({
+        'action': 'create',
+        'test': newTest,
+      }),
+    );
 
-  // Zapisujemy
-  await prefs.setString('saved_tests', json.encode(allTests));
+    if (!mounted) return;
 
-  if (mounted) {
+    if (response.statusCode == 200) {
+      // OK – test utworzony
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Test zapisany! Przejdź do „Utworzone testy” → opublikuj'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      Navigator.pop(context);
+    } else if (response.statusCode == 409) {
+      // Duplikat
+      String msg = 'Test o tej nazwie już istnieje dla tej kwalifikacji i autora.';
+      try {
+        final body = json.decode(response.body);
+        if (body is Map && body['message'] is String) {
+          msg = body['message'];
+        }
+      } catch (_) {}
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.red,
+        ),
+      );
+      // NIE robimy Navigator.pop – użytkownik może zmienić nazwę
+    } else {
+      // Inny błąd
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Błąd zapisu testu (${response.statusCode})'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  } catch (e) {
+    if (!mounted) return;
+    debugPrint("Błąd wysyłania create: $e");
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Test zapisany! Przejdź do „Utworzone testy” → opublikuj'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 4),
+        content: Text('Błąd połączenia z serwerem'),
+        backgroundColor: Colors.red,
       ),
     );
-    Navigator.pop(context); // wracamy do listy testów
   }
+
 }
 
   @override

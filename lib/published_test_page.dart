@@ -37,14 +37,6 @@ void _loadPublishedTests() async {
   final prefs = await SharedPreferences.getInstance();
   List<Map<String, dynamic>> localPublished = [];
 
-  // 1. Pobierz lokalnie zapisane testy
-  final savedTestsJson = prefs.getString('saved_tests');
-  if (savedTestsJson != null) {
-    final allTests = (json.decode(savedTestsJson) as List)
-        .cast<Map<String, dynamic>>();
-    localPublished = allTests.where((t) => t['published'] == true).toList();
-  }
-  
   try {
     // 2. Pobierz testy z serwera
     final response = await http.get(

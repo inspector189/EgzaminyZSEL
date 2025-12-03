@@ -2,6 +2,7 @@ import 'package:flutter/material.dart'
     show
         StatelessWidget,
         ValueChanged,
+        VoidCallback, // ⬅ DODANE
         BuildContext,
         Widget,
         Icon,
@@ -15,7 +16,14 @@ import 'package:flutter/material.dart'
 
 class SearchBar extends StatelessWidget {
   final ValueChanged<String> onChanged;
-  const SearchBar({super.key, required this.onChanged});
+  final VoidCallback? onTap; // ⬅ DODANE
+
+  const SearchBar({
+    super.key,
+    required this.onChanged,
+    this.onTap, // ⬅ DODANE
+  });
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -23,8 +31,10 @@ class SearchBar extends StatelessWidget {
     final fill =
         theme.inputDecorationTheme.fillColor ??
         colorScheme.surfaceContainerHighest;
+
     return TextField(
       onChanged: onChanged,
+      onTap: onTap, // ⬅ TU PODPINAMY
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.search),
         hintText: 'Wyszukaj użytkownika..',
