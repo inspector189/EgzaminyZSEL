@@ -1118,8 +1118,8 @@ class _QualificationCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Najlepszy: ${qStats['best']}%'),
-                Text('Najgorszy: ${qStats['worst']}%'),
+                Text('Najlepszy: ${qStats['best'].toStringAsFixed(2)}%'),
+                Text('Najgorszy: ${qStats['worst'].toStringAsFixed(2)}%'),
               ],
             ),
           ],

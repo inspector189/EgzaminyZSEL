@@ -232,7 +232,41 @@ Future<void> _syncWithServerSession() async {
     } finally {
     }
   }
+Future<void> _showLoginInfoAndStart() async {
+  final shouldLogin = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Zaloguj się"),
+      content: const Text(
+        "Zaloguj się przy pomocy maila z domeną @zselektr.onmicrosoft.com.\n\n"
+        "Dzięki zalogowaniu się jako uczeń będziesz miał możliwość "
+        "sprawdzenia swoich statystyk oraz robienia testów z zestawu od nauczyciela.",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text("Anuluj"),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text("OK"),
+        ),
+      ],
+    ),
+  );
 
+  if (shouldLogin != true) return;
+
+  try {
+    OAuth2Service.startLogin();
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Błąd logowania: $e")),
+      );
+    }
+  }
+}
   void _openStatistics(BuildContext context) {
     Future.microtask(() {
       if (context.mounted) {
@@ -667,39 +701,23 @@ Future<void> _signOut({bool showSnack = true}) async {
                       leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
                       title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
                       onTap: () async {
-                        Navigator.pop(context);
-                        if (_isLoggedIn) {
-                          _toggleProfilePopup(context);
-                        } else {
-                          if (kIsWeb) {
-                            try {
-                              OAuth2Service.startLogin();
-                              await _checkLoginState();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Zalogowano pomyślnie'),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Błąd logowania: $e')),
-                                );
-                              }
-                            }
+                          Navigator.pop(context);
+
+                          if (_isLoggedIn) {
+                            _toggleProfilePopup(context);
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Logowanie dostępne tylko na webie',
-                                ),
-                              ),
-                            );
+                            if (!kIsWeb) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Logowanie dostępne tylko na webie")),
+                              );
+                              return;
+                            }
+
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _showLoginInfoAndStart();
+                            });
                           }
-                        }
-                      },
+                        },
                     ),
 
                     ListTile(
@@ -741,25 +759,18 @@ Future<void> _signOut({bool showSnack = true}) async {
                     icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
                     tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
                     color: colorScheme.onPrimary,
-                    onPressed: () async {
+                   onPressed: () async {
                       if (_isLoggedIn) {
                         _toggleProfilePopup(context);
                       } else {
-                        if (kIsWeb) {
-                          try {
-                            OAuth2Service.startLogin();
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Błąd logowania: $e')),
-                            );
-                          }
-                        } else {
+                        if (!kIsWeb) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Logowanie tylko na webie'),
-                            ),
+                            const SnackBar(content: Text('Logowanie tylko na webie')),
                           );
+                          return;
                         }
+
+                        _showLoginInfoAndStart();
                       }
                     },
                   ),
@@ -869,7 +880,7 @@ class HomeContent extends StatelessWidget {
             onTap: onQualificationTap,
           ),
         ]),
-        _buildGrid('🧑‍🔧 Technik Elektronik', [
+        _buildGrid('💾 Technik Elektronik', [
           QuestionTile(
             icon: Icons.analytics,
             code: 'ELM.02',
@@ -883,7 +894,7 @@ class HomeContent extends StatelessWidget {
             onTap: onQualificationTap,
           ),
         ]),
-        _buildGrid('🧑‍🏭 Technik Elektryk', [
+        _buildGrid('💡 Technik Elektryk', [
           QuestionTile(
             icon: Icons.electrical_services,
             code: 'ELE.02',
