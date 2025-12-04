@@ -880,7 +880,7 @@ class HomeContent extends StatelessWidget {
             onTap: onQualificationTap,
           ),
         ]),
-        _buildGrid('💾 Technik Elektronik', [
+        _buildGrid('📟 Technik Elektronik', [
           QuestionTile(
             icon: Icons.analytics,
             code: 'ELM.02',
