@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:math';
 import 'dart:typed_data';
-
+import 'egzamin_podglad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -805,7 +805,7 @@ Widget _buildTestList(List<Map<String, dynamic>> tests) {
                   child: Text('Brak wyników', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
                 )
               else
-                ..._buildGroupedResults(sortedResults),
+                ..._buildGroupedResults(context, sortedResults),
               const SizedBox(height: 8),
             ],
           ),
@@ -814,9 +814,38 @@ Widget _buildTestList(List<Map<String, dynamic>> tests) {
     ),
   );
 }
+  String _fmtDuration(int? seconds) {
+    if (seconds == null || seconds <= 0) return '-';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m}m ${s}s';
+  }
+  Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
+  try {
+    final response = await http.post(
+      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/podgladEgzaminu.php'),
+      body: {
+        'api_token': apiToken,
+        'exam_id': examId.toString(),
+      },
+    );
 
-List<Widget> _buildGroupedResults(List<dynamic> results) {
-  // Grupuj po userName
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return {
+          'questions': List<dynamic>.from(data['questions']),
+          'selectedAnswers': (data['selectedAnswers'] as List).cast<String?>(),
+        };
+      }
+    }
+    print('PHP error: ${response.body}');
+  } catch (e) {
+    print('Błąd: $e');
+  }
+  return null;
+}
+List<Widget> _buildGroupedResults(BuildContext context, List<dynamic> results) {
   final Map<String, List<dynamic>> grouped = {};
   for (var r in results) {
     final user = r['userName'] as String? ?? 'Nieznany';
@@ -826,47 +855,89 @@ List<Widget> _buildGroupedResults(List<dynamic> results) {
 
   final List<Widget> widgets = [];
   grouped.forEach((user, userResults) {
-    // Posortuj wyniki użytkownika od najnowszego
     userResults.sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
     final latest = userResults.first;
     final latestScore = (latest['score'] as num?)?.toDouble() ?? 0.0;
     final latestDate = _formatDate(latest['date'] as String? ?? '');
+
     widgets.add(
       ExpansionTile(
         title: Text('$user - $latestDate - ${latestScore.toStringAsFixed(0)}%'),
         children: userResults.map((r) {
           final score = (r['score'] as num?)?.toDouble() ?? 0.0;
           final date = _formatDate(r['date'] as String? ?? '');
-          final durationSec = (r['duration_sec'] as num?)?.toInt() ?? 0;
-          final duration = Duration(seconds: durationSec);
-          String twoDigits(int n) => n.toString().padLeft(2, '0');
-          final hours = twoDigits(duration.inHours);
-          final minutes = twoDigits(duration.inMinutes.remainder(60));
-          final seconds = twoDigits(duration.inSeconds.remainder(60));
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-            leading: CircleAvatar(
-              radius: 22,
-              backgroundColor: score >= 75
-                  ? Colors.green
-                  : score >= 50
-                      ? Colors.orange
-                      : Colors.red,
-              child: Text(
-                '${score.toStringAsFixed(0)}%',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+          final czas = _fmtDuration(
+            (r['duration_sec'] is int)
+                ? r['duration_sec'] as int
+                : int.tryParse('${r['duration_sec'] ?? ''}'),
+          );
+          final examId = int.tryParse(r['id']?.toString() ?? "") ?? 0;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Material( // <- ważne, żeby button reagował
+              color: Colors.transparent,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: score >= 75
+                        ? Colors.green
+                        : score >= 50
+                            ? Colors.orange
+                            : Colors.red,
+                    child: Text(
+                      '${score.toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(user, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text('Data: $date'),
+                        Text('Czas trwania: $czas'),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed
+                        : () async {
+                          for (var r in results) {
+                              print("DEBUG r: $r");
+                            }
+                            final data = await fetchExamDetailsFull(examId);
+                            if (!context.mounted) return;
+
+                            if (data != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EgzaminPodgladView(
+                                    questions: data['questions'],
+                                    selectedAnswers:
+                                        (data['selectedAnswers']).cast<String?>(),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text("Nie udało się wczytać podglądu.")),
+                              );
+                            }
+                          },
+                    child: const Text("Podgląd"),
+                  ),
+                ],
               ),
             ),
-            title: Text(user, style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Data: $date', style: TextStyle(color: Colors.grey[700])),
-                Text('Czas trwania: $hours:$minutes:$seconds', style: TextStyle(color: Colors.grey[700])),
-              ],
-            ),
-            
-            trailing: Text('${score.toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
           );
         }).toList(),
       ),

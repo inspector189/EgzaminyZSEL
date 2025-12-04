@@ -417,7 +417,12 @@ class LastExamRow extends StatelessWidget {
   final bool showBorder;
 
   const LastExamRow({super.key, required this.exam, required this.showBorder});
-
+  String _fmtDuration(int? seconds) {
+    if (seconds == null || seconds <= 0) return '-';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m}m ${s}s';
+  }
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -436,9 +441,12 @@ class LastExamRow extends StatelessWidget {
               ? wynikDouble.toInt().toString()
               : wynikDouble.toStringAsFixed(1);
     }
+    final czas = _fmtDuration(
+              (exam['czas_trwania_sec'] is int)
+                  ? exam['czas_trwania_sec'] as int
+                  : int.tryParse('${exam['czas_trwania_sec'] ?? ''}'),
+            );
 
-    final tryb = exam['tryb'] ?? exam['mode'] ?? '';
-    final czas = exam['czas_trwania_sec']?.toString() ?? '-';
     final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
 
     return Container(
@@ -465,11 +473,7 @@ class LastExamRow extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Text(
-                  "Czas: ${czas}s${tryb.isNotEmpty ? ' • $tryb' : ''}",
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  Text('Czas trwania: $czas', style: TextStyle(color: Colors.grey[700])
                 ),
               ],
             ),
