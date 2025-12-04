@@ -823,7 +823,7 @@ Widget _buildTestList(List<Map<String, dynamic>> tests) {
   Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
   try {
     final response = await http.post(
-      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/podgladEgzaminu.php'),
+      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/podgladEgzaminuDlaTestow.php'),
       body: {
         'api_token': apiToken,
         'exam_id': examId.toString(),
@@ -871,7 +871,10 @@ List<Widget> _buildGroupedResults(BuildContext context, List<dynamic> results) {
                 ? r['duration_sec'] as int
                 : int.tryParse('${r['duration_sec'] ?? ''}'),
           );
-          final examId = int.tryParse(r['id']?.toString() ?? "") ?? 0;
+          final examId = int.tryParse(
+            (r['exam_id'] ?? r['id'] ?? '').toString(),
+          ) ?? 0;
+          print("EXAM ID USED: $examId");
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

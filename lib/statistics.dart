@@ -427,27 +427,36 @@ class LastExamRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final date = (exam['data_czas'] ?? '').split(' ').first;
+    // pełna data+czas z bazy (np. "2025-12-04 08:15:45")
+final fullDateTime = (exam['data_czas'] ?? '') as String;
 
-    final wynikRaw = exam['wynik']?.toString() ?? '';
-    final wynikDouble = double.tryParse(wynikRaw);
+// tylko data do wyświetlenia
+final date = fullDateTime.split(' ').first;
 
-    String wynik;
-    if (wynikDouble == null) {
-      wynik = '-';
-    } else {
-      wynik =
-          (wynikDouble % 1 == 0)
-              ? wynikDouble.toInt().toString()
-              : wynikDouble.toStringAsFixed(1);
-    }
-    final czas = _fmtDuration(
-              (exam['czas_trwania_sec'] is int)
-                  ? exam['czas_trwania_sec'] as int
-                  : int.tryParse('${exam['czas_trwania_sec'] ?? ''}'),
-            );
+final wynikRaw = exam['wynik']?.toString() ?? '';
+final wynikDouble = double.tryParse(wynikRaw);
 
-    final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
+String wynik;
+if (wynikDouble == null) {
+  wynik = '-';
+} else {
+  wynik =
+      (wynikDouble % 1 == 0)
+          ? wynikDouble.toInt().toString()
+          : wynikDouble.toStringAsFixed(1);
+}
+
+// surowe sekundy z bazy
+final int durationSec =
+    (exam['czas_trwania_sec'] is int)
+        ? exam['czas_trwania_sec'] as int
+        : int.tryParse('${exam['czas_trwania_sec'] ?? '0'}') ?? 0;
+
+// ładny tekst do wyświetlenia
+final czas = _fmtDuration(durationSec);
+
+final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
+
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -480,46 +489,57 @@ class LastExamRow extends StatelessWidget {
           ),
 
           ElevatedButton(
-            onPressed:
-                examId == 0
-                    ? null
-                    : () async {
-                      final data = await fetchExamDetailsFull(examId);
-                      if (!context.mounted) return;
+  onPressed:
+      examId == 0
+          ? null
+          : () async {
+            final data = await fetchExamDetailsFull(
+              examId,
+              fullDateTime,  // ⬅ wysyłamy pełną datę+czas
+              durationSec,   // ⬅ wysyłamy czas trwania w sekundach
+            );
+            if (!context.mounted) return;
 
-                      if (data != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (_) => EgzaminPodgladView(
-                                  questions: data['questions'],
-                                  selectedAnswers:
-                                      (data['selectedAnswers']).cast<String?>(),
-                                ),
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Nie udało się wczytać podglądu."),
-                          ),
-                        );
-                      }
-                    },
-            child: const Text("Podgląd"),
-          ),
+            if (data != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (_) => EgzaminPodgladView(
+                        questions: data['questions'],
+                        selectedAnswers:
+                            (data['selectedAnswers']).cast<String?>(),
+                      ),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Nie udało się wczytać podglądu."),
+                ),
+              );
+            }
+          },
+  child: const Text("Podgląd"),
+),
+
         ],
       ),
     );
   }
-    Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
+    Future<Map<String, dynamic>?> fetchExamDetailsFull(
+  int examId,
+  String examDateTime,
+  int durationSec,
+) async {
   try {
     final response = await http.post(
-      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/podgladEgzaminu.php'),
+      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/podgladEgzaminu_user.php'),
       body: {
-        'api_token': _apiKey,
-        'exam_id': examId.toString(),
+        'api_token'   : _apiKey,
+        'exam_id'     : examId.toString(),
+        'exam_date'   : examDateTime,        // ⬅ wysyłamy datę+czas
+        'duration_sec': durationSec.toString(), // ⬅ wysyłamy czas w sekundach
       },
     );
 
@@ -538,4 +558,5 @@ class LastExamRow extends StatelessWidget {
   }
   return null;
 }
+
 }
