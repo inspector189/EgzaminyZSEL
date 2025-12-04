@@ -756,23 +756,56 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Widget _buildFinishButton(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: ElevatedButton(
-        onPressed: _isButtonDisabled ? null : _finishExam,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          foregroundColor: colorScheme.onPrimary,
-          backgroundColor: colorScheme.primary,
-        ),
-        child: Text(
-          _isButtonDisabled ? "Wysyłanie..." : "Zakończ egzamin",
-          style: const TextStyle(fontSize: 16),
-        ),
+  final colorScheme = Theme.of(context).colorScheme;
+  return Padding(
+    padding: const EdgeInsets.all(12),
+    child: ElevatedButton(
+      onPressed: _isButtonDisabled ? null : _confirmFinishExam,
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        foregroundColor: colorScheme.onPrimary,
+        backgroundColor: colorScheme.primary,
       ),
-    );
+      child: Text(
+        _isButtonDisabled ? "Wysyłanie..." : "Zakończ egzamin",
+        style: const TextStyle(fontSize: 16),
+      ),
+    ),
+  );
+}
+
+  Future<void> _confirmFinishExam() async {
+  if (_isButtonDisabled) return;
+
+  final shouldFinish = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false, // kliknięcie obok nie zamknie okna
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text('Zakończyć egzamin?'),
+        content: const Text(
+          'Czy na pewno chcesz zakończyć egzamin?\n'
+          'Po zakończeniu nie będzie można zmienić odpowiedzi.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Anuluj'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Zakończ'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (shouldFinish == true) {
+    await _finishExam();
   }
+}
+
 
  Future<void> _finishExam() async {
   setState(() => _isButtonDisabled = true);
