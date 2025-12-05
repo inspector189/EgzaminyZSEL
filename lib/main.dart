@@ -21,6 +21,7 @@ import 'statistics.dart';
 import 'theme_manager.dart';
 import 'utils/http_service.dart';
 import 'utils/quotes.dart';
+import 'AboutUsPage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -755,6 +756,17 @@ Future<void> _signOut({bool showSnack = true}) async {
                   buildPopupMenu('Teleinformatyk'),
                   buildPopupMenu('Automatyk'),
                   const Spacer(),
+                  IconButton(
+                      icon: const Icon(Icons.info_outline),
+                      tooltip: 'O nas',
+                      color: colorScheme.onPrimary,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AboutPage()),
+                        );
+                      },
+                    ),
                   IconButton(
                     icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
                     tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
