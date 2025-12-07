@@ -1,34 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart'
-    show CachedNetworkImage;
-import 'package:flutter/material.dart'
-    show
-        Widget,
-        BuildContext,
-        BoxFit,
-        Center,
-        GestureDetector,
-        LayoutBuilder,
-        Theme,
-        BorderRadius,
-        BoxDecoration,
-        Icons,
-        Icon,
-        Container,
-        Image,
-        InteractiveViewer,
-        FadeTransition,
-        Colors,            
-        Navigator,          
-        Padding,           
-        ClipRRect,        
-        Transform,      
-        Duration,        
-        Material,  
-        CircularProgressIndicator;
-
-import 'package:flutter/widgets.dart';
-import 'package:flutter_app/app_themes.dart' show ExtraColors;
-import 'package:shimmer/shimmer.dart' show Shimmer;
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_app/app_themes.dart';
+import 'package:shimmer/shimmer.dart';
 
 const double imageZoomScale = 1.75;
 
@@ -86,9 +59,9 @@ void _showZoomedImage(BuildContext context, String url) {
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Zamknij',
-    barrierColor: Colors.black.withOpacity(0.92),
+    barrierColor: Colors.black.withValues(alpha: 0.92),
     transitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (context, _, __) {
+    pageBuilder: (context, _, _) {
       return _ZoomedImageViewer(imageUrl: url);
     },
     transitionBuilder: (context, animation, _, child) {
@@ -96,6 +69,7 @@ void _showZoomedImage(BuildContext context, String url) {
     },
   );
 }
+
 class _ZoomedImageViewer extends StatelessWidget {
   final String imageUrl;
 
@@ -122,20 +96,28 @@ class _ZoomedImageViewer extends StatelessWidget {
                   fit: BoxFit.contain,
                   width: targetWidth,
                   height: targetHeight,
-                  placeholder: (_, __) => Container(
-                    width: targetWidth,
-                    height: targetHeight,
-                    color: const Color(0xFF111111),
-                    child: const Center(
-                      child: CircularProgressIndicator(color: Colors.white70),
-                    ),
-                  ),
-                  errorWidget: (_, __, ___) => Container(
-                    width: targetWidth,
-                    height: targetHeight,
-                    color: const Color(0xFF111111),
-                    child: const Icon(Icons.error, color: Colors.white70, size: 60),
-                  ),
+                  placeholder:
+                      (_, _) => Container(
+                        width: targetWidth,
+                        height: targetHeight,
+                        color: const Color(0xFF111111),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                  errorWidget:
+                      (_, _, _) => Container(
+                        width: targetWidth,
+                        height: targetHeight,
+                        color: const Color(0xFF111111),
+                        child: const Icon(
+                          Icons.error,
+                          color: Colors.white70,
+                          size: 60,
+                        ),
+                      ),
                 ),
               ),
             ),

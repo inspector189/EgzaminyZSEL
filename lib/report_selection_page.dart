@@ -1,16 +1,11 @@
-import 'dart:convert' show json;
 import 'dart:js_interop';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:http/http.dart' as http show post;
 import 'package:pdf/pdf.dart' show PdfPageFormat;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart' show Printing;
 import 'package:web/web.dart' as web;
-
-const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 
 String normalizeQualification(String? input) {
   if (input == null || input.trim().isEmpty) return '';
@@ -93,7 +88,7 @@ class _ReportSelectionPageState extends State<ReportSelectionPage> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: selectedQualification,
+              initialValue: selectedQualification,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'Wybierz kwalifikację',

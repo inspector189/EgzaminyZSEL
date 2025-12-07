@@ -12,12 +12,10 @@ import 'dart:async';
 import 'utils/exam_timer.dart';
 import 'utils/video_player.dart';
 import 'utils/zoomable_image.dart';
-
-const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+import 'utils/helpers.dart' show apiKey;
 
 const double _minImageHeight = 100;
 const double _maxImageHeight = 500;
-
 
 enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie, zTestu }
 
@@ -33,7 +31,7 @@ class EgzaminView extends StatefulWidget {
     required this.tryb,
     required this.kwalifikacja,
     required this.returnToHome,
-    this.userName, 
+    this.userName,
     this.testData,
   }) : assert(
          tryb != TrybEgzaminu.zTestu || testData != null,
@@ -117,8 +115,18 @@ class _EgzaminViewState extends State<EgzaminView> {
   @override
   void initState() {
     super.initState();
-    fetchQuestions();
     _scrollController.addListener(_onScroll);
+  }
+
+  bool _fetched = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if(!_fetched) {
+      fetchQuestions();
+      _fetched = true;
+    }
   }
 
   Timer? _scrollDebounce;
@@ -138,32 +146,107 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Future<void> fetchQuestions() async {
-  final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-  final testData = args?['testData'] as Map<String, dynamic>?;
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final testData = args?['testData'] as Map<String, dynamic>?;
 
     if (testData != null) {
-    // ==========================
-    // TEST NAUCZYCIELA – pobierz pytania z published_tests
-    // ==========================
-    final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/published_tests.php');
-    try {
-      final response = await http.get(uri); // GET, bo uczeń nie potrzebuje tokena
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        final List<dynamic> allPublished = json.decode(response.body);
+      // ==========================
+      // TEST NAUCZYCIELA – pobierz pytania z published_tests
+      // ==========================
+      final uri = Uri.parse(
+        'https://egzaminy.zsel.edu.pl/egzaminy/published_tests.php',
+      );
+      try {
+        final response = await http.get(
+          uri,
+        ); // GET, bo uczeń nie potrzebuje tokena
+        if (response.statusCode == 200 && response.body.isNotEmpty) {
+          final List<dynamic> allPublished = json.decode(response.body);
 
-        // Znajdź test o dokładnie tych parametrach
-        final matching = allPublished.firstWhere(
-          (t) =>
-              t['name'] == testData['name'] &&
-              t['author'] == testData['author'] &&
-              t['qualification'] == testData['qualification'],
-          orElse: () => null,
-        );
+          // Znajdź test o dokładnie tych parametrach
+          final matching = allPublished.firstWhere(
+            (t) =>
+                t['name'] == testData['name'] &&
+                t['author'] == testData['author'] &&
+                t['qualification'] == testData['qualification'],
+            orElse: () => null,
+          );
 
-        if (matching != null) {
-          final List<dynamic> fetchedQuestions = List.from(matching['test_json'] ?? []);
+          if (matching != null) {
+            final List<dynamic> fetchedQuestions = List.from(
+              matching['test_json'] ?? [],
+            );
 
-          for (var q in fetchedQuestions) {
+            for (var q in fetchedQuestions) {
+              q['pytanie_text'] = _clean(q['pytanie']);
+              q['pytanie_images'] =
+                  (q['images'] as List?)?.cast<String>() ?? [];
+              q['pytanie_videos'] =
+                  (q['videos'] as List?)?.cast<String>() ?? [];
+
+              for (int i = 1; i <= 4; i++) {
+                final key = 'odp$i';
+                q['${key}_text'] = _clean(q[key]);
+                q['${key}_images'] =
+                    (q['${key}_images'] as List?)?.cast<String>() ?? [];
+                q['${key}_videos'] =
+                    (q['${key}_videos'] as List?)?.cast<String>() ?? [];
+              }
+            }
+
+            if (mounted) {
+              setState(() {
+                questions = fetchedQuestions;
+                selectedAnswers = List.filled(fetchedQuestions.length, null);
+                isLoading = false;
+                _visibleCount = 30.clamp(0, fetchedQuestions.length);
+              });
+            }
+            _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
+            startTime = DateTime.now();
+            _startTimer();
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint("Pobranie pytań nauczyciela nie powiodło się: $e");
+        }
+      }
+    } else {
+      // ==========================
+      // Normalny egzamin – losuj pytania
+      // ==========================
+      final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
+      final url = Uri.parse(
+        'https://egzaminy.zsel.edu.pl/egzaminy/$kwalifikacja.php',
+      );
+      try {
+        final response = await http.get(url);
+        if (response.statusCode == 200 && response.body.isNotEmpty) {
+          final List<dynamic> allQuestions = json.decode(response.body);
+          List<dynamic> selected = [];
+
+          switch (widget.tryb) {
+            case TrybEgzaminu.jednoPytanie:
+              selected = List.from(allQuestions)..shuffle();
+              break;
+            case TrybEgzaminu.czterdziesciPytan:
+              selected = List.from(allQuestions)..shuffle();
+              selected = selected.take(40).toList();
+              break;
+            case TrybEgzaminu.wszystkie:
+              selected = allQuestions;
+              break;
+            case TrybEgzaminu.zTestu:
+              if (widget.testData == null) {
+                throw Exception('Brak testData w trybie zTestu!');
+              }
+              selected = List.from(widget.testData!['questions'] ?? []);
+              break;
+          }
+
+          for (var q in selected) {
             q['pytanie_text'] = _clean(q['pytanie']);
             q['pytanie_images'] = (q['images'] as List?)?.cast<String>() ?? [];
             q['pytanie_videos'] = (q['videos'] as List?)?.cast<String>() ?? [];
@@ -171,90 +254,30 @@ class _EgzaminViewState extends State<EgzaminView> {
             for (int i = 1; i <= 4; i++) {
               final key = 'odp$i';
               q['${key}_text'] = _clean(q[key]);
-              q['${key}_images'] = (q['${key}_images'] as List?)?.cast<String>() ?? [];
-              q['${key}_videos'] = (q['${key}_videos'] as List?)?.cast<String>() ?? [];
+              q['${key}_images'] =
+                  (q['${key}_images'] as List?)?.cast<String>() ?? [];
+              q['${key}_videos'] =
+                  (q['${key}_videos'] as List?)?.cast<String>() ?? [];
             }
           }
 
           if (mounted) {
             setState(() {
-              questions = fetchedQuestions;
-              selectedAnswers = List.filled(fetchedQuestions.length, null);
+              questions = selected;
+              selectedAnswers = List.filled(selected.length, null);
               isLoading = false;
-              _visibleCount = 30.clamp(0, fetchedQuestions.length);
+              _visibleCount = 30.clamp(0, selected.length);
             });
           }
           _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
           startTime = DateTime.now();
           _startTimer();
         }
+      } catch (e) {
+        if (kDebugMode) debugPrint("Pobranie pytań nie powiodło się: $e");
       }
-    } catch (e) {
-      if (kDebugMode) debugPrint("Pobranie pytań nauczyciela nie powiodło się: $e");
-    }
-  } else {
-    // ==========================
-    // Normalny egzamin – losuj pytania
-    // ==========================
-    final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
-    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/$kwalifikacja.php');
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        final List<dynamic> allQuestions = json.decode(response.body);
-        List<dynamic> selected = [];
-
-        switch (widget.tryb) {
-          case TrybEgzaminu.jednoPytanie:
-            selected = List.from(allQuestions)..shuffle();
-            break;
-          case TrybEgzaminu.czterdziesciPytan:
-            selected = List.from(allQuestions)..shuffle();
-            selected = selected.take(40).toList();
-            break;
-          case TrybEgzaminu.wszystkie:
-            selected = allQuestions;
-            break;
-          case TrybEgzaminu.zTestu:
-            if (widget.testData == null) {
-              throw Exception('Brak testData w trybie zTestu!');
-            }
-            selected = List.from(widget.testData!['questions'] ?? []);
-            break;
-
-        }
-
-        for (var q in selected) {
-          q['pytanie_text'] = _clean(q['pytanie']);
-          q['pytanie_images'] = (q['images'] as List?)?.cast<String>() ?? [];
-          q['pytanie_videos'] = (q['videos'] as List?)?.cast<String>() ?? [];
-
-          for (int i = 1; i <= 4; i++) {
-            final key = 'odp$i';
-            q['${key}_text'] = _clean(q[key]);
-            q['${key}_images'] = (q['${key}_images'] as List?)?.cast<String>() ?? [];
-            q['${key}_videos'] = (q['${key}_videos'] as List?)?.cast<String>() ?? [];
-          }
-        }
-
-        if (mounted) {
-          setState(() {
-            questions = selected;
-            selectedAnswers = List.filled(selected.length, null);
-            isLoading = false;
-            _visibleCount = 30.clamp(0, selected.length);
-          });
-        }
-        _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
-        startTime = DateTime.now();
-        _startTimer();
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint("Pobranie pytań nie powiodło się: $e");
     }
   }
-}
-
 
   Future<void> sendResultToServer({
     required String kwalifikacja,
@@ -266,12 +289,14 @@ class _EgzaminViewState extends State<EgzaminView> {
         widget.userName ??
         (await SharedPreferences.getInstance()).getString('userName') ??
         'anonymous';
-    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/zapisz_wynik.php');
+    final url = Uri.parse(
+      'https://egzaminy.zsel.edu.pl/egzaminy/zapisz_wynik.php',
+    );
     final response = await http.post(
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $_apiKey',
+        'Authorization': 'Bearer $apiKey',
       },
       body: {
         'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
@@ -292,12 +317,14 @@ class _EgzaminViewState extends State<EgzaminView> {
     bool poprawna,
   ) async {
     if (pytanieId <= 0) return;
-    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/zapis_trudnosci.php');
+    final url = Uri.parse(
+      'https://egzaminy.zsel.edu.pl/egzaminy/zapis_trudnosci.php',
+    );
     final response = await http.post(
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $_apiKey',
+        'Authorization': 'Bearer $apiKey',
       },
       body: {
         'pytanie_id': pytanieId.toString(),
@@ -392,21 +419,19 @@ class _EgzaminViewState extends State<EgzaminView> {
           children: [
             Text(text, style: const TextStyle(fontSize: 15)),
             ...images.map(
-            (url) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minHeight: _minImageHeight,
-                    maxHeight: _maxImageHeight,
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: _minImageHeight,
+                      maxHeight: _maxImageHeight,
+                    ),
+                    child: buildZoomableImage(context, url),
                   ),
-                  child: buildZoomableImage(context, url),
                 ),
               ),
             ),
-          ),
-
-
 
             ...videos.map(
               (url) => Padding(
@@ -414,15 +439,11 @@ class _EgzaminViewState extends State<EgzaminView> {
                 child: Center(
                   child: SizedBox(
                     height: 400,
-                    child: InlineVideoPlayer(
-                      url: url,
-                      height: 400,
-                    ),
+                    child: InlineVideoPlayer(url: url, height: 400),
                   ),
                 ),
               ),
             ),
-
           ],
         ),
       ),
@@ -481,7 +502,7 @@ class _EgzaminViewState extends State<EgzaminView> {
                       color: colorScheme.primary,
                     ),
                   ),
-                  if (widget.tryb == TrybEgzaminu.zTestu)
+                if (widget.tryb == TrybEgzaminu.zTestu)
                   Text(
                     'Pytanie ${index + 1}${q['id'] != null ? ' (ID: ${q['id']})' : ''}',
                     style: TextStyle(
@@ -500,35 +521,31 @@ class _EgzaminViewState extends State<EgzaminView> {
             const SizedBox(height: 8),
             Text(pytanieText, style: const TextStyle(fontSize: 16)),
             ...pytanieImages.map(
-            (url) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minHeight: _minImageHeight,
-                    maxHeight: _maxImageHeight,
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: _minImageHeight,
+                      maxHeight: _maxImageHeight,
+                    ),
+                    child: buildZoomableImage(context, url),
                   ),
-                  child: buildZoomableImage(context, url),
                 ),
               ),
             ),
-          ),
-
 
             ...pytanieVideos.map(
-            (url) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Center(
-                child: SizedBox(
-                  height: 400,
-                  child: InlineVideoPlayer(
-                    url: url,
+              (url) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: SizedBox(
                     height: 400,
+                    child: InlineVideoPlayer(url: url, height: 400),
                   ),
                 ),
               ),
             ),
-          ),
 
             const SizedBox(height: 12),
             ...['A', 'B', 'C', 'D'].map((litera) {
@@ -653,7 +670,7 @@ class _EgzaminViewState extends State<EgzaminView> {
               : _buildLazyList(),
       bottomNavigationBar:
           (widget.tryb == TrybEgzaminu.czterdziesciPytan ||
-                      widget.tryb == TrybEgzaminu.zTestu)
+                  widget.tryb == TrybEgzaminu.zTestu)
               ? _buildFinishButton(context)
               : null,
     );
@@ -756,174 +773,185 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Widget _buildFinishButton(BuildContext context) {
-  final colorScheme = Theme.of(context).colorScheme;
-  return Padding(
-    padding: const EdgeInsets.all(12),
-    child: ElevatedButton(
-      onPressed: _isButtonDisabled ? null : _confirmFinishExam,
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        foregroundColor: colorScheme.onPrimary,
-        backgroundColor: colorScheme.primary,
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: ElevatedButton(
+        onPressed: _isButtonDisabled ? null : _confirmFinishExam,
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          foregroundColor: colorScheme.onPrimary,
+          backgroundColor: colorScheme.primary,
+        ),
+        child: Text(
+          _isButtonDisabled ? "Wysyłanie..." : "Zakończ egzamin",
+          style: const TextStyle(fontSize: 16),
+        ),
       ),
-      child: Text(
-        _isButtonDisabled ? "Wysyłanie..." : "Zakończ egzamin",
-        style: const TextStyle(fontSize: 16),
-      ),
-    ),
-  );
-}
+    );
+  }
 
   Future<void> _confirmFinishExam() async {
-  if (_isButtonDisabled) return;
+    if (_isButtonDisabled) return;
 
-  final shouldFinish = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false, // kliknięcie obok nie zamknie okna
-    builder: (ctx) {
-      return AlertDialog(
-        title: const Text('Zakończyć egzamin?'),
-        content: const Text(
-          'Czy na pewno chcesz zakończyć egzamin?\n'
-          'Po zakończeniu nie będzie można zmienić odpowiedzi.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Anuluj'),
+    final shouldFinish = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // kliknięcie obok nie zamknie okna
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Zakończyć egzamin?'),
+          content: const Text(
+            'Czy na pewno chcesz zakończyć egzamin?\n'
+            'Po zakończeniu nie będzie można zmienić odpowiedzi.',
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Zakończ'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Anuluj'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Zakończ'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldFinish == true) {
+      await _finishExam();
+    }
+  }
+
+  Future<void> _finishExam() async {
+    setState(() => _isButtonDisabled = true);
+
+    int correct = 0;
+    for (int i = 0; i < questions.length; i++) {
+      if (selectedAnswers[i] == questions[i]['poprawna']) {
+        correct++;
+      }
+    }
+
+    final percent = (correct / questions.length) * 100;
+    final endTime = DateTime.now();
+    final duration = endTime.difference(startTime).inSeconds;
+    final prefs = await SharedPreferences.getInstance();
+    final userName = prefs.getString("userName") ?? "anonymous";
+
+    // ==============================
+    // Część wspólna – pytania do payload
+    // ==============================
+    final List<Map<String, dynamic>> pytaniaDoBazy = [];
+    for (var q in questions) {
+      pytaniaDoBazy.add({
+        'id': q['id'],
+        'pytanie': q['pytanie'],
+        'poprawna': q['poprawna'],
+      });
+    }
+
+    // ==============================
+    // Sprawdzenie, czy to test nauczyciela
+    // ==============================
+
+    final testData = widget.testData;
+
+    if (testData != null) {
+      final testKey =
+          '${testData['name']}||${testData['author']}||${testData['qualification']}';
+
+      final payload = {
+        'userName': userName,
+        'test_key': testKey,
+        'score': percent,
+        'kwalifikacja': widget.kwalifikacja.replaceAll(' ', '').toLowerCase(),
+        'date': endTime.toIso8601String(),
+        'duration_sec': duration,
+        'selectedAnswers': selectedAnswers,
+        'questions': pytaniaDoBazy,
+      };
+
+      final uri = Uri.parse(
+        'https://egzaminy.zsel.edu.pl/egzaminy/savePublishedResult.php',
+      );
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+      if (kDebugMode) {
+        print("STATUS: ${response.statusCode}");
+        print("BODY: ${response.body}");
+      }
+
+      if (response.statusCode != 200 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Błąd zapisu wyniku testu nauczyciela: ${response.body}',
+            ),
           ),
-        ],
+        );
+      }
+    } else {
+      // ==============================
+      // EGZAMIN 40 PYTAŃ – wysyłka na serwer
+      // ==============================
+      final Map<String, dynamic> payload = {
+        'kwalifikacja': widget.kwalifikacja,
+        'wynik': percent,
+        'data_czas': endTime.toIso8601String(),
+        'czas_trwania': duration,
+        'userName': userName,
+        'pytania': pytaniaDoBazy,
+        'wybrane_odpowiedzi': selectedAnswers,
+      };
+
+      final uri = Uri.parse(
+        'https://egzaminy.zsel.edu.pl/egzaminy/save_exam.php',
       );
-    },
-  );
-
-  if (shouldFinish == true) {
-    await _finishExam();
-  }
-}
-
-
- Future<void> _finishExam() async {
-  setState(() => _isButtonDisabled = true);
-
-  int correct = 0;
-  for (int i = 0; i < questions.length; i++) {
-    if (selectedAnswers[i] == questions[i]['poprawna']) {
-      correct++;
-    }
-  }
-
-  final percent = (correct / questions.length) * 100;
-  final endTime = DateTime.now();
-  final duration = endTime.difference(startTime).inSeconds;
-  final prefs = await SharedPreferences.getInstance();
-  final userName = prefs.getString("userName") ?? "anonymous";
-
-  // ==============================
-  // Część wspólna – pytania do payload
-  // ==============================
-  final List<Map<String, dynamic>> pytaniaDoBazy = [];
-  for (var q in questions) {
-    pytaniaDoBazy.add({
-      'id': q['id'],
-      'pytanie': q['pytanie'],
-      'poprawna': q['poprawna'],
-    });
-  }
-
-  // ==============================
-  // Sprawdzenie, czy to test nauczyciela
-  // ==============================
-
-  final testData = widget.testData;
-
-  if (testData != null) {
-    final testKey = '${testData['name']}||${testData['author']}||${testData['qualification']}';
-
-    final payload = {
-      'userName': userName,
-      'test_key': testKey,
-      'score': percent,                    
-      'kwalifikacja': widget.kwalifikacja.replaceAll(' ', '').toLowerCase(),
-      'date': endTime.toIso8601String(),   
-      'duration_sec': duration,           
-      'selectedAnswers': selectedAnswers,
-      'questions': pytaniaDoBazy,
-    };
-
-    final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/savePublishedResult.php');
-
-    final response = await http.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(payload),
-      
-    );
-      print("STATUS: ${response.statusCode}");
-      print("BODY: ${response.body}");
-    if (response.statusCode != 200 && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Błąd zapisu wyniku testu nauczyciela: ${response.body}')),
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode(payload),
       );
+
+      if (response.statusCode != 200 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Błąd zapisu egzaminu: ${response.body}')),
+        );
+      }
     }
-  } else {
+
     // ==============================
-    // EGZAMIN 40 PYTAŃ – wysyłka na serwer
+    // Widok wyniku końcowego
     // ==============================
-    final Map<String, dynamic> payload = {
-      'kwalifikacja': widget.kwalifikacja,
-      'wynik': percent,
-      'data_czas': endTime.toIso8601String(),
-      'czas_trwania': duration,
-      'userName': userName,
-      'pytania': pytaniaDoBazy,
-      'wybrane_odpowiedzi': selectedAnswers,
-    };
-
-    final uri = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/save_exam.php');
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_apiKey',
-      },
-      body: jsonEncode(payload),
-    );
-
-    if (response.statusCode != 200 && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Błąd zapisu egzaminu: ${response.body}')),
-      );
-    }
-  }
-
-  // ==============================
-  // Widok wyniku końcowego
-  // ==============================
-  if (mounted) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EgzaminWynikView(
-          correctAnswers: correct,
-          totalQuestions: questions.length,
-          questions: questions,
-          selectedAnswers: selectedAnswers,
-          returnToHome: true,
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => EgzaminWynikView(
+                correctAnswers: correct,
+                totalQuestions: questions.length,
+                questions: questions,
+                selectedAnswers: selectedAnswers,
+                returnToHome: true,
+              ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  setState(() => _isButtonDisabled = false);
-}
+    setState(() => _isButtonDisabled = false);
+  }
 
   void _losujNowePytanie() {
     if (questions.length <= 1) return;

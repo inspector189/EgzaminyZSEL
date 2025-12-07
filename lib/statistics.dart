@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/widgets/question_tile.dart';
+//import 'package:flutter_app/widgets/question_tile.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'egzamin_podglad.dart';
-import 'admin_stats.dart';
+//import 'admin_stats.dart';
 
-const _apiKey = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
+import 'utils/helpers.dart';
 
 class StatisticsPage extends StatelessWidget {
   const StatisticsPage({super.key});
@@ -133,10 +133,10 @@ class StatisticsPage extends StatelessWidget {
     if (userName == 'anonymous') return [];
 
     final response = await http.post(
-      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/stats_all.php'),
+      Uri.parse('$apiBaseUrl/stats_all.php'),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $_apiKey',
+        'Authorization': 'Bearer $apiKey',
       },
     );
 
@@ -165,12 +165,12 @@ class StatisticsPage extends StatelessWidget {
       throw Exception('ℹ️ Funkcja statystyk wymaga zalogowania.');
     }
 
-    final url = Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/stats.php');
+    final url = Uri.parse('$apiBaseUrl/stats.php');
     final response = await http.post(
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $_apiKey',
+        'Authorization': 'Bearer $apiKey',
       },
       body: {'userName': userName},
     );
@@ -423,40 +423,40 @@ class LastExamRow extends StatelessWidget {
     final s = seconds % 60;
     return '${m}m ${s}s';
   }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     // pełna data+czas z bazy (np. "2025-12-04 08:15:45")
-final fullDateTime = (exam['data_czas'] ?? '') as String;
+    final fullDateTime = (exam['data_czas'] ?? '') as String;
 
-// tylko data do wyświetlenia
-final date = fullDateTime.split(' ').first;
+    // tylko data do wyświetlenia
+    final date = fullDateTime.split(' ').first;
 
-final wynikRaw = exam['wynik']?.toString() ?? '';
-final wynikDouble = double.tryParse(wynikRaw);
+    final wynikRaw = exam['wynik']?.toString() ?? '';
+    final wynikDouble = double.tryParse(wynikRaw);
 
-String wynik;
-if (wynikDouble == null) {
-  wynik = '-';
-} else {
-  wynik =
-      (wynikDouble % 1 == 0)
-          ? wynikDouble.toInt().toString()
-          : wynikDouble.toStringAsFixed(1);
-}
+    String wynik;
+    if (wynikDouble == null) {
+      wynik = '-';
+    } else {
+      wynik =
+          (wynikDouble % 1 == 0)
+              ? wynikDouble.toInt().toString()
+              : wynikDouble.toStringAsFixed(1);
+    }
 
-// surowe sekundy z bazy
-final int durationSec =
-    (exam['czas_trwania_sec'] is int)
-        ? exam['czas_trwania_sec'] as int
-        : int.tryParse('${exam['czas_trwania_sec'] ?? '0'}') ?? 0;
+    // surowe sekundy z bazy
+    final int durationSec =
+        (exam['czas_trwania_sec'] is int)
+            ? exam['czas_trwania_sec'] as int
+            : int.tryParse('${exam['czas_trwania_sec'] ?? '0'}') ?? 0;
 
-// ładny tekst do wyświetlenia
-final czas = _fmtDuration(durationSec);
+    // ładny tekst do wyświetlenia
+    final czas = _fmtDuration(durationSec);
 
-final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
-
+    final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -482,81 +482,87 @@ final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                  Text('Czas trwania: $czas', style: TextStyle(color: Colors.grey[700])
+                Text(
+                  'Czas trwania: $czas',
+                  style: TextStyle(color: Colors.grey[700]),
                 ),
               ],
             ),
           ),
 
           ElevatedButton(
-  onPressed:
-      examId == 0
-          ? null
-          : () async {
-            final data = await fetchExamDetailsFull(
-              examId,
-              fullDateTime,  // ⬅ wysyłamy pełną datę+czas
-              durationSec,   // ⬅ wysyłamy czas trwania w sekundach
-            );
-            if (!context.mounted) return;
+            onPressed:
+                examId == 0
+                    ? null
+                    : () async {
+                      final data = await fetchExamDetailsFull(
+                        examId,
+                        fullDateTime, // ⬅ wysyłamy pełną datę+czas
+                        durationSec, // ⬅ wysyłamy czas trwania w sekundach
+                      );
+                      if (!context.mounted) return;
 
-            if (data != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (_) => EgzaminPodgladView(
-                        questions: data['questions'],
-                        selectedAnswers:
-                            (data['selectedAnswers']).cast<String?>(),
-                      ),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Nie udało się wczytać podglądu."),
-                ),
-              );
-            }
-          },
-  child: const Text("Podgląd"),
-),
-
+                      if (data != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (_) => EgzaminPodgladView(
+                                  questions: data['questions'],
+                                  selectedAnswers:
+                                      (data['selectedAnswers']).cast<String?>(),
+                                ),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Nie udało się wczytać podglądu."),
+                          ),
+                        );
+                      }
+                    },
+            child: const Text("Podgląd"),
+          ),
         ],
       ),
     );
   }
-    Future<Map<String, dynamic>?> fetchExamDetailsFull(
-  int examId,
-  String examDateTime,
-  int durationSec,
-) async {
-  try {
-    final response = await http.post(
-      Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/podgladEgzaminu_user.php'),
-      body: {
-        'api_token'   : _apiKey,
-        'exam_id'     : examId.toString(),
-        'exam_date'   : examDateTime,        // ⬅ wysyłamy datę+czas
-        'duration_sec': durationSec.toString(), // ⬅ wysyłamy czas w sekundach
-      },
-    );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['success'] == true) {
-        return {
-          'questions': List<dynamic>.from(data['questions']),
-          'selectedAnswers': (data['selectedAnswers'] as List).cast<String?>(),
-        };
+  Future<Map<String, dynamic>?> fetchExamDetailsFull(
+    int examId,
+    String examDateTime,
+    int durationSec,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$apiBaseUrl/podgladEgzaminu_user.php'),
+        body: {
+          'api_token': apiKey,
+          'exam_id': examId.toString(),
+          'exam_date': examDateTime, // ⬅ wysyłamy datę+czas
+          'duration_sec': durationSec.toString(), // ⬅ wysyłamy czas w sekundach
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return {
+            'questions': List<dynamic>.from(data['questions']),
+            'selectedAnswers':
+                (data['selectedAnswers'] as List).cast<String?>(),
+          };
+        }
+      }
+      if (kDebugMode) {
+        debugPrint('PHP error: ${response.body}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Błąd: $e');
       }
     }
-    print('PHP error: ${response.body}');
-  } catch (e) {
-    print('Błąd: $e');
+    return null;
   }
-  return null;
-}
-
 }

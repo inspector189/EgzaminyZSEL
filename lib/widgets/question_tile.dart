@@ -28,7 +28,7 @@ class QuestionTile extends StatefulWidget {
 class _QuestionTileState extends State<QuestionTile> {
   static final Map<String, int?> _cache = {};
   int? _count;
-  bool _loading = true;
+  bool _loading = false;
   bool _error = false;
 
   bool _hovering = false;
@@ -37,7 +37,10 @@ class _QuestionTileState extends State<QuestionTile> {
   @override
   void initState() {
     super.initState();
-    _loadCount();
+    if (widget.showCount) {
+      _loading = true;
+      _loadCount();
+    }
   }
 
   Future<void> _loadCount() async {
@@ -48,7 +51,6 @@ class _QuestionTileState extends State<QuestionTile> {
     }
 
     setState(() {
-      _loading = true;
       _error = false;
     });
 

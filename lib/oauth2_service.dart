@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'utils/helpers.dart';
 
 class OAuth2Service {
   static const String clientId = '67af475e-082d-4187-b1ef-5fa26fa0fe77';
@@ -63,82 +64,71 @@ class OAuth2Service {
   }
 
   static Future<bool> handleRedirect() async {
-  final uri = Uri.parse(web.window.location.href);
-  final code = uri.queryParameters['code'];
-  final state = uri.queryParameters['state'];
-  final storedState = web.window.localStorage.getItem('oauth_state');
-  final codeVerifier = web.window.localStorage.getItem('code_verifier');
+    final uri = Uri.parse(web.window.location.href);
+    final code = uri.queryParameters['code'];
+    final state = uri.queryParameters['state'];
+    final storedState = web.window.localStorage.getItem('oauth_state');
+    final codeVerifier = web.window.localStorage.getItem('code_verifier');
 
-  if (code == null || state != storedState || codeVerifier == null) {
-    return false;
-  }
+    if (code == null || state != storedState || codeVerifier == null) {
+      return false;
+    }
 
-  web.window.localStorage.removeItem('oauth_state');
-  web.window.localStorage.removeItem('code_verifier');
+    web.window.localStorage.removeItem('oauth_state');
+    web.window.localStorage.removeItem('code_verifier');
 
-  try {
-    final response = await http.post(
-      Uri.parse(tokenUrl),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {
-        'client_id': clientId,
-        'grant_type': 'authorization_code',
-        'code': code,
-        'redirect_uri': redirectUri,
-        'code_verifier': codeVerifier,
-      },
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(tokenUrl),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'client_id': clientId,
+          'grant_type': 'authorization_code',
+          'code': code,
+          'redirect_uri': redirectUri,
+          'code_verifier': codeVerifier,
+        },
+      );
 
-    if (response.statusCode == 200) {
-      final jsonMap = jsonDecode(response.body) as Map<String, dynamic>;
-      final idToken = jsonMap['id_token'] as String?;
+      if (response.statusCode == 200) {
+        final jsonMap = jsonDecode(response.body) as Map<String, dynamic>;
+        final idToken = jsonMap['id_token'] as String?;
 
-      // zapis nazwy + maila (tak jak miałeś)
-      await _saveUserFromIdToken(idToken);
+        await _saveUserFromIdToken(idToken);
 
-      bool isAdmin = false;
+        bool isAdmin = false;
 
-      if (idToken != null) {
-        // ---- wywołanie ms-login.php ----
-        final msRes = await http.post(
-          Uri.parse('https://egzaminy.zsel.edu.pl/egzaminy/ms-login.php'),
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: {
-            'id_token': idToken,
-          },
-        );
+        if (idToken != null) {
+          final msRes = await http.post(
+            Uri.parse('$apiBaseUrl/ms-login.php'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: {'id_token': idToken},
+          );
 
-        if (msRes.statusCode == 200) {
-          final msJson =
-              jsonDecode(msRes.body) as Map<String, dynamic>;
-          isAdmin = msJson['isAdmin'] == true;
-        } else {
-          if (kDebugMode) {
-            print(
-              'ms-login error: ${msRes.statusCode} ${msRes.body}',
-            );
+          if (msRes.statusCode == 200) {
+            final msJson = jsonDecode(msRes.body) as Map<String, dynamic>;
+            isAdmin = msJson['isAdmin'] == true;
+          } else {
+            if (kDebugMode) {
+              print('ms-login error: ${msRes.statusCode} ${msRes.body}');
+            }
           }
         }
-      }
 
-      // zapisujemy info o adminie w SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isAdmin', isAdmin);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isAdmin', isAdmin);
 
-      return true;
-    } else {
-      if (kDebugMode) {
-        print('Token error: ${response.statusCode} - ${response.body}');
+        return true;
+      } else {
+        if (kDebugMode) {
+          print('Token error: ${response.statusCode} - ${response.body}');
+        }
       }
+    } catch (e) {
+      if (kDebugMode) print('Błąd tokena: $e');
     }
-  } catch (e) {
-    if (kDebugMode) print('Błąd tokena: $e');
+    return false;
   }
-  return false;
-}
-
 
   static Future<void> _saveUserFromIdToken(String? idToken) async {
     if (idToken == null) return;

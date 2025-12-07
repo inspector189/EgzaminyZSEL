@@ -14,7 +14,7 @@ class QualificationPage extends StatelessWidget {
 
   final String qualification;
   final bool isAdmin;
-  
+
   final dynamic isLoggedIn;
 
   @override
@@ -99,32 +99,33 @@ class QualificationPage extends StatelessWidget {
         label: 'Opublikowane zestawy pytań przez nauczycieli',
         showCount: false,
         onTap: (_) {
-          if(isLoggedIn)
-          {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PublishedTestsPage(qualification: qualification),
+          if (isLoggedIn) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (_) => PublishedTestsPage(qualification: qualification),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.login, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Aby rozwiązać test od nauczyciela musisz się zalogować!',
+                      ),
+                    ),
+                  ],
                 ),
+              ),
             );
           }
-          else{
-               ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        Icon(Icons.login, color: Colors.blue),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text('Aby rozwiązać test od nauczyciela musisz się zalogować!'),
-                        ),
-                      ],
-                    ),
-                  )
-                );
-          }
         },
-      )
+      ),
     ];
     if (isAdmin) {
       tiles.add(

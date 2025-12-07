@@ -20,12 +20,24 @@ import 'qualification_page.dart';
 import 'statistics.dart';
 import 'theme_manager.dart';
 import 'utils/http_service.dart';
+import 'utils/helpers.dart';
 import 'utils/quotes.dart';
 import 'AboutUsPage.dart';
 
+//Debug data here (use your data to login in debug)
+const String userName = "";
+const String userEmail = "";
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kIsWeb) {
+  if (kDebugMode) {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userName', userName);
+    await prefs.setString('userEmail', userEmail);
+    await prefs.setBool('isAdmin', true);
+  }
+
+  if (kIsWeb && !kDebugMode) {
     final success = await OAuth2Service.handleRedirect();
     if (success) {
       cleanUrl();
@@ -113,88 +125,80 @@ class _MyHomePageState extends State<MyHomePage> {
     selectedQuote = quotes[Random().nextInt(quotes.length)];
     Future.microtask(_checkLoginState);
   }
-Future<void> _syncWithServerSession() async {
-  // jeśli lokalnie nie ma zalogowanego usera – nic nie sprawdzamy
-  if (!_isLoggedIn || _userEmail == null) return;
-  if (!kIsWeb) return; // sesje masz tylko na webie
 
-  try {
-    final url = Uri.parse(
-      'https://egzaminy.zsel.edu.pl/egzaminy/session-status.php',
-    );
+  Future<void> _syncWithServerSession() async {
+    if (kDebugMode) return;
 
-    // Możesz użyć POST z pustym body
-    final response = await HttpService.postJson(url, {});
+    if (!_isLoggedIn || _userEmail == null) return;
 
-    if (response == null) return;
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final ok = data['ok'] == true;
-
-      if (!ok) {
-        // backend mówi: brak poprawnej sesji → wyloguj lokalnie
-        await _signOut(showSnack: false);
-        if (kDebugMode) {
-          debugPrint('ℹ️ Sesja na serwerze nie istnieje – logout lokalny');
-        }
-      } else {
-        // opcjonalnie: zsynchronizuj isAdmin z backendem
-        final bool adminFromServer = data['isAdmin'] == true;
-        if (mounted) {
-          setState(() {
-            _isAdmin = adminFromServer;
-          });
-        }
-      }
-    } else if (response.statusCode == 401) {
-      // np. check_logged_user(true) zwrócił 401 – też wyloguj lokalnie
-      await _signOut(showSnack: false);
-      if (kDebugMode) {
-        debugPrint('ℹ️ 401 z session-status – logout lokalny');
-      }
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      debugPrint('❌ Błąd sprawdzania sesji na serwerze: $e');
-    }
-    // przy błędzie sieci nic nie ruszamy – user zostaje zalogowany lokalnie
-  }
-}
-
-  Future<void> _checkLoginState() async {
-  final prefs = await SharedPreferences.getInstance();
-  final userName = prefs.getString('userName');
-  final userEmail = prefs.getString('userEmail');
-  final isAdmin = prefs.getBool('isAdmin') ?? false;
-
-  final bool isLoggedIn = userName != null && userEmail != null;
-
-  if (kDebugMode) {
-    debugPrint(
-      'ℹ️ Sprawdzanie statusu logowania: '
-      'userName=$userName, userEmail=$userEmail, isAdmin=$isAdmin',
-    );
-  }
-
-  setState(() {
-    _isLoggedIn = isLoggedIn;
-    _userName = isLoggedIn ? userName : null;
-    _userEmail = isLoggedIn ? userEmail : null;
-    _isAdmin = isLoggedIn ? isAdmin : false;
-  });
-
-  // DODANE: sprawdzenie sesji na serwerze
-  await _syncWithServerSession();
-}
-
-
-
-  Future<void> _verifyEmail(String email) async {
+    if (!kIsWeb) return;
 
     try {
+      final url = Uri.parse('$apiBaseUrl/session-status.php');
+
+      final response = await HttpService.postJson(url, {});
+
+      if (response == null) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final ok = data['ok'] == true;
+
+        if (!ok) {
+          await _signOut(showSnack: false);
+          if (kDebugMode) {
+            debugPrint('ℹ️ Sesja na serwerze nie istnieje - logout lokalny');
+          }
+        } else {
+          final bool adminFromServer = data['isAdmin'] == true;
+          if (mounted) {
+            setState(() {
+              _isAdmin = adminFromServer;
+            });
+          }
+        }
+      } else if (response.statusCode == 401) {
+        await _signOut(showSnack: false);
+        if (kDebugMode) {
+          debugPrint('ℹ️ 401 z session-status - logout lokalny');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Błąd sprawdzania sesji na serwerze: $e');
+      }
+    }
+  }
+
+  Future<void> _checkLoginState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userName = prefs.getString('userName');
+    final userEmail = prefs.getString('userEmail');
+    final isAdmin = prefs.getBool('isAdmin') ?? false;
+
+    final bool isLoggedIn = userName != null && userEmail != null;
+
+    if (kDebugMode) {
+      debugPrint(
+        'ℹ️ Sprawdzanie statusu logowania: '
+        'userName=$userName, userEmail=$userEmail, isAdmin=$isAdmin',
+      );
+    }
+
+    setState(() {
+      _isLoggedIn = isLoggedIn;
+      _userName = isLoggedIn ? userName : null;
+      _userEmail = isLoggedIn ? userEmail : null;
+      _isAdmin = isLoggedIn ? isAdmin : false;
+    });
+
+    await _syncWithServerSession();
+  }
+  /*
+  Future<void> _verifyEmail(String email) async {
+    try {
       final url = Uri.parse(
-        'https://egzaminy.zsel.edu.pl/egzaminy/verify-email.php',
+        '$apiBaseUrl/verify-email.php',
       );
       final response = await HttpService.postJson(url, {'email': email});
 
@@ -230,44 +234,46 @@ Future<void> _syncWithServerSession() async {
         });
       }
       if (kDebugMode) debugPrint('❌ Błąd weryfikacji email: $e');
-    } finally {
+    } finally {}
+  }*/
+
+  Future<void> _showLoginInfoAndStart() async {
+    final shouldLogin = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Zaloguj się"),
+            content: const Text(
+              "Zaloguj się przy pomocy maila z domeną @zselektr.onmicrosoft.com.\n\n"
+              "Dzięki zalogowaniu się jako uczeń będziesz miał możliwość "
+              "sprawdzenia swoich statystyk oraz robienia testów z zestawu od nauczyciela.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Anuluj"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+    );
+
+    if (shouldLogin != true) return;
+
+    try {
+      OAuth2Service.startLogin();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Błąd logowania: $e")));
+      }
     }
   }
-Future<void> _showLoginInfoAndStart() async {
-  final shouldLogin = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text("Zaloguj się"),
-      content: const Text(
-        "Zaloguj się przy pomocy maila z domeną @zselektr.onmicrosoft.com.\n\n"
-        "Dzięki zalogowaniu się jako uczeń będziesz miał możliwość "
-        "sprawdzenia swoich statystyk oraz robienia testów z zestawu od nauczyciela.",
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text("Anuluj"),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text("OK"),
-        ),
-      ],
-    ),
-  );
 
-  if (shouldLogin != true) return;
-
-  try {
-    OAuth2Service.startLogin();
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Błąd logowania: $e")),
-      );
-    }
-  }
-}
   void _openStatistics(BuildContext context) {
     Future.microtask(() {
       if (context.mounted) {
@@ -279,43 +285,36 @@ Future<void> _showLoginInfoAndStart() async {
     });
   }
 
-Future<void> _signOut({bool showSnack = true}) async {
-  // 1. Spróbuj zabić sesję na backendzie
-  if (kIsWeb) {
-    try {
-      final url = Uri.parse(
-        'https://egzaminy.zsel.edu.pl/egzaminy/logout.php',
-      );
-      // ignorujemy odpowiedź – ważne, że request poleci
-      await HttpService.postJson(url, {});
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('⚠️ Błąd przy wylogowaniu na backendzie: $e');
+  Future<void> _signOut({bool showSnack = true}) async {
+    if (kIsWeb) {
+      try {
+        final url = Uri.parse('$apiBaseUrl/logout.php');
+        await HttpService.postJson(url, {});
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('⚠️ Błąd przy wylogowaniu: $e');
+        }
       }
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('userName');
+    await prefs.remove('userEmail');
+    await prefs.remove('isAdmin');
+
+    setState(() {
+      _isLoggedIn = false;
+      _userName = null;
+      _userEmail = null;
+      _isAdmin = false;
+    });
+
+    if (mounted && showSnack) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Wylogowano')));
+    }
   }
-
-  // 2. Wyczyść lokalne dane
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.remove('userName');
-  await prefs.remove('userEmail');
-  await prefs.remove('isAdmin');
-
-  setState(() {
-    _isLoggedIn = false;
-    _userName = null;
-    _userEmail = null;
-    _isAdmin = false;
-  });
-
-  if (mounted && showSnack) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Wylogowano')),
-    );
-  }
-}
-
-
 
   OverlayEntry? _currentProfilePopup;
 
@@ -702,23 +701,27 @@ Future<void> _signOut({bool showSnack = true}) async {
                       leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
                       title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
                       onTap: () async {
-                          Navigator.pop(context);
+                        Navigator.pop(context);
 
-                          if (_isLoggedIn) {
-                            _toggleProfilePopup(context);
-                          } else {
-                            if (!kIsWeb) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Logowanie dostępne tylko na webie")),
-                              );
-                              return;
-                            }
-
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              _showLoginInfoAndStart();
-                            });
+                        if (_isLoggedIn) {
+                          _toggleProfilePopup(context);
+                        } else {
+                          if (!kIsWeb) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "Logowanie dostępne tylko na webie",
+                                ),
+                              ),
+                            );
+                            return;
                           }
-                        },
+
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _showLoginInfoAndStart();
+                          });
+                        }
+                      },
                     ),
 
                     ListTile(
@@ -757,27 +760,29 @@ Future<void> _signOut({bool showSnack = true}) async {
                   buildPopupMenu('Automatyk'),
                   const Spacer(),
                   IconButton(
-                      icon: const Icon(Icons.info_outline),
-                      tooltip: 'O nas',
-                      color: colorScheme.onPrimary,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const AboutPage()),
-                        );
-                      },
-                    ),
+                    icon: const Icon(Icons.info_outline),
+                    tooltip: 'O nas',
+                    color: colorScheme.onPrimary,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AboutPage()),
+                      );
+                    },
+                  ),
                   IconButton(
                     icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
                     tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
                     color: colorScheme.onPrimary,
-                   onPressed: () async {
+                    onPressed: () async {
                       if (_isLoggedIn) {
                         _toggleProfilePopup(context);
                       } else {
                         if (!kIsWeb) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Logowanie tylko na webie')),
+                            const SnackBar(
+                              content: Text('Logowanie tylko na webie'),
+                            ),
                           );
                           return;
                         }
@@ -930,7 +935,8 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.settings_input_component,
             code: 'ELM.04',
-            label: 'przeglądy, konserwacja, diagnostyka i naprawa instalacji automatyki przemysłowej',
+            label:
+                'przeglądy, konserwacja, diagnostyka i naprawa instalacji automatyki przemysłowej',
             onTap: onQualificationTap,
           ),
         ]),

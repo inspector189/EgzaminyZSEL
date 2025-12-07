@@ -1,32 +1,4 @@
-import 'package:flutter/material.dart'
-    show
-        StatelessWidget,
-        VoidCallback,
-        BuildContext,
-        Widget,
-        EdgeInsets,
-        Offset,
-        SizedBox,
-        Icon,
-        Theme,
-        BorderRadius,
-        WidgetStateProperty,
-        WidgetState,
-        Colors,
-        BoxShadow,
-        BoxDecoration,
-        Icons,
-        CircleAvatar,
-        CrossAxisAlignment,
-        FontWeight,
-        Text,
-        Column,
-        Expanded,
-        IconButton,
-        Row,
-        Container,
-        InkWell,
-        Padding;
+import 'package:flutter/material.dart';
 
 class ModernAdminRow extends StatelessWidget {
   final String email;

@@ -5,14 +5,13 @@ import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
 import 'dart:convert';
 import 'utils/zoomable_image.dart';
+import 'utils/helpers.dart';
 
 class QuestionStatsPage extends StatefulWidget {
   const QuestionStatsPage({super.key});
   @override
   QuestionStatsPageState createState() => QuestionStatsPageState();
 }
-
-final _apiKey = "zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^";
 
 class QuestionStatsPageState extends State<QuestionStatsPage>
     with AutomaticKeepAliveClientMixin {
@@ -76,11 +75,9 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
 
     try {
       final response = await http.get(
-        Uri.parse(
-          'https://egzaminy.zsel.edu.pl/egzaminy/wyswietl_trudnosci.php',
-        ),
+        Uri.parse('$apiBaseUrl/wyswietl_trudnosci.php'),
         headers: {
-          'Authorization': 'Bearer $_apiKey',
+          'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
         },
       );
@@ -120,9 +117,7 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
 
     try {
       final res = await http.get(
-        Uri.parse(
-          'https://egzaminy.zsel.edu.pl/egzaminy/${kwal.replaceAll(" ", "")}.php',
-        ),
+        Uri.parse('$apiBaseUrl/${kwal.replaceAll(" ", "")}.php'),
       );
 
       if (res.statusCode == 200) {
@@ -324,7 +319,10 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
                       odp,
                       style: TextStyle(
                         fontSize: 15,
-                        color: isCorrect ? colorScheme.surface : colorScheme.onSurface,
+                        color:
+                            isCorrect
+                                ? colorScheme.surface
+                                : colorScheme.onSurface,
                       ),
                     ),
                   ),
