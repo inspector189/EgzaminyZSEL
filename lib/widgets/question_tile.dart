@@ -169,7 +169,7 @@ class _QuestionTileState extends State<QuestionTile> {
             duration: const Duration(milliseconds: 150),
             curve: Curves.easeOut,
             width: itemWidth,
-            height: 200,
+            height: 220,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: colorScheme.surface,
@@ -208,7 +208,10 @@ class _QuestionTileState extends State<QuestionTile> {
                 ),
                 if (widget.showCount) ...[
                   const SizedBox(height: 12),
-                  _countWidget(colorScheme, extras),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: _countWidget(colorScheme, extras),
+                  ),
                 ],
               ],
             ),

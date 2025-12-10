@@ -859,13 +859,13 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.code,
             code: 'INF.03',
-            label: 'strony internetowe i bazy danych',
+            label: 'Tworzenie i administrowanie stronami i aplikacjami internetowymi oraz bazami danych',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.router,
             code: 'INF.04',
-            label: 'programowanie aplikacji',
+            label: 'Projektowanie, programowanie i testowanie aplikacji',
             onTap: onQualificationTap,
           ),
         ]),
@@ -873,13 +873,13 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.memory,
             code: 'INF.02',
-            label: 'sprzęt, systemy i sieci',
+            label: 'Administracja i eksploatacja systemów komputerowych, urządzeń peryferyjnych i lokalnych sieci koputerowych',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.code,
             code: 'INF.03',
-            label: 'strony internetowe i bazy danych',
+            label: 'Tworzenie i administrowanie stronami i aplikacjami internetowymi oraz bazami danych',
             onTap: onQualificationTap,
           ),
         ]),
@@ -887,13 +887,13 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.network_check,
             code: 'INF.07',
-            label: 'systemy i urządzenia sieciowe',
+            label: 'Montaż i konfigurowanie lokalnych sieci komputerowych oraz administrowanie systemami operacyjnymi',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.security,
             code: 'INF.08',
-            label: 'sieci rozległe',
+            label: 'Ekspolatacja i konfiguracja oraz administrowanie sieciami rozległymi',
             onTap: onQualificationTap,
           ),
         ]),
@@ -901,13 +901,13 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.analytics,
             code: 'ELM.02',
-            label: 'instalacje i pomiary',
+            label: 'Montaż oraz instalowanie układów i urządzeń elektronicznych',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.build,
             code: 'ELM.05',
-            label: 'serwis urządzeń elektronicznych',
+            label: 'Eksploatacja urządzeń elektronicznych',
             onTap: onQualificationTap,
           ),
         ]),
@@ -915,13 +915,13 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.electrical_services,
             code: 'ELE.02',
-            label: 'układy elektryczne',
+            label: 'Montaż, uruchamianie i konserwacja intalacji, maszyn i urządzeń elektrycznych',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.precision_manufacturing,
             code: 'ELE.05',
-            label: 'eksploatacja maszyn i urządzeń',
+            label: 'eksploatacja maszyn, urządzeń i instalacji elektrycznych',
             onTap: onQualificationTap,
           ),
         ]),
@@ -929,14 +929,14 @@ class HomeContent extends StatelessWidget {
           QuestionTile(
             icon: Icons.build_circle,
             code: 'ELM.01',
-            label: 'montaż i uruchamianie urządzeń automatyki przemysłowej',
+            label: 'Montaż, uruchamianie i obsługiwanie układów automatyki przemysłowej',
             onTap: onQualificationTap,
           ),
           QuestionTile(
             icon: Icons.settings_input_component,
             code: 'ELM.04',
             label:
-                'przeglądy, konserwacja, diagnostyka i naprawa instalacji automatyki przemysłowej',
+                'Eksploatacja układów automatyki przemysłowej',
             onTap: onQualificationTap,
           ),
         ]),
