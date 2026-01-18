@@ -12,6 +12,7 @@ import 'widgets/home_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'admin_panel.dart';
+import 'utils/qualifications.dart';
 import 'app_themes.dart';
 import 'widgets/profile_popup.dart';
 import 'oauth2_service.dart';
@@ -418,7 +419,7 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  List<String> getMenuItems(String category) {
+  /*List<String> getMenuItems(String category) {
     switch (category) {
       case 'Programista':
         return ['INF 03', 'INF 04'];
@@ -435,10 +436,11 @@ class _MyHomePageState extends State<MyHomePage> {
       default:
         return [];
     }
-  }
+  }*/
 
   Widget buildPopupMenu(String title) {
     final colorScheme = Theme.of(context).colorScheme;
+
     if (title == 'Strona Główna') {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6.0),
@@ -474,20 +476,24 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       );
     }
+    final profession = professions.firstWhere(
+      (p) => p.name == title,
+      orElse: () => Profession(name: '', emoji: '', qualifications: []),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6.0),
-      child: PopupMenuButton<String>(
+      child: PopupMenuButton<Qualification>(
         tooltip: title,
         offset: const Offset(0, kToolbarHeight),
         color: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        onSelected: (value) {
+        onSelected: (qualification) {
           _navigatorKey.currentState?.pushAndRemoveUntil(
             MaterialPageRoute(
               builder:
-                  (context) => QualificationPage(
-                    qualification: value,
+                  (_) => QualificationPage(
+                    qualification: qualification.code,
                     isAdmin: _isAdmin,
                     isLoggedIn: _isLoggedIn,
                   ),
@@ -496,8 +502,17 @@ class _MyHomePageState extends State<MyHomePage> {
           );
         },
         itemBuilder: (context) {
-          return getMenuItems(title).map((item) {
-            return PopupMenuItem<String>(value: item, child: Text(item));
+          return profession.qualifications.map((q) {
+            return PopupMenuItem<Qualification>(
+              value: q,
+              child: Row(
+                children: [
+                  Icon(q.icon, size: 20),
+                  const SizedBox(width: 8),
+                  Text(q.code),
+                ],
+              ),
+            );
           }).toList();
         },
         child: Container(
@@ -505,13 +520,26 @@ class _MyHomePageState extends State<MyHomePage> {
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 0),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(4)),
           child: Center(
-            child: Text(
-              title,
-              style: TextStyle(
-                color: colorScheme.onSecondary,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "technik",
+                  style: TextStyle(
+                    color: colorScheme.onSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: colorScheme.onSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -564,137 +592,30 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     _drawerItem(context, 'Strona Główna'),
-                    ExpansionTile(
-                      title: const Text('Programista'),
-                      children:
-                          getMenuItems('Programista').map((kwal) {
-                            return ListTile(
-                              title: Text(kwal),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _navigatorKey.currentState?.push(
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => QualificationPage(
-                                          qualification: kwal,
-                                          isAdmin: _isAdmin,
-                                          isLoggedIn: _isLoggedIn,
-                                        ),
-                                  ),
-                                );
-                              },
-                            );
-                          }).toList(),
-                    ),
-                    ExpansionTile(
-                      title: const Text('Informatyk'),
-                      children:
-                          getMenuItems('Informatyk').map((kwal) {
-                            return ListTile(
-                              title: Text(kwal),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _navigatorKey.currentState?.push(
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => QualificationPage(
-                                          qualification: kwal,
-                                          isAdmin: _isAdmin,
-                                          isLoggedIn: _isLoggedIn,
-                                        ),
-                                  ),
-                                );
-                              },
-                            );
-                          }).toList(),
-                    ),
-                    ExpansionTile(
-                      title: const Text('Elektryk'),
-                      children:
-                          getMenuItems('Elektryk').map((kwal) {
-                            return ListTile(
-                              title: Text(kwal),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _navigatorKey.currentState?.push(
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => QualificationPage(
-                                          qualification: kwal,
-                                          isAdmin: _isAdmin,
-                                          isLoggedIn: _isLoggedIn,
-                                        ),
-                                  ),
-                                );
-                              },
-                            );
-                          }).toList(),
-                    ),
-                    ExpansionTile(
-                      title: const Text('Elektronik'),
-                      children:
-                          getMenuItems('Elektronik').map((kwal) {
-                            return ListTile(
-                              title: Text(kwal),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _navigatorKey.currentState?.push(
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => QualificationPage(
-                                          qualification: kwal,
-                                          isAdmin: _isAdmin,
-                                          isLoggedIn: _isLoggedIn,
-                                        ),
-                                  ),
-                                );
-                              },
-                            );
-                          }).toList(),
-                    ),
-                    ExpansionTile(
-                      title: const Text('Teleinformatyk'),
-                      children:
-                          getMenuItems('Teleinformatyk').map((kwal) {
-                            return ListTile(
-                              title: Text(kwal),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _navigatorKey.currentState?.push(
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => QualificationPage(
-                                          qualification: kwal,
-                                          isAdmin: _isAdmin,
-                                          isLoggedIn: _isLoggedIn,
-                                        ),
-                                  ),
-                                );
-                              },
-                            );
-                          }).toList(),
-                    ),
-                    ExpansionTile(
-                      title: const Text('Automatyk'),
-                      children:
-                          getMenuItems('Automatyk').map((kwal) {
-                            return ListTile(
-                              title: Text(kwal),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _navigatorKey.currentState?.push(
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => QualificationPage(
-                                          qualification: kwal,
-                                          isAdmin: _isAdmin,
-                                          isLoggedIn: _isLoggedIn,
-                                        ),
-                                  ),
-                                );
-                              },
-                            );
-                          }).toList(),
+
+                    ...professions.map(
+                      (profession) => ExpansionTile(
+                        title: Text(profession.name),
+                        children:
+                            profession.qualifications.map((q) {
+                              return ListTile(
+                                title: Text(q.code),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _navigatorKey.currentState?.push(
+                                    MaterialPageRoute(
+                                      builder:
+                                          (_) => QualificationPage(
+                                            qualification: q.code,
+                                            isAdmin: _isAdmin,
+                                            isLoggedIn: _isLoggedIn,
+                                          ),
+                                    ),
+                                  );
+                                },
+                              );
+                            }).toList(),
+                      ),
                     ),
                     const Divider(),
                     ListTile(
@@ -702,7 +623,6 @@ class _MyHomePageState extends State<MyHomePage> {
                       title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
                       onTap: () async {
                         Navigator.pop(context);
-
                         if (_isLoggedIn) {
                           _toggleProfilePopup(context);
                         } else {
@@ -716,7 +636,6 @@ class _MyHomePageState extends State<MyHomePage> {
                             );
                             return;
                           }
-
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             _showLoginInfoAndStart();
                           });
@@ -752,12 +671,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ? [
                   const Spacer(),
                   buildPopupMenu('Strona Główna'),
-                  buildPopupMenu('Programista'),
-                  buildPopupMenu('Informatyk'),
-                  buildPopupMenu('Elektryk'),
-                  buildPopupMenu('Elektronik'),
-                  buildPopupMenu('Teleinformatyk'),
-                  buildPopupMenu('Automatyk'),
+                  ...professions.map((p) => buildPopupMenu(p.name)),
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.info_outline),
@@ -855,91 +769,20 @@ class HomeContent extends StatelessWidget {
       children: [
         HomeHeader(selectedQuote: selectedQuote),
         const SizedBox(height: 40),
-        _buildGrid('👨‍💻 Technik Programista', [
-          QuestionTile(
-            icon: Icons.code,
-            code: 'INF.03',
-            label: 'Tworzenie i administrowanie stronami i aplikacjami internetowymi oraz bazami danych',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
-            icon: Icons.router,
-            code: 'INF.04',
-            label: 'Projektowanie, programowanie i testowanie aplikacji',
-            onTap: onQualificationTap,
-          ),
-        ]),
-        _buildGrid('💻 Technik Informatyk', [
-          QuestionTile(
-            icon: Icons.memory,
-            code: 'INF.02',
-            label: 'Administracja i eksploatacja systemów komputerowych, urządzeń peryferyjnych i lokalnych sieci koputerowych',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
-            icon: Icons.code,
-            code: 'INF.03',
-            label: 'Tworzenie i administrowanie stronami i aplikacjami internetowymi oraz bazami danych',
-            onTap: onQualificationTap,
-          ),
-        ]),
-        _buildGrid('🌐 Technik Teleinformatyk', [
-          QuestionTile(
-            icon: Icons.network_check,
-            code: 'INF.07',
-            label: 'Montaż i konfigurowanie lokalnych sieci komputerowych oraz administrowanie systemami operacyjnymi',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
-            icon: Icons.security,
-            code: 'INF.08',
-            label: 'Ekspolatacja i konfiguracja oraz administrowanie sieciami rozległymi',
-            onTap: onQualificationTap,
-          ),
-        ]),
-        _buildGrid('📟 Technik Elektronik', [
-          QuestionTile(
-            icon: Icons.analytics,
-            code: 'ELM.02',
-            label: 'Montaż oraz instalowanie układów i urządzeń elektronicznych',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
-            icon: Icons.build,
-            code: 'ELM.05',
-            label: 'Eksploatacja urządzeń elektronicznych',
-            onTap: onQualificationTap,
-          ),
-        ]),
-        _buildGrid('💡 Technik Elektryk', [
-          QuestionTile(
-            icon: Icons.electrical_services,
-            code: 'ELE.02',
-            label: 'Montaż, uruchamianie i konserwacja intalacji, maszyn i urządzeń elektrycznych',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
-            icon: Icons.precision_manufacturing,
-            code: 'ELE.05',
-            label: 'eksploatacja maszyn, urządzeń i instalacji elektrycznych',
-            onTap: onQualificationTap,
-          ),
-        ]),
-        _buildGrid('🤖 Technik Automatyk', [
-          QuestionTile(
-            icon: Icons.build_circle,
-            code: 'ELM.01',
-            label: 'Montaż, uruchamianie i obsługiwanie układów automatyki przemysłowej',
-            onTap: onQualificationTap,
-          ),
-          QuestionTile(
-            icon: Icons.settings_input_component,
-            code: 'ELM.04',
-            label:
-                'Eksploatacja układów automatyki przemysłowej',
-            onTap: onQualificationTap,
-          ),
-        ]),
+
+        ...professions.map((profession) {
+          return _buildGrid(
+            '${profession.emoji} Technik ${profession.name}',
+            profession.qualifications.map((q) {
+              return QuestionTile(
+                icon: q.icon,
+                code: q.code,
+                label: q.description,
+                onTap: onQualificationTap,
+              );
+            }).toList(),
+          );
+        }),
       ],
     );
   }
