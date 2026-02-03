@@ -82,8 +82,6 @@ class AboutPage extends StatelessWidget {
               style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 40),
-
-            // Masonry layout for authors
             LayoutBuilder(
               builder: (context, constraints) {
                 final crossAxisCount = constraints.maxWidth >= 900 ? 2 : 1;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import "questions_panel.dart";
+
+import 'questions_panel.dart';
 import 'widgets/admin_tiles.dart';
 import 'admin_stats.dart';
 import 'manage_admins.dart';
@@ -12,7 +13,7 @@ class AdminPanelPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final adminTiles = [
+    final adminTiles = <AdminTileData>[
       AdminTileData(
         icon: Icons.people,
         label: 'Administratorzy',
@@ -44,13 +45,14 @@ class AdminPanelPage extends StatelessWidget {
         },
       ),
       AdminTileData(
-        icon: Icons.play_circle_fill, 
+        icon: Icons.play_circle_fill,
         label: 'Przeprowadź test',
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const CreatingTestsAndReportsPage()),
-            
+            MaterialPageRoute(
+              builder: (_) => const CreatingTestsAndReportsPage(),
+            ),
           );
         },
       ),
@@ -81,20 +83,20 @@ class AdminPanelPage extends StatelessWidget {
                 columns = 2;
               }
 
+              final availableWidth =
+                  constraints.maxWidth - (20 * (columns - 1));
+              final tileWidth =
+                  (availableWidth / columns).clamp(0, 300).toDouble();
+
               return Wrap(
                 spacing: 20,
                 runSpacing: 20,
                 alignment: WrapAlignment.center,
                 children:
-                    adminTiles.map((tile) {
-                      final tileWidth = constraints.maxWidth / columns - 20;
+                    adminTiles.map((data) {
                       return SizedBox(
-                        width: tileWidth < 300 ? tileWidth : 300,
-                        child: AdminTile(
-                          icon: tile.icon,
-                          label: tile.label,
-                          onTap: tile.onTap,
-                        ),
+                        width: tileWidth,
+                        child: AdminTile(data: data),
                       );
                     }).toList(),
               );

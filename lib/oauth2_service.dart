@@ -8,21 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/helpers.dart';
 
 class OAuth2Service {
-  static const String clientId = '67af475e-082d-4187-b1ef-5fa26fa0fe77';
-  static const String tenantId = 'de78aefd-fda9-4eaf-a2d1-cf8492188649';
-  static const String redirectUri =
-      'https://egzaminy.zsel.edu.pl/redirect.html';
-  static const String tokenUrl =
-      'https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token';
-  static const String authorizeUrl =
-      'https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize';
-  static const List<String> scopes = [
-    'openid',
-    'profile',
-    'email',
-    'User.Read',
-    'offline_access',
-  ];
 
   static String? _codeVerifier;
   static String? _state;

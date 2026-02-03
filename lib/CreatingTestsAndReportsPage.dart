@@ -17,9 +17,6 @@ import 'TestCreatorPage.dart';
 import 'utils/video_player.dart';
 import 'utils/helpers.dart';
 
-// =============================
-// WIDGET Z OBRAZKAMI
-// =============================
 class RichQuestionWidget extends StatelessWidget {
   final Map<String, dynamic> question;
   final int number;
@@ -56,7 +53,6 @@ class RichQuestionWidget extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Obrazki pytania
             ...pytanieImages.map(
               (url) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -89,7 +85,6 @@ class RichQuestionWidget extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Teraz tylko sama treść – litera A/B/C/D jest już w tekście!
                       Text(text, style: const TextStyle(fontSize: 15)),
                       ...images.map(
                         (url) => Padding(
@@ -204,7 +199,6 @@ class _CreatingTestsAndReportsPageState
   }
 }
 
-// ==================== PODGLĄD TESTU ====================
 class TestPreviewPage extends StatelessWidget {
   final Map<String, dynamic> test;
   final VoidCallback onPublish;
@@ -247,7 +241,6 @@ class TestPreviewPage extends StatelessWidget {
   }
 }
 
-// ==================== ZAKŁADKA: UTWORZONE TESTY ====================
 class CreatedTestsTab extends StatefulWidget {
   const CreatedTestsTab({super.key});
   @override
@@ -412,7 +405,9 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
           });
         }
       } catch (e) {
-        // cicho – brak wyników lub błąd połączenia
+        if (kDebugMode) {
+          debugPrint('Błąd pobierania wyników: $e');
+        }
       }
     }
 
@@ -577,9 +572,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
     final pdf = pw.Document();
     final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
     final ttf = pw.Font.ttf(fontData);
-    //final qual = test['qualification'] as String;
 
-    // Pomocnicza funkcja do pobierania obrazków
     List<String> getImages(Map<String, dynamic> q, String prefix) {
       if (prefix.isEmpty) {
         return (q['pytanie_images'] as List?)?.cast<String>() ?? [];
@@ -707,7 +700,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
         pw.SizedBox(height: 5),
       ];
 
-      // Dodaj obrazki pytania
       for (final url in pytanieImages) {
         try {
           final resp = await http.get(Uri.parse(url));
@@ -1079,7 +1071,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
                     vertical: 4,
                   ),
                   child: Material(
-                    // <- ważne, żeby button reagował
                     color: Colors.transparent,
                     child: Row(
                       children: [
@@ -1167,8 +1158,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
   Future<void> _generateAnswerKeyPdf(Map<String, dynamic> test) async {
     final String qual = test['qualification'];
     final questions = List<Map<String, dynamic>>.from(test['questions']);
-
-    // Pobierz poprawne odpowiedzi z kwalifikacji.php
     final url = "$apiBaseUrl/$qual.php";
 
     List<dynamic> fullDb = [];
@@ -1191,14 +1180,12 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
       return;
     }
 
-    // Tworzymy mapę ID → poprawna odpowiedź
     final Map<String, String> answerMap = {};
     for (final q in fullDb) {
       answerMap[q['id'].toString()] =
           q['poprawna'].toString().trim().toUpperCase();
     }
 
-    // Generujemy dane klucza
     final List<List<String>> answerRows = [];
     for (int i = 0; i < questions.length; i++) {
       final q = questions[i];
@@ -1291,8 +1278,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
     final fontData = await rootBundle.load("assets/fonts/DejaVuSans.ttf");
     final ttf = pw.Font.ttf(fontData);
 
-    // 🔹 Grupowanie: najpierw po UID (jeśli jest), inaczej po nazwie.
-    // Dla każdej grupy bierzemy TYLKO najnowszy wynik.
     final Map<String, Map<String, dynamic>> lastResults = {};
 
     for (var r in results) {
@@ -1312,7 +1297,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
       }
     }
 
-    // 🔹 Przygotuj wiersze: name, uid, score, date
     final rows =
         lastResults.values.map((raw) {
           final r = raw;
@@ -1440,10 +1424,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
                               if (uid.isNotEmpty)
                                 pw.Text(
                                   'UID: $uid',
-                                  style: pw.TextStyle(
-                                    font: ttf,
-                                    fontSize: 9, // mniejsza czcionka
-                                  ),
+                                  style: pw.TextStyle(font: ttf, fontSize: 9),
                                 ),
                             ],
                           ),
@@ -1488,7 +1469,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
   }
 }
 
-// ==================== ZAKŁADKA: STWÓRZ NOWY TEST ====================
 class CreateNewTestTab extends StatefulWidget {
   const CreateNewTestTab({super.key});
   @override
@@ -1509,9 +1489,7 @@ class _CreateNewTestTabState extends State<CreateNewTestTab> {
   Future<void> _loadQualificationsFromServer() async {
     try {
       final response = await http.post(
-        Uri.parse(
-          '$apiBaseUrl/egzaminy_wyniki_post.php',
-        ),
+        Uri.parse('$apiBaseUrl/egzaminy_wyniki_post.php'),
         headers: {
           'Authorization': 'Bearer $apiToken',
           'Content-Type': 'application/json',

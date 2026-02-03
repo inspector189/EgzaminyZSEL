@@ -112,7 +112,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   late final String selectedQuote;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   bool _isLoggedIn = false;
@@ -125,6 +125,12 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     selectedQuote = quotes[Random().nextInt(quotes.length)];
     Future.microtask(_checkLoginState);
+  }
+
+  @override
+  void dispose() {
+    _closeProfilePopup();
+    super.dispose();
   }
 
   Future<void> _syncWithServerSession() async {
@@ -317,54 +323,51 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  OverlayEntry? _currentProfilePopup;
+  OverlayEntry? _profileOverlay;
 
-  void _toggleProfilePopup(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (_currentProfilePopup != null) {
+  void _toggleProfilePopup() {
+    if (_profileOverlay != null) {
       _closeProfilePopup();
       return;
     }
 
-    late OverlayEntry overlayEntry;
+    final overlay = Overlay.of(context);
 
-    final controller = AnimationController(
-      vsync: Navigator.of(context),
+    _profileController = AnimationController(
+      vsync: this,
       duration: const Duration(milliseconds: 250),
     );
-    final fadeAnimation = CurvedAnimation(
-      parent: controller,
+
+    final animation = CurvedAnimation(
+      parent: _profileController!,
       curve: Curves.easeOut,
     );
-    final slideAnimation = Tween<Offset>(
+
+    final slide = Tween<Offset>(
       begin: const Offset(0.2, -0.2),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: controller, curve: Curves.easeOut));
+    ).animate(animation);
 
-    overlayEntry = OverlayEntry(
+    _profileOverlay = OverlayEntry(
       builder:
-          (context) => Stack(
+          (_) => Stack(
             children: [
               GestureDetector(
-                onTap: _closeProfilePopup,
                 behavior: HitTestBehavior.translucent,
-                child: Container(color: Colors.transparent),
+                onTap: _closeProfilePopup,
               ),
               Positioned(
                 top: kToolbarHeight + 16,
                 right: 16,
                 width: 300,
                 child: FadeTransition(
-                  opacity: fadeAnimation,
+                  opacity: animation,
                   child: SlideTransition(
-                    position: slideAnimation,
+                    position: slide,
                     child: ProfilePopup(
                       userName: _userName!,
                       userEmail: _userEmail!,
                       isAdmin: _isAdmin,
-                      colorScheme: colorScheme,
-                      onClose: _closeProfilePopup,
                       onOpenAdminPanel: () {
                         _closeProfilePopup();
                         Navigator.push(
@@ -399,44 +402,22 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
     );
 
-    _currentProfilePopup = overlayEntry;
-    Overlay.of(context).insert(overlayEntry);
-    controller.forward();
-
-    _profilePopupController = controller;
+    overlay.insert(_profileOverlay!);
+    _profileController!.forward();
   }
 
-  AnimationController? _profilePopupController;
+  AnimationController? _profileController;
 
   void _closeProfilePopup() {
-    if (_currentProfilePopup == null) return;
+    if (_profileOverlay == null) return;
 
-    _profilePopupController?.reverse().then((_) {
-      _currentProfilePopup?.remove();
-      _currentProfilePopup = null;
-      _profilePopupController?.dispose();
-      _profilePopupController = null;
+    _profileController?.reverse().then((_) {
+      _profileOverlay?.remove();
+      _profileOverlay = null;
+      _profileController?.dispose();
+      _profileController = null;
     });
   }
-
-  /*List<String> getMenuItems(String category) {
-    switch (category) {
-      case 'Programista':
-        return ['INF 03', 'INF 04'];
-      case 'Informatyk':
-        return ['INF 03', 'INF 02'];
-      case 'Elektryk':
-        return ['ELE.05', 'ELM.02', 'ELE.02'];
-      case 'Elektronik':
-        return ['ELM.05', 'ELM.02'];
-      case 'Teleinformatyk':
-        return ['INF.08', 'INF.07'];
-      case 'Automatyk':
-        return ['ELM.01', 'ELM.04'];
-      default:
-        return [];
-    }
-  }*/
 
   Widget buildPopupMenu(String title) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -624,7 +605,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       onTap: () async {
                         Navigator.pop(context);
                         if (_isLoggedIn) {
-                          _toggleProfilePopup(context);
+                          _toggleProfilePopup();
                         } else {
                           if (!kIsWeb) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -690,7 +671,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     color: colorScheme.onPrimary,
                     onPressed: () async {
                       if (_isLoggedIn) {
-                        _toggleProfilePopup(context);
+                        _toggleProfilePopup();
                       } else {
                         if (!kIsWeb) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -753,7 +734,7 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class HomeContent extends StatelessWidget {
-  final Function(String) onQualificationTap;
+  final void Function(String) onQualificationTap;
   final String selectedQuote;
 
   const HomeContent({
@@ -778,7 +759,7 @@ class HomeContent extends StatelessWidget {
                 icon: q.icon,
                 code: q.code,
                 label: q.description,
-                onTap: onQualificationTap,
+                onTap: () => onQualificationTap(q.code),
               );
             }).toList(),
           );

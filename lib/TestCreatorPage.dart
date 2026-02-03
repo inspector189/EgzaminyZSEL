@@ -1,5 +1,3 @@
-// test_creator_page.dart
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -7,10 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'CreatingTestsAndReportsPage.dart';
 import 'utils/helpers.dart';
-
-// Ważne: RichQuestionWidget musi być dostępny w tym pliku lub zaimportowany z innego pliku
-// Jeśli masz go w creating_tests_and_reports_page.dart – zaimportuj go tak:
-// import 'creating_tests_and_reports_page.dart' show RichQuestionWidget;
 
 enum TestCreationMode { random, manual }
 
@@ -57,14 +51,12 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
             q['odp${i}_text'] = unescape.convert(q['odp$i'] ?? '');
           }
 
-          // Obrazki – dokładnie jak w Twoim działającym egzamin.dart
           q['pytanie_images'] = (q['images'] as List?)?.cast<String>() ?? [];
           for (int i = 1; i <= 4; i++) {
             q['odp${i}_images'] =
                 (q['odp${i}_images'] as List?)?.cast<String>() ?? [];
           }
 
-          // Filmy (opcjonalnie)
           q['pytanie_videos'] = (q['videos'] as List?)?.cast<String>() ?? [];
           for (int i = 1; i <= 4; i++) {
             q['odp${i}_videos'] =
@@ -121,25 +113,24 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
     final prefs = await SharedPreferences.getInstance();
     final userName = prefs.getString('userName') ?? 'Nauczyciel';
 
-    // KLUCZOWE POPRAWKI:
     final cleanQual =
         widget.qualification
             .replaceAll('.', '')
             .replaceAll(' ', '')
-            .toLowerCase(); // np. "inf02"
+            .toLowerCase();
 
     final newTest = {
       'name': name,
-      'qualification': cleanQual, // ← bez kropek, małe litery
+      'qualification': cleanQual,
       'author': userName,
       'createdAt': DateTime.now().toIso8601String(),
-      'published': false, // ← domyślnie nieopublikowany
-      'results': <Map<String, dynamic>>[], // ← pusta lista wyników
-      'questions': selectedQuestions, // ← już z _text, _images itd.
+      'published': false,
+      'results': <Map<String, dynamic>>[],
+      'questions': selectedQuestions,
     };
 
     // Pobieramy istniejące testy
-    final String? existingJson = prefs.getString('saved_tests');
+    /*final String? existingJson = prefs.getString('saved_tests');
     List<dynamic> allTests = [];
     if (existingJson != null && existingJson.isNotEmpty) {
       try {
@@ -147,7 +138,7 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
       } catch (e) {
         allTests = [];
       }
-    }
+    }*/
 
     try {
       final response = await http.post(
@@ -159,43 +150,39 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
         body: json.encode({'action': 'create', 'test': newTest}),
       );
 
-      if (!mounted) return;
-
-      if (response.statusCode == 200) {
-        // OK – test utworzony
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Test zapisany! Przejdź do „Utworzone testy” → opublikuj',
+      if (mounted) {
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Test zapisany! Przejdź do „Utworzone testy” → opublikuj',
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
             ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
-          ),
-        );
-        Navigator.pop(context);
-      } else if (response.statusCode == 409) {
-        // Duplikat
-        String msg =
-            'Test o tej nazwie już istnieje dla tej kwalifikacji i autora.';
-        try {
-          final body = json.decode(response.body);
-          if (body is Map && body['message'] is String) {
-            msg = body['message'];
-          }
-        } catch (_) {}
+          );
+          Navigator.pop(context);
+        } else if (response.statusCode == 409) {
+          String msg =
+              'Test o tej nazwie już istnieje dla tej kwalifikacji i autora.';
+          try {
+            final body = json.decode(response.body);
+            if (body is Map && body['message'] is String) {
+              msg = body['message'];
+            }
+          } catch (_) {}
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.red),
-        );
-        // NIE robimy Navigator.pop – użytkownik może zmienić nazwę
-      } else {
-        // Inny błąd
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Błąd zapisu testu (${response.statusCode})'),
-            backgroundColor: Colors.red,
-          ),
-        );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), backgroundColor: Colors.red),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Błąd zapisu testu (${response.statusCode})'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -231,7 +218,6 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
       ),
       body: Column(
         children: [
-          // Górny panel z nazwą i przyciskiem zapisu
           Container(
             padding: const EdgeInsets.all(16),
             color: Theme.of(
@@ -283,7 +269,6 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
           Expanded(
             child:
                 widget.mode == TestCreationMode.random
-                    // Tryb losowy – tylko podgląd wybranych
                     ? ListView.builder(
                       itemCount: selectedQuestions.length,
                       itemBuilder: (context, i) {
@@ -295,7 +280,6 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
                         );
                       },
                     )
-                    // Tryb ręczny – wybór pytań
                     : ListView.builder(
                       itemCount: allQuestions.length,
                       itemBuilder: (context, i) {

@@ -31,12 +31,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     super.initState();
     fetchAllStats();
   }
-  /*
-  void _expandStudents() {
-    setState(() {
-      _studentsExpanded = true;
-    });
-  }*/
 
   Future<void> fetchAllStats() async {
     setState(() {
@@ -44,9 +38,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
       errorMessage = null;
     });
     try {
-      final url = Uri.parse(
-        '$apiBaseUrl/stats_all.php',
-      );
+      final url = Uri.parse('$apiBaseUrl/stats_all.php');
       final response = await http.post(
         url,
         headers: {
@@ -135,13 +127,11 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // FILTROWANIE WYNIKÓW
     final filteredResults =
         allResults.where((exam) {
           final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
           if (examDate == null) return false;
 
-          // Filtrowanie po dacie
           final afterStartDate =
               startDate == null ||
               examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
@@ -149,7 +139,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
               endDate == null ||
               examDate.isBefore(endDate!.add(const Duration(days: 1)));
 
-          // Filtrowanie po godzinie
           final afterStartTime =
               startTime == null ||
               (examDate.hour > startTime!.hour ||
@@ -161,7 +150,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                   (examDate.hour == endTime!.hour &&
                       examDate.minute <= endTime!.minute));
 
-          // Filtrowanie po kwalifikacji
           final matchesQualification =
               selectedQualification == null ||
               (exam['kwalifikacja'] ?? '').toString() == selectedQualification;
@@ -173,24 +161,20 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
               matchesQualification;
         }).toList();
 
-    // 🔹 GRUPOWANIE PO UID (jeśli jest), inaczej po nazwie
     final Map<String, List<dynamic>> usersByUid = {};
     for (final exam in filteredResults) {
-      String uid = (exam['UID'] ?? '').toString().trim(); // <-- kolumna UID
-      String name =
-          (exam['userID'] ?? '').toString().trim(); // <-- imię i nazwisko
+      String uid = (exam['UID'] ?? '').toString().trim();
+      String name = (exam['userID'] ?? '').toString().trim();
 
       if (name.isEmpty || name.toLowerCase() == 'anonymous') {
         name = 'Użytkownik anonimowy';
       }
 
-      // Jeśli mamy UID – grupujemy po nim, jeśli nie – po nazwie
       final key = uid.isNotEmpty ? uid : name;
 
       usersByUid.putIfAbsent(key, () => []).add(exam);
     }
 
-    // 🔹 LISTA UŻYTKOWNIKÓW (name + uid + exams) + wyszukiwanie
     final List<Map<String, dynamic>> filteredUsers =
         usersByUid.entries
             .map((entry) {
@@ -218,7 +202,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
             return a['name'].toString().compareTo(b['name'].toString());
           });
 
-    // 🔹 Statystyki według kwalifikacji
     final qualifications = <String, List<dynamic>>{};
     for (final r in filteredResults) {
       final q = (r['kwalifikacja'] ?? '').toString().trim();
@@ -249,7 +232,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                           }),
                       onTap: () {
                         setState(() {
-                          _studentsExpanded = true; // ⬅ wysuń przy kliknięciu
+                          _studentsExpanded = true;
                         });
                       },
                     ),
@@ -714,23 +697,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
               ),
     );
   }
-
-  /*Map<String, List<dynamic>> _groupBy(
-    List<dynamic> list,
-    String Function(dynamic) keySelector,
-  ) {
-    final Map<String, List<dynamic>> grouped = {};
-    for (final item in list) {
-      String key = keySelector(item).trim();
-
-      if (key.isEmpty || key.toLowerCase() == 'anonymous') {
-        key = 'Użytkownik anonimowy';
-      }
-
-      grouped.putIfAbsent(key, () => []).add(item);
-    }
-    return grouped;
-  }*/
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -922,8 +888,8 @@ class _QualificationTile extends StatelessWidget {
           'api_token': apiKey,
           'exam_id': examId.toString(),
           'userName': userName,
-          'exam_date': examDateTime, // ⬅ data+godzina
-          'duration_sec': durationSec.toString(), // ⬅ czas w sekundach
+          'exam_date': examDateTime,
+          'duration_sec': durationSec.toString(),
         },
       );
 
@@ -993,8 +959,7 @@ class _QualificationTile extends StatelessWidget {
           )
         else
           ...recentExams.map((exam) {
-            final String dateTimeStr =
-                (exam['data_czas'] ?? '-') as String; // pełna data+godzina
+            final String dateTimeStr = (exam['data_czas'] ?? '-') as String;
             final wynik = scoreFormatter(exam['wynik']);
 
             final int durationSec =
@@ -1021,8 +986,8 @@ class _QualificationTile extends StatelessWidget {
                         final details = await fetchExamDetailsFull(
                           examId,
                           userName,
-                          dateTimeStr, // ⬅ wysyłamy pełną datę+czas
-                          durationSec, // ⬅ i czas w sekundach
+                          dateTimeStr,
+                          durationSec,
                         );
                         if (!context.mounted) return;
 

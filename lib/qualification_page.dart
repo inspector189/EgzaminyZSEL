@@ -14,17 +14,22 @@ class QualificationPage extends StatelessWidget {
 
   final String qualification;
   final bool isAdmin;
-
-  final dynamic isLoggedIn;
+  final bool isLoggedIn;
 
   @override
   Widget build(BuildContext context) {
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final returnToHome = args?['returnToHome'] ?? false;
+    final route = ModalRoute.of(context);
+    final args = route?.settings.arguments;
+    final returnToHome =
+        args is Map<String, dynamic> && args['returnToHome'] == true;
 
     final screenWidth = MediaQuery.of(context).size.width;
     final itemWidth = screenWidth < 600 ? screenWidth - 40 : 300.0;
+
+    final sanitizedQualification = qualification.toLowerCase().replaceAll(
+      '.',
+      '',
+    );
 
     final tiles = [
       QuestionTile(
@@ -32,17 +37,14 @@ class QualificationPage extends StatelessWidget {
         code: 'Losuj 1 pytanie',
         label: 'Sprawdź swoją wiedzę',
         showCount: false,
-        onTap: (_) {
+        onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder:
                   (context) => EgzaminView(
                     tryb: TrybEgzaminu.jednoPytanie,
-                    kwalifikacja: qualification.toLowerCase().replaceAll(
-                      '.',
-                      '',
-                    ),
+                    kwalifikacja: sanitizedQualification,
                     returnToHome: false,
                   ),
             ),
@@ -54,17 +56,14 @@ class QualificationPage extends StatelessWidget {
         code: 'Test 40 losowych pytań',
         label: 'Pełny egzamin próbny',
         showCount: false,
-        onTap: (_) {
+        onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder:
                   (context) => EgzaminView(
                     tryb: TrybEgzaminu.czterdziesciPytan,
-                    kwalifikacja: qualification.toLowerCase().replaceAll(
-                      '.',
-                      '',
-                    ),
+                    kwalifikacja: sanitizedQualification,
                     returnToHome: false,
                   ),
             ),
@@ -76,17 +75,14 @@ class QualificationPage extends StatelessWidget {
         code: 'Baza wszystkich pytań',
         label: 'Przeglądaj wszystkie pytania',
         showCount: false,
-        onTap: (_) {
+        onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder:
                   (context) => EgzaminView(
                     tryb: TrybEgzaminu.wszystkie,
-                    kwalifikacja: qualification.toLowerCase().replaceAll(
-                      '.',
-                      '',
-                    ),
+                    kwalifikacja: sanitizedQualification,
                     returnToHome: false,
                   ),
             ),
@@ -98,7 +94,7 @@ class QualificationPage extends StatelessWidget {
         code: 'Testy z zestawu nauczyciela',
         label: 'Opublikowane zestawy pytań przez nauczycieli',
         showCount: false,
-        onTap: (_) {
+        onTap: () {
           if (isLoggedIn) {
             Navigator.push(
               context,
@@ -134,16 +130,13 @@ class QualificationPage extends StatelessWidget {
           code: 'Edytuj pytania',
           label: 'Zarządzaj bazą egzaminów',
           showCount: false,
-          onTap: (_) {
+          onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder:
                     (_) => EditQuestionsPage(
-                      qualification: qualification.toLowerCase().replaceAll(
-                        '.',
-                        '',
-                      ),
+                      qualification: sanitizedQualification,
                     ),
               ),
             );

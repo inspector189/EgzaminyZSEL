@@ -216,5 +216,4 @@ class _AnswerOption {
     required this.isCorrect,
     required this.isSelected,
   });
-  
 }

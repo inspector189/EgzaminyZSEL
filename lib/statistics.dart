@@ -497,8 +497,8 @@ class LastExamRow extends StatelessWidget {
                     : () async {
                       final data = await fetchExamDetailsFull(
                         examId,
-                        fullDateTime, // ⬅ wysyłamy pełną datę+czas
-                        durationSec, // ⬅ wysyłamy czas trwania w sekundach
+                        fullDateTime,
+                        durationSec,
                       );
                       if (!context.mounted) return;
 
@@ -540,8 +540,8 @@ class LastExamRow extends StatelessWidget {
         body: {
           'api_token': apiKey,
           'exam_id': examId.toString(),
-          'exam_date': examDateTime, // ⬅ wysyłamy datę+czas
-          'duration_sec': durationSec.toString(), // ⬅ wysyłamy czas w sekundach
+          'exam_date': examDateTime,
+          'duration_sec': durationSec.toString(),
         },
       );
 
@@ -556,11 +556,11 @@ class LastExamRow extends StatelessWidget {
         }
       }
       if (kDebugMode) {
-        debugPrint('PHP error: ${response.body}');
+        debugPrint('Błąd PHP: ${response.body}');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Błąd: $e');
+        debugPrint('Błąd podczas pobierania danych egzaminu: $e');
       }
     }
     return null;
