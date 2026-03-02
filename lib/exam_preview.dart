@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/app_themes.dart';
 import 'package:html_unescape/html_unescape.dart';
-import 'utils/video_player.dart';
-import 'utils/zoomable_image.dart';
+import 'utils/app_themes.dart';
+import 'widgets/video_player.dart';
+import 'widgets/zoomable_image.dart';
 
 class EgzaminPodgladView extends StatelessWidget {
   final List<dynamic> questions;

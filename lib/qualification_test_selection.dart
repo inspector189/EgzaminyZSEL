@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'egzamin.dart';
-import 'edit_questions.dart';
+import 'exam_solving.dart';
+import 'question_editing.dart';
 import 'widgets/question_tile.dart';
-import 'published_test_page.dart';
+import 'published_test_view.dart';
 
 class QualificationPage extends StatelessWidget {
   const QualificationPage({

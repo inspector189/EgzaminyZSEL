@@ -1,18 +1,16 @@
-import 'dart:convert';
+import 'package:flutter_app/services/api_service.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'dart:typed_data';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/app_themes.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart' as http_parser;
+import 'package:flutter_app/utils/app_themes.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_html/html.dart' as html;
 import 'dart:async';
 import 'package:shimmer/shimmer.dart';
-import 'utils/admin_video_player.dart';
+import 'widgets/admin_video_player.dart';
 import 'utils/helpers.dart';
 
 enum MediaKind { none, image, video }
@@ -28,7 +26,6 @@ class EditQuestionsPage extends StatefulWidget {
 }
 
 class _EditQuestionsPageState extends State<EditQuestionsPage> {
-  // obrazki powiązane z TREŚCIĄ pytania (max 5)
   final List<String> _questionImageFilenames = [];
 
   final _unescape = HtmlUnescape();
@@ -72,14 +69,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   String? _extractFirstImageSrcSmart(String html) {
-    // surowy <img ... src="...">
     final raw = _firstMatch(
       RegExp('<img[^>]+src=["\']([^"\']+)["\']', caseSensitive: false),
       html,
     );
     if (raw != null) return raw;
 
-    // escaped: &lt;img ... src=&quot;...&quot;&gt;
     final esc = _firstMatch(
       RegExp('&lt;img[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false),
       html,
@@ -90,28 +85,24 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   String? _extractFirstVideoSrcSmart(String html) {
-    // <video src="...">
     final rawVideo = _firstMatch(
       RegExp('<video[^>]+src=["\']([^"\']+)["\']', caseSensitive: false),
       html,
     );
     if (rawVideo != null) return rawVideo;
 
-    // <video><source src="..."></video>
     final rawSource = _firstMatch(
       RegExp('<source[^>]+src=["\']([^"\']+)["\']', caseSensitive: false),
       html,
     );
     if (rawSource != null) return rawSource;
 
-    // escaped &lt;video ... src=&quot;...&quot;&gt;
     final escVideo = _firstMatch(
       RegExp('&lt;video[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false),
       html,
     );
     if (escVideo != null) return escVideo;
 
-    // escaped &lt;source src=&quot;...&quot;&gt;
     final escSource = _firstMatch(
       RegExp('&lt;source[^&]+src=&quot;([^&]+)&quot;', caseSensitive: false),
       html,
@@ -230,7 +221,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   String? _uploadedVideoUrl;
   String? _uploadedVideoFilename;
 
-  // --- nowe: tryb odpowiedzi tekst/obrazek + dane obrazków ABCD ---
   AnswerKind _odp1Kind = AnswerKind.text;
   AnswerKind _odp2Kind = AnswerKind.text;
   AnswerKind _odp3Kind = AnswerKind.text;
@@ -343,10 +333,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           .toLowerCase();
 
   Future<List<dynamic>> _fetchQuestions(String kval) async {
-    final url = Uri.parse('$apiBaseUrl/$kval.php');
-    final res = await http.get(url);
-    if (res.statusCode == 200 && res.body.isNotEmpty) {
-      final decoded = json.decode(res.body);
+    final result = await ApiService.instance.fetchQuestions(kval);
+    if (result.isSuccess) {
+      final decoded = result.data!;
       for (final q in decoded) {
         if (q['pytanie'] is String) {
           q['pytanie'] = q['pytanie'].toString().replaceAll(
@@ -356,26 +345,17 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         }
       }
 
-      if (decoded is List) return decoded;
-      throw 'Nieprawidłowy format danych pytań';
+      return decoded;
     }
-    throw 'HTTP ${res.statusCode} przy pobieraniu pytań';
+    throw 'HTTP ${result.statusCode} przy pobieraniu pytań';
   }
 
   Future<Map<int, Map<String, dynamic>>> _fetchAllTrudnosci() async {
-    final url = Uri.parse('$apiBaseUrl/wyswietl_trudnosci.php');
+    final res = await ApiService.instance.fetchDifficultyStats();
 
-    final res = await http.get(
-      url,
-      headers: {
-        'Authorization': 'Bearer $apiKey',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    if (res.statusCode != 200) return {};
+    if (!res.isSuccess) return {};
     final String kval = _sanitizedTable();
-    final List<dynamic> jsonList = json.decode(res.body);
+    final List<dynamic> jsonList = res.data!;
     final Map<int, Map<String, dynamic>> result = {};
 
     for (final item in jsonList) {
@@ -432,7 +412,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _imageHeightPx = null;
       _imageHeightCtrl.clear();
 
-      // odpowiedzi A–D zresetowane do trybu tekstowego
       _odp1Kind = AnswerKind.text;
       _odp2Kind = AnswerKind.text;
       _odp3Kind = AnswerKind.text;
@@ -510,7 +489,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       final rawHtml = q['pytanie']?.toString() ?? '';
       final unescapedHtml = _unescapeLtGt(rawHtml);
 
-      // 1) MULTIMEDIA z tablic w JSON
       final rawImages =
           (q['images'] is List)
               ? (q['images'] as List).cast<String>()
@@ -520,16 +498,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               ? (q['videos'] as List).cast<String>()
               : <String>[];
 
-      // 2) Spróbuj wyciągnąć multimedia z HTML, gdy tablice puste
       String? vidUrl =
           rawVideos.isNotEmpty
               ? rawVideos.first
               : _extractFirstVideoSrcSmart(unescapedHtml);
 
-      // w pytaniu może być kilka obrazków → bierzemy maks 5
       final List<String> questionImages = List<String>.from(rawImages.take(5));
 
-      // 3) Ustaw multimedia pytania
       _questionImageFilenames
         ..clear()
         ..addAll(
@@ -542,7 +517,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _uploadedVideoUrl = vidUrl;
         _uploadedVideoFilename = _filenameFromUrl(vidUrl);
 
-        // wyczyść obrazki
         _imageBytes = null;
         _imageName = null;
         _uploadedImageUrl = null;
@@ -551,7 +525,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       } else if (_questionImageFilenames.isNotEmpty) {
         _mediaKind = MediaKind.image;
 
-        // do podglądu weź pierwszy URL
         final firstUrl =
             questionImages.isNotEmpty ? questionImages.first : null;
         _uploadedImageUrl = firstUrl;
@@ -564,7 +537,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _imageName = null;
         _imageCtrl.clear();
 
-        // wyczyść wideo
         _videoBytes = null;
         _videoName = null;
         _uploadedVideoUrl = null;
@@ -575,7 +547,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
         _questionImageFilenames.clear();
 
-        // wyczyść oba
         _imageBytes = null;
         _imageName = null;
         _uploadedImageUrl = null;
@@ -589,11 +560,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _disposeLocalTempVideo();
       }
 
-      // 4) Wysokość (parsujemy na unescapowanym HTML)
       _imageHeightPx = null;
       _imageHeightCtrl.clear();
 
-      // 5) Reszta pól
       final cleaned = _stripStyleAndImage(rawHtml);
       _contentCtrl.text = _unescapeLtGt(cleaned);
 
@@ -602,7 +571,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _odp3Ctrl.text = _answerToUi(q['odp3']?.toString());
       _odp4Ctrl.text = _answerToUi(q['odp4']?.toString());
 
-      // ustaw tryb odpowiedzi (tekst/obrazek) na podstawie HTML
       _setupAnswerKindFromRaw(q['odp1']?.toString(), 1);
       _setupAnswerKindFromRaw(q['odp2']?.toString(), 2);
       _setupAnswerKindFromRaw(q['odp3']?.toString(), 3);
@@ -615,46 +583,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _correct = ['A', 'B', 'C', 'D'].contains(poprawna) ? poprawna : 'A';
     });
   }
-
-  int? _parseTagHeightPx(String html) {
-    final i1 = html.toLowerCase().indexOf('<img');
-    final i2 = html.toLowerCase().indexOf('<video');
-    int tagStart = -1;
-    if (i1 != -1 && (i2 == -1 || i1 < i2)) tagStart = i1;
-    if (i2 != -1 && (i1 == -1 || i2 < i1)) tagStart = i2;
-    if (tagStart == -1) return null;
-    final tagEnd = html.indexOf('>', tagStart);
-    if (tagEnd == -1) return null;
-    final tag = html.substring(tagStart, tagEnd + 1);
-    final styleRe = RegExp(
-      r'''style\s*=\s*["']([^"']+)["']''',
-      caseSensitive: false,
-    );
-    final styleMatch = styleRe.firstMatch(tag);
-    if (styleMatch == null) return null;
-    final style = styleMatch.group(1)!;
-    final hRe = RegExp(r'height\s*:\s*(\d+)\s*px', caseSensitive: false);
-    final hMatch = hRe.firstMatch(style);
-    if (hMatch == null) return null;
-    final v = int.tryParse(hMatch.group(1)!);
-    if (v == null || v <= 0) return null;
-    return v;
-  }
-
-  /*String? _extractFirstTagSrc(String html, String tagName) {
-    final idx = html.toLowerCase().indexOf('<$tagName');
-    if (idx == -1) return null;
-    final srcIdx = html.indexOf('src=', idx);
-    if (srcIdx == -1) return null;
-    final quote =
-        html.contains('src="') ? '"' : (html.contains("src='") ? "'" : '"');
-    final qIdx = html.indexOf('src=$quote', idx);
-    if (qIdx == -1) return null;
-    final start = qIdx + 5;
-    final end = html.indexOf(quote, start);
-    if (end == -1) return null;
-    return html.substring(start, end);
-  }*/
 
   String _stripStyleAndImage(String html) {
     var out = html;
@@ -767,89 +695,32 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }
   }
 
-  Future<void> _pickImage() async {
-    try {
-      final typeGroup = const XTypeGroup(
-        label: 'images',
-        extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'],
-      );
-      final XFile? file = await openFile(acceptedTypeGroups: [typeGroup]);
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      setState(() {
-        _mediaKind = MediaKind.image;
-        _imageBytes = bytes;
-        _imageName = file.name;
-        _uploadedImageUrl = null;
-        _uploadedImageFilename = null;
-      });
-      _refreshIfPreview(immediate: true);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Nie udało się otworzyć selektora plików: $e'),
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _uploadImage({bool addToQuestionList = false}) async {
     if (_imageBytes == null || _imageName == null) return;
-    setState(() => _isUploading = true);
+    if (mounted) setState(() => _isUploading = true);
     _refreshIfPreview(immediate: true);
+
     try {
-      final uri = Uri.parse('$apiBaseUrl/upload_image_next.php');
-      String ext = (_imageName ?? 'jpg').split('.').last.toLowerCase();
-      if (ext.isEmpty) ext = 'jpg';
-      final mediaType = http_parser.MediaType(
-        'image',
-        ext == 'jpg' ? 'jpeg' : ext,
+      final result = await ApiService.instance.uploadImage(
+        _sanitizedTable(),
+        _imageBytes!,
+        _imageName!,
       );
-      final req =
-          http.MultipartRequest('POST', uri)
-            ..headers['Authorization'] = 'Bearer $apiKey'
-            ..headers['X-API-Key'] = apiKey
-            ..headers['Accept'] = 'application/json'
-            ..fields['kwalifikacja'] = _sanitizedTable()
-            ..fields['egzamin'] = _sanitizedTable()
-            ..files.add(
-              http.MultipartFile.fromBytes(
-                'file',
-                _imageBytes!,
-                filename: _imageName ?? 'upload.$ext',
-                contentType: mediaType,
-              ),
-            );
-      final res = await http.Response.fromStream(await req.send());
-      if (res.statusCode != 200) {
-        throw 'Upload HTTP ${res.statusCode}: ${res.body}';
+
+      if (!result.isSuccess) {
+        throw result.errorMessage ?? 'Upload HTTP ${result.statusCode}';
       }
-      final data = jsonDecode(res.body);
-      if (data['ok'] != true || data['url'] == null) {
-        throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
-      }
+
       setState(() {
-        _uploadedImageUrl = data['url'] as String;
-        _uploadedImageFilename =
-            (data['filename'] as String?) ??
-            _filenameFromUrl(_uploadedImageUrl!);
-        _mediaKind = MediaKind.image;
-      });
-      setState(() {
-        _uploadedImageUrl = data['url'] as String;
-        _uploadedImageFilename =
-            (data['filename'] as String?) ??
-            _filenameFromUrl(_uploadedImageUrl!);
+        _uploadedImageUrl = result.data!['url'];
+        _uploadedImageFilename = result.data!['filename'];
         _mediaKind = MediaKind.image;
 
-        if (addToQuestionList) {
-          if (_questionImageFilenames.length < 5 &&
-              _uploadedImageFilename != null &&
-              _uploadedImageFilename!.isNotEmpty) {
-            _questionImageFilenames.add(_uploadedImageFilename!);
-          }
+        if (addToQuestionList &&
+            _questionImageFilenames.length < 5 &&
+            _uploadedImageFilename != null &&
+            _uploadedImageFilename!.isNotEmpty) {
+          _questionImageFilenames.add(_uploadedImageFilename!);
         }
       });
     } catch (e) {
@@ -859,161 +730,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         );
       }
     } finally {
-      setState(() => _isUploading = false);
+      if (mounted) setState(() => _isUploading = false);
     }
-  }
-
-  void _previewImage() {
-    // jeśli mamy listę obrazków pytania – pokaż je wszystkie
-    if (_mediaKind == MediaKind.image && _questionImageFilenames.isNotEmpty) {
-      final kvalPath = _sanitizedTable();
-      final urls =
-          _questionImageFilenames.map((fname) {
-            return '$apiBaseUrl/$kvalPath/obrazy/$fname';
-          }).toList();
-
-      _showImagesDialog(urls);
-      return;
-    }
-
-    // stary fallback – pojedynczy URL / bytes
-    final url = _uploadedImageUrl ?? _imageCtrl.text.trim();
-    if (url.isNotEmpty) {
-      _showImageDialogUrl(url);
-      return;
-    }
-    if (_imageBytes != null && _imageBytes!.isNotEmpty) {
-      _showImageDialogBytes(_imageBytes!);
-      return;
-    }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Brak obrazka do podglądu.')));
-  }
-
-  void _showImagesDialog(List<String> imageUrls) {
-    // dla jednego obrazka użyj istniejącej logiki
-    if (imageUrls.length == 1) {
-      _showImageDialogUrl(imageUrls.first);
-      return;
-    }
-
-    _showImageDialogBody(
-      context,
-      builder: (screen) {
-        return PageView.builder(
-          itemCount: imageUrls.length,
-          itemBuilder: (context, index) {
-            final url = imageUrls[index];
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Image.network(
-                url,
-                height: _imageHeightPx?.toDouble(),
-                fit: BoxFit.contain,
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showImageDialogUrl(String imageUrl) {
-    _showImageDialogBody(
-      context,
-      builder:
-          (screen) => Image.network(
-            imageUrl,
-            height: _imageHeightPx?.toDouble(),
-            fit: BoxFit.contain,
-          ),
-    );
-  }
-
-  void _showImageDialogBytes(Uint8List bytes) {
-    _showImageDialogBody(
-      context,
-      builder:
-          (screen) => Image.memory(
-            bytes,
-            height: _imageHeightPx?.toDouble(),
-            fit: BoxFit.contain,
-          ),
-    );
-  }
-
-  void _showImageDialogBody(
-    BuildContext context, {
-    required Widget Function(Size screen) builder,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Zamknij',
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (context, a1, a2) {
-        final screen = MediaQuery.of(context).size;
-        bool isPressed = false;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return GestureDetector(
-              onTap: () => Navigator.of(context, rootNavigator: true).pop(),
-              child: Scaffold(
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.surface.withValues(alpha: 0.9),
-                body: Stack(
-                  children: [
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {},
-                        child: Listener(
-                          onPointerDown:
-                              (_) => setState(() => isPressed = true),
-                          onPointerUp: (_) => setState(() => isPressed = false),
-                          child: MouseRegion(
-                            cursor:
-                                isPressed
-                                    ? SystemMouseCursors.grabbing
-                                    : SystemMouseCursors.grab,
-                            child: InteractiveViewer(
-                              panEnabled: true,
-                              minScale: 0.5,
-                              maxScale: 4,
-                              child: builder(screen),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          size: 30,
-                          color: colorScheme.surface,
-                        ),
-                        tooltip: 'Zamknij',
-                        onPressed:
-                            () =>
-                                Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                ).pop(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   Future<void> _pickVideo() async {
@@ -1118,44 +836,22 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }
 
     if (bytes == null || name == null) return;
+    if (mounted) setState(() => _isUploading = true);
 
-    setState(() => _isUploading = true);
     try {
-      final uri = Uri.parse('$apiBaseUrl/upload_image_next.php');
-      String ext = name.split('.').last.toLowerCase();
-      if (ext.isEmpty) ext = 'jpg';
-      final mediaType = http_parser.MediaType(
-        'image',
-        ext == 'jpg' ? 'jpeg' : ext,
+      final result = await ApiService.instance.uploadImage(
+        _sanitizedTable(),
+        bytes,
+        name,
       );
-      final req =
-          http.MultipartRequest('POST', uri)
-            ..headers['Authorization'] = 'Bearer $apiKey'
-            ..headers['X-API-Key'] = apiKey
-            ..headers['Accept'] = 'application/json'
-            ..fields['kwalifikacja'] = _sanitizedTable()
-            ..fields['egzamin'] = _sanitizedTable()
-            ..files.add(
-              http.MultipartFile.fromBytes(
-                'file',
-                bytes,
-                filename: name,
-                contentType: mediaType,
-              ),
-            );
 
-      final res = await http.Response.fromStream(await req.send());
-      if (res.statusCode != 200) {
-        throw 'Upload HTTP ${res.statusCode}: ${res.body}';
-      }
-      final data = jsonDecode(res.body);
-      if (data['ok'] != true || data['url'] == null) {
-        throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
+      if (!result.isSuccess) {
+        throw result.errorMessage ?? 'Upload HTTP ${result.statusCode}';
       }
 
       setState(() {
-        final url = data['url'] as String;
-        final filename = (data['filename'] as String?) ?? _filenameFromUrl(url);
+        final url = result.data!['url']!;
+        final filename = result.data!['filename'];
 
         switch (index) {
           case 1:
@@ -1189,41 +885,22 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   Future<void> _uploadVideo() async {
     if (_videoBytes == null || _videoName == null) return;
-    setState(() => _isUploading = true);
+    if (mounted) setState(() => _isUploading = true);
+
     try {
-      final uri = Uri.parse('$apiBaseUrl/upload_video.php');
-      final ext = _videoName!.split('.').last.toLowerCase();
-      final mt = switch (ext) {
-        'webm' => http_parser.MediaType('video', 'webm'),
-        'ogg' => http_parser.MediaType('video', 'ogg'),
-        _ => http_parser.MediaType('video', 'mp4'),
-      };
-      final req =
-          http.MultipartRequest('POST', uri)
-            ..headers['Authorization'] = 'Bearer $apiKey'
-            ..headers['X-API-Key'] = apiKey
-            ..headers['Accept'] = 'application/json'
-            ..fields['kwalifikacja'] = _sanitizedTable()
-            ..fields['egzamin'] = _sanitizedTable()
-            ..files.add(
-              http.MultipartFile.fromBytes(
-                'file',
-                _videoBytes!,
-                filename: _videoName!,
-                contentType: mt,
-              ),
-            );
-      final res = await http.Response.fromStream(await req.send());
-      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
-      final data = jsonDecode(res.body);
-      if (data['ok'] != true || data['url'] == null) {
-        throw 'Upload error: ${data['error'] ?? 'brak szczegółów'}';
+      final result = await ApiService.instance.uploadVideo(
+        _sanitizedTable(),
+        _videoBytes!,
+        _videoName!,
+      );
+
+      if (!result.isSuccess) {
+        throw result.errorMessage ?? 'Upload HTTP ${result.statusCode}';
       }
+
       setState(() {
-        _uploadedVideoUrl = data['url'] as String;
-        _uploadedVideoFilename =
-            (data['filename'] as String?) ??
-            _filenameFromUrl(_uploadedVideoUrl!);
+        _uploadedVideoUrl = result.data!['url'];
+        _uploadedVideoFilename = result.data!['filename'];
         _mediaKind = MediaKind.video;
       });
       _refreshIfPreview(immediate: true);
@@ -1238,60 +915,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }
   }
 
-  /*void _previewVideo() async {
-    String? localPathOrBlob;
-    if (_uploadedVideoUrl == null && _videoBytes != null) {
-      localPathOrBlob = await _ensureLocalTempVideo();
-    }
-    if (_uploadedVideoUrl == null && localPathOrBlob == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Brak wideo do podglądu.')),
-        );
-      }
-      return;
-    }
-    if (!mounted) return;
-    const double h = 400;
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Podgląd wideo'),
-          content: SizedBox(
-            width: 520,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_uploadedVideoUrl != null)
-                  Text(
-                    'URL: ${_uploadedVideoUrl!}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                const SizedBox(height: 8),
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: InlineVideoPlayer(
-                    url: _uploadedVideoUrl,
-                    filePath: kIsWeb ? null : localPathOrBlob,
-                    blobUrl: kIsWeb ? localPathOrBlob : null,
-                    height: h,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Zamknij'),
-            ),
-          ],
-        );
-      },
-    );
-  }*/
-
   void _removeMedia() {
     setState(() {
       _imageBytes = null;
@@ -1305,7 +928,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _uploadedVideoFilename = null;
       _mediaKind = MediaKind.none;
       _isUploading = false;
-      _questionImageFilenames.clear(); // <--- DODANE
+      _questionImageFilenames.clear();
       _disposeLocalTempVideo();
     });
     _refreshIfPreview(immediate: true);
@@ -1365,7 +988,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       }
     }
 
-    // multimedia pytania
     if (_mediaKind == MediaKind.image &&
         _questionImageFilenames.isEmpty &&
         _imageBytes != null &&
@@ -1382,7 +1004,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       if (_uploadedVideoUrl == null) return;
     }
 
-    // upload obrazków odpowiedzi, jeśli jeszcze nie wrzucone
     for (int idx = 1; idx <= 4; idx++) {
       AnswerKind kind;
       Uint8List? bytes;
@@ -1441,7 +1062,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       if (editingId != null) 'id': editingId,
     };
 
-    // odpowiedzi A–D
     for (int i = 0; i < 4; i++) {
       final text = [_odp1Ctrl, _odp2Ctrl, _odp3Ctrl, _odp4Ctrl][i].text.trim();
       final kind = [_odp1Kind, _odp2Kind, _odp3Kind, _odp4Kind][i];
@@ -1468,14 +1088,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         if (filename != null && filename.isNotEmpty) {
           payload['odp${i + 1}_img_filename'] = filename;
         }
-        // tekst jako opis/alt
         payload['odp${i + 1}'] = text;
       }
     }
 
     if (_mediaKind == MediaKind.image && _questionImageFilenames.isNotEmpty) {
       payload['question_images'] = _questionImageFilenames;
-      // dodatkowo dla zgodności – pierwszy obrazek jako img_filename
       payload['img_filename'] = _questionImageFilenames.first;
 
       if (_imageHeightPx != null && _imageHeightPx! > 0) {
@@ -1489,25 +1107,16 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }
 
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/add_question.php'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $apiKey',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(payload),
-      );
-      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
-      final body = jsonDecode(res.body);
-      if (body is! Map || body['ok'] != true) {
-        throw body['error'] ?? 'Nieznany błąd serwera';
+      final result = await ApiService.instance.saveQuestion(payload);
+      if (!result.isSuccess || result.data?['ok'] != true) {
+        throw result.data?['error'] ?? 'Nieznany błąd serwera';
       }
+
       final isEdit = editingId != null;
       final int? savedId =
-          (body['id'] is int)
-              ? body['id'] as int
-              : int.tryParse('${body['id']}');
+          (result.data!['id'] is int)
+              ? result.data!['id'] as int
+              : int.tryParse('${result.data!['id']}');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1531,19 +1140,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   Future<void> _deleteQuestion(int id) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/delete_question.php'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-          'X-API-Key': apiKey,
-        },
-        body: jsonEncode({'egzamin': _sanitizedTable(), 'id': id}),
+      final result = await ApiService.instance.deleteQuestion(
+        _sanitizedTable(),
+        id,
       );
-      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
-      final body = jsonDecode(res.body);
-      if (body['ok'] != true) throw body['error'] ?? 'Błąd usuwania';
+      if (!result.isSuccess) {
+        throw result.errorMessage ?? 'HTTP ${result.statusCode}';
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pytanie zostało usunięte.')),
@@ -1587,15 +1190,10 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     if (!ok) return;
     setState(() => _busyResetAll = true);
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/reset_trudnosc.php'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: {'kwalifikacja': _sanitizedTable()},
+      final result = await ApiService.instance.resetDifficulty(
+        _sanitizedTable(),
       );
-      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
+      if (!result.isSuccess) throw 'HTTP ${result.statusCode}';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1640,15 +1238,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         false;
     if (!ok) return;
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/reset_trudnosc.php'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: {'kwalifikacja': _sanitizedTable(), 'pytanie_id': '$id'},
+      final result = await ApiService.instance.resetDifficulty(
+        _sanitizedTable(),
+        questionId: id,
       );
-      if (res.statusCode != 200) throw 'HTTP ${res.statusCode}: ${res.body}';
+      if (!result.isSuccess) throw 'HTTP ${result.statusCode}';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Zresetowano trudność pytania ID $id')),
@@ -2373,36 +1967,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  /*Widget _heightFieldRow() {
-    if (_uploadedImageUrl != null || _imageBytes != null) {
-      return Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _imageHeightCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Wysokość [px]',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              keyboardType: TextInputType.number,
-              onChanged: (v) {
-                final n = int.tryParse(v.trim());
-                setState(
-                  () => _imageHeightPx = (n == null || n <= 0) ? null : n,
-                );
-                _refreshIfPreview(immediate: true);
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      );
-    } else {
-      return Row();
-    }
-  }
-*/
   Widget _buildList() {
     final items = _filteredQuestions;
     final int displayCount = _displayCount.clamp(0, items.length);
@@ -2436,12 +2000,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }
 
     return Align(
-      alignment: Alignment.centerLeft, // obrazek przy lewej krawędzi
+      alignment: Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minHeight: 50,
-          maxHeight: 200, // <--- limit wysokości odpowiedzi
-        ),
+        constraints: const BoxConstraints(minHeight: 50, maxHeight: 200),
         child: img,
       ),
     );
@@ -2454,19 +2015,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final id = int.tryParse(q['id']?.toString() ?? '');
     final poprawna = (q['poprawna']?.toString().toUpperCase() ?? 'A');
 
-    // domyślny kolor czcionki dla niepoprawnych odpowiedzi
     final defaultTextColor =
         theme.brightness == Brightness.light ? Colors.black : Colors.white;
 
-    // --- NOWE: przygotuj listę obrazków TYLKO dla treści pytania ---
-
-    // 1) surowa lista obrazków zwrócona przez backend
     final rawImages =
         (q['images'] is List)
             ? (q['images'] as List).cast<String>()
             : <String>[];
 
-    // 2) zbierz URL-e obrazków, które pojawiają się w odpowiedziach A–D
     final Set<String> answerImageUrls = {};
     for (int i = 1; i <= 4; i++) {
       final odpRaw = q['odp$i']?.toString() ?? '';
@@ -2477,15 +2033,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       }
     }
 
-    // 3) z listy obrazków pytania usuń te, które są użyte w odpowiedziach
     final questionImages =
         rawImages.where((url) => !answerImageUrls.contains(url)).toList();
 
-    // --- budowanie odpowiedzi A–D (tekst + ewentualny obrazek) ---
     final answers =
         ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
-          final index = e.key; // 0..3
-          final letter = e.value; // A/B/C/D
+          final index = e.key;
+          final letter = e.value;
           final isCorrect = letter == poprawna;
 
           final odpRaw = q['odp${index + 1}']?.toString() ?? '';
@@ -2493,7 +2047,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             odpRaw.replaceFirst(RegExp(r'^[A-D]\.\s*'), ''),
           );
 
-          // wyciągamy <img> z odpowiedzi (jeśli w HTML-u się pojawia)
           final imgFromBody = _extractFirstImageSrcSmart(odpHtml);
           String odpTextOnly = odpHtml;
           if (imgFromBody != null) {
@@ -2507,7 +2060,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           return Container(
             margin: const EdgeInsets.only(bottom: 6),
             child: IgnorePointer(
-              ignoring: true, // wygląd przycisku, ale bez klikalności
+              ignoring: true,
               child: ElevatedButton(
                 onPressed: () {},
                 style: ElevatedButton.styleFrom(
@@ -2545,7 +2098,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       )
                     else
                       Text('$letter.'),
-                    // obrazek odpowiedzi (max 200px)
                     if (imgFromBody != null) ...[
                       const SizedBox(height: 8),
                       _buildAnswerImage(url: imgFromBody),
@@ -2584,10 +2136,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 Expanded(
                   child: _renderHtml(
                     q['pytanie']?.toString() ?? '',
-                    images: questionImages, // <--- TYLKO obrazki pytania
+                    images: questionImages,
                     videos: (q['videos'] as List?)?.cast<String>(),
-                    // dla treści pytania nie wyciągamy inline <img> z HTML,
-                    // polegamy na tablicy images
                     extractInlineImages: false,
                     minImageHeight: 100,
                     maxImageHeight: 500,
@@ -2666,7 +2216,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final colorScheme = theme.colorScheme;
     final extras = theme.extension<ExtraColors>()!;
 
-    // domyślny kolor czcionki dla niepoprawnych odpowiedzi
     final defaultTextColor =
         theme.brightness == Brightness.light ? Colors.black : Colors.white;
 
@@ -2695,10 +2244,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       Widget player;
 
       if (_uploadedVideoUrl != null) {
-        // wideo już na serwerze
         player = InlineVideoPlayer(url: _uploadedVideoUrl!, height: 400);
       } else if (_videoBytes != null && _videoBytes!.isNotEmpty) {
-        // wideo lokalne – użyj blob/temp
         return FutureBuilder<String?>(
           future: _ensureLocalTempVideo(),
           builder: (context, snapshot) {
@@ -2713,7 +2260,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: InlineVideoPlayer(
-                url: kIsWeb ? null : null, // Desktop/Mobile - używamy filePath
+                url: kIsWeb ? null : null,
                 filePath: kIsWeb ? null : snapshot.data,
                 blobUrl: kIsWeb ? snapshot.data : null,
                 height: 400,
@@ -2736,7 +2283,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       );
     }
 
-    // podgląd odpowiedzi A–D (tekst / obrazek)
     final answers =
         ['A', 'B', 'C', 'D'].asMap().entries.map((e) {
           final index = e.key;

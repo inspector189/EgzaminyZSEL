@@ -59,7 +59,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   dtd: ^4.0.0
   flutter_lints: ^6.0.0
-  google_fonts: ^6.3.2
+  google_fonts: ^8.0.2
   json_rpc_2: ^4.0.0
   path: ^1.9.1
   stack_trace: ^1.12.1

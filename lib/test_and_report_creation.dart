@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:math';
-import 'egzamin_podglad.dart';
+import 'package:flutter_app/services/api_service.dart';
+
+import 'exam_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -13,8 +14,8 @@ import 'package:printing/printing.dart';
 import 'package:web/web.dart' as web;
 import 'package:html_unescape/html_unescape.dart';
 import 'dart:js_interop' as js_interop;
-import 'TestCreatorPage.dart';
-import 'utils/video_player.dart';
+import 'test_creator.dart';
+import 'widgets/video_player.dart';
 import 'utils/helpers.dart';
 
 class RichQuestionWidget extends StatelessWidget {
@@ -282,22 +283,11 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
     }
 
     try {
-      final Map<String, dynamic> payload = {'email': email};
+      final result = await ApiService.instance.checkSuperAdmin(email);
 
-      if (kDebugMode) {
-        payload['debugSecret'] = debugSecret;
-      }
-
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/is_super_admin.php'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(payload),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      if (result.isSuccess) {
         setState(() {
-          isSuperAdmin = data['isSuperAdmin'] == true;
+          isSuperAdmin = result.data ?? false;
         });
 
         prefs.setBool("isSuperAdmin", isSuperAdmin);
@@ -318,13 +308,10 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
         body['debugSecret'] = debugSecret;
       }
 
-      final response = await http.get(
-        Uri.parse(allTestsUrl),
-        headers: {'Authorization': 'Bearer $apiToken'},
-      );
+      final result = await ApiService.instance.fetchAllTests();
 
-      if (response.statusCode == 200) {
-        final List<dynamic> serverTests = json.decode(response.body);
+      if (result.isSuccess) {
+        final List<dynamic> serverTests = result.data!;
         final serverMaps = serverTests.cast<Map<String, dynamic>>();
 
         for (final t in serverMaps) {
@@ -387,21 +374,11 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
           '${test['name']}||${test['author']}||${test['qualification']}';
 
       try {
-        final response = await http.post(
-          Uri.parse(
-            'https://egzaminy.zsel.edu.pl/egzaminy/getPublishedResults.php',
-          ),
-          headers: {
-            'Authorization': 'Bearer $apiToken',
-            'Content-Type': 'application/json',
-          },
-          body: json.encode({'test_key': testKey}),
-        );
+        final result = await ApiService.instance.fetchTestResults(testKey);
 
-        if (response.statusCode == 200) {
-          final List<dynamic> results = json.decode(response.body);
+        if (result.isSuccess) {
           setState(() {
-            savedTests[i]['results'] = results;
+            savedTests[i]['results'] = result.data!;
           });
         }
       } catch (e) {
@@ -462,22 +439,14 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
       if (kDebugMode) {
         payload['debugSecret'] = debugSecret;
       }
-      final response = await http.post(
-        Uri.parse(publishedTestsUrl),
-        headers: {
-          'Authorization': 'Bearer $apiToken',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(payload),
-      );
 
-      if (response.statusCode == 200) {
+      final result = await ApiService.instance.deleteTest(test);
+
+      if (result.isSuccess) {
         debugPrint('Test usunięty z serwera');
         return;
       } else {
-        debugPrint(
-          'Serwer zwrócił błąd: ${response.statusCode} ${response.body}',
-        );
+        debugPrint('Serwer zwrócił błąd: ${result.statusCode}');
       }
     } catch (e) {
       debugPrint('Błąd połączenia przy usuwaniu z serwera: $e');
@@ -496,17 +465,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
     await prefs.setString('saved_tests', json.encode(savedTests));
 
     try {
-      await http.post(
-        Uri.parse(publishedTestsUrl),
-        headers: {
-          'Authorization': 'Bearer $apiToken',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'action': willPublish ? 'publish' : 'unpublish',
-          'test': test,
-        }),
-      );
+      await ApiService.instance.setTestPublished(test, willPublish);
     } catch (e) {
       setState(() {
         test['published'] = !willPublish;
@@ -515,7 +474,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Brak internetu – publikacja zostanie zsynchronizowana później',
+              'Brak internetu - publikacja zostanie zsynchronizowana później',
             ),
           ),
         );
@@ -702,15 +661,15 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
 
       for (final url in pytanieImages) {
         try {
-          final resp = await http.get(Uri.parse(url));
-          if (resp.statusCode == 200) {
+          final result = await ApiService.instance.downloadImage(url);
+          if (result.isSuccess) {
             children.add(
               pw.Center(
                 child: pw.SizedBox(
                   width: 460,
                   height: 300,
                   child: pw.Image(
-                    pw.MemoryImage(resp.bodyBytes),
+                    pw.MemoryImage(result.data!),
                     fit: pw.BoxFit.contain,
                   ),
                 ),
@@ -734,8 +693,8 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
 
         for (final url in images) {
           try {
-            final resp = await http.get(Uri.parse(url));
-            if (resp.statusCode == 200) {
+            final result = await ApiService.instance.downloadImage(url);
+            if (result.isSuccess) {
               children.add(
                 pw.Padding(
                   padding: const pw.EdgeInsets.only(left: 34, top: 8),
@@ -743,7 +702,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
                     width: 380,
                     height: 220,
                     child: pw.Image(
-                      pw.MemoryImage(resp.bodyBytes),
+                      pw.MemoryImage(result.data!),
                       fit: pw.BoxFit.contain,
                     ),
                   ),
@@ -998,13 +957,10 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
 
   Future<Map<String, dynamic>?> fetchExamDetailsFull(int examId) async {
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/podgladEgzaminuDlaTestow.php'),
-        body: {'api_token': apiToken, 'exam_id': examId.toString()},
-      );
+      final result = await ApiService.instance.fetchExamPreviewForTest(examId);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         if (data['success'] == true) {
           return {
             'questions': List<dynamic>.from(data['questions']),
@@ -1014,7 +970,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
         }
       }
       if (kDebugMode) {
-        debugPrint('PHP error: ${response.body}');
+        debugPrint('PHP error: ${result.errorMessage ?? result.statusCode}');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -1158,15 +1114,14 @@ class _CreatedTestsTabState extends State<CreatedTestsTab> {
   Future<void> _generateAnswerKeyPdf(Map<String, dynamic> test) async {
     final String qual = test['qualification'];
     final questions = List<Map<String, dynamic>>.from(test['questions']);
-    final url = "$apiBaseUrl/$qual.php";
 
     List<dynamic> fullDb = [];
     try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        fullDb = json.decode(response.body);
+      final result = await ApiService.instance.fetchQuestions(qual);
+      if (result.isSuccess) {
+        fullDb = result.data!;
       } else {
-        throw Exception("Błąd połączenia: ${response.statusCode}");
+        throw Exception("Błąd połączenia: ${result.statusCode}");
       }
     } catch (e) {
       if (mounted) {
@@ -1488,17 +1443,9 @@ class _CreateNewTestTabState extends State<CreateNewTestTab> {
 
   Future<void> _loadQualificationsFromServer() async {
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/egzaminy_wyniki_post.php'),
-        headers: {
-          'Authorization': 'Bearer $apiToken',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({}),
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> allData = json.decode(response.body);
+      final result = await ApiService.instance.fetchQualifications();
+      if (result.isSuccess) {
+        final List<dynamic> allData = result.data!;
         final Set<String> quals = {};
         for (final exam in allData) {
           final q =

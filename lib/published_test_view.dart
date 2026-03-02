@@ -1,11 +1,7 @@
-// published_tests_page.dart
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import '../egzamin.dart'; // bo używasz EgzaminView
-//import 'CreatingTestsAndReportsPage.dart' hide publishedTestsUrl, apiToken; // bo używasz RichQuestionWidget
-import 'utils/helpers.dart';
+import 'package:flutter_app/services/api_service.dart';
+//import 'package:shared_preferences/shared_preferences.dart';
+import 'exam_solving.dart';
 
 class PublishedTestsPage extends StatefulWidget {
   final String qualification;
@@ -34,18 +30,13 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
       publishedTests = [];
     });
 
-    final prefs = await SharedPreferences.getInstance();
+    //final prefs = await SharedPreferences.getInstance();
     List<Map<String, dynamic>> localPublished = [];
 
     try {
-      final response = await http.get(
-        Uri.parse(publishedTestsUrl),
-        headers: {'Authorization': 'Bearer $apiToken'},
-      );
-
-      if (response.statusCode == 200) {
-        final serverTests =
-            (json.decode(response.body) as List).cast<Map<String, dynamic>>();
+      final result = await ApiService.instance.fetchPublishedTests();
+      if (result.isSuccess) {
+        final serverTests = result.data!;
 
         final Map<String, Map<String, dynamic>> merged = {};
         for (final t in [...localPublished, ...serverTests]) {

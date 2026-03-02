@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/app_themes.dart';
+import 'package:flutter_app/utils/app_themes.dart';
 import 'package:shimmer/shimmer.dart';
 
 const double imageZoomScale = 1.75;

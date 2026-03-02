@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'theme_manager.dart';
+import 'utils/theme_manager.dart';
 
 class PersonalisationPage extends StatelessWidget {
   const PersonalisationPage({super.key});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'utils/faq_questions.dart';
-import 'utils/authors.dart';
+import 'utils/faq_questions_array.dart';
+import 'utils/authors_array.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key, this.returnToHome = false});
@@ -111,7 +111,7 @@ class AboutPage extends StatelessWidget {
     final textColor = colorScheme.onSurface;
 
     return Card(
-      color: colorScheme.secondary.withValues(alpha: 0.15),
+      color: colorScheme.secondary.withValues(alpha: 0.25),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: Padding(
@@ -127,10 +127,10 @@ class AboutPage extends StatelessWidget {
                   backgroundColor: theme.colorScheme.primary,
                   child: Text(
                     author["name"]![0],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: colorScheme.onPrimary,
                     ),
                   ),
                 ),
@@ -161,21 +161,18 @@ class AboutPage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Card(
-              color: theme.colorScheme.surface,
-              elevation: 1,
-              shape: RoundedRectangleBorder(
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  author["desc"]!,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    color: colorScheme.onSurface,
-                  ),
+              child: Text(
+                author["desc"]!,
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                  color: colorScheme.onSurface,
                 ),
               ),
             ),

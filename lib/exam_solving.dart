@@ -1,18 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_app/app_themes.dart';
-import 'dart:convert';
-import 'wyniki.dart';
+import 'exam_results.dart';
 import 'dart:math';
 import 'package:shimmer/shimmer.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'dart:async';
-import 'utils/exam_timer.dart';
-import 'utils/video_player.dart';
-import 'utils/zoomable_image.dart';
-import 'utils/helpers.dart' show apiKey;
+import 'utils/app_themes.dart';
+import 'widgets/exam_timer.dart';
+import 'widgets/video_player.dart';
+import 'widgets/zoomable_image.dart';
 
 const double _minImageHeight = 100;
 const double _maxImageHeight = 500;
@@ -46,7 +44,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   final _unescape = HtmlUnescape();
   Timer? _timer;
   final int minutesToEndExam = 60;
-  late DateTime _endTime;
+  DateTime _endTime = DateTime.now();
   String _clean(String? s) => _unescape.convert(s?.toString() ?? '');
 
   void _startTimer() {
@@ -64,6 +62,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   @override
   void dispose() {
     _timer?.cancel();
+    _scrollDebounce?.cancel();
     _textSearchCtrl.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -106,7 +105,6 @@ class _EgzaminViewState extends State<EgzaminView> {
   bool _isButtonDisabled = false;
   List<dynamic> questions = [];
   int current = 0;
-  String? selectedAnswer;
   bool isLoading = true;
   List<String?> selectedAnswers = [];
   late DateTime startTime;
@@ -123,7 +121,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if(!_fetched) {
+    if (!_fetched) {
       fetchQuestions();
       _fetched = true;
     }
@@ -154,15 +152,10 @@ class _EgzaminViewState extends State<EgzaminView> {
       // ==========================
       // TEST NAUCZYCIELA – pobierz pytania z published_tests
       // ==========================
-      final uri = Uri.parse(
-        'https://egzaminy.zsel.edu.pl/egzaminy/published_tests.php',
-      );
       try {
-        final response = await http.get(
-          uri,
-        ); // GET, bo uczeń nie potrzebuje tokena
-        if (response.statusCode == 200 && response.body.isNotEmpty) {
-          final List<dynamic> allPublished = json.decode(response.body);
+        final result = await ApiService.instance.fetchPublishedTests();
+        if (result.isSuccess && result.data != null) {
+          final List<dynamic> allPublished = result.data ?? [];
 
           // Znajdź test o dokładnie tych parametrach
           final matching = allPublished.firstWhere(
@@ -195,6 +188,10 @@ class _EgzaminViewState extends State<EgzaminView> {
               }
             }
 
+            for (int i = 0; i < fetchedQuestions.length; i++) {
+              fetchedQuestions[i]['_originalIndex'] = i;
+            }
+
             if (mounted) {
               setState(() {
                 questions = fetchedQuestions;
@@ -203,9 +200,13 @@ class _EgzaminViewState extends State<EgzaminView> {
                 _visibleCount = 30.clamp(0, fetchedQuestions.length);
               });
             }
-            _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
-            startTime = DateTime.now();
-            _startTimer();
+            if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
+              _endTime = DateTime.now().add(
+                Duration(minutes: minutesToEndExam),
+              );
+              startTime = DateTime.now();
+              _startTimer();
+            }
           }
         }
       } catch (e) {
@@ -218,13 +219,10 @@ class _EgzaminViewState extends State<EgzaminView> {
       // Normalny egzamin – losuj pytania
       // ==========================
       final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
-      final url = Uri.parse(
-        'https://egzaminy.zsel.edu.pl/egzaminy/$kwalifikacja.php',
-      );
       try {
-        final response = await http.get(url);
-        if (response.statusCode == 200 && response.body.isNotEmpty) {
-          final List<dynamic> allQuestions = json.decode(response.body);
+        final result = await ApiService.instance.fetchQuestions(kwalifikacja);
+        if (result.isSuccess && result.data != null) {
+          final List<dynamic> allQuestions = result.data!;
           List<dynamic> selected = [];
 
           switch (widget.tryb) {
@@ -261,6 +259,10 @@ class _EgzaminViewState extends State<EgzaminView> {
             }
           }
 
+          for (int i = 0; i < selected.length; i++) {
+            selected[i]['_originalIndex'] = i;
+          }
+
           if (mounted) {
             setState(() {
               questions = selected;
@@ -269,45 +271,15 @@ class _EgzaminViewState extends State<EgzaminView> {
               _visibleCount = 30.clamp(0, selected.length);
             });
           }
-          _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
-          startTime = DateTime.now();
-          _startTimer();
+          if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
+            _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
+            startTime = DateTime.now();
+            _startTimer();
+          }
         }
       } catch (e) {
         if (kDebugMode) debugPrint("Pobranie pytań nie powiodło się: $e");
       }
-    }
-  }
-
-  Future<void> sendResultToServer({
-    required String kwalifikacja,
-    required double wynik,
-    required String dataCzas,
-    required int czasTrwania,
-  }) async {
-    final userName =
-        widget.userName ??
-        (await SharedPreferences.getInstance()).getString('userName') ??
-        'anonymous';
-    final url = Uri.parse(
-      'https://egzaminy.zsel.edu.pl/egzaminy/zapisz_wynik.php',
-    );
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $apiKey',
-      },
-      body: {
-        'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
-        'wynik': wynik.toStringAsFixed(2),
-        'data_czas': dataCzas,
-        'czas_trwania': czasTrwania.toString(),
-        'userName': userName,
-      },
-    );
-    if (response.statusCode != 200 && kDebugMode) {
-      debugPrint('Zapis wyniku nie powiódł się: ${response.body}');
     }
   }
 
@@ -317,23 +289,13 @@ class _EgzaminViewState extends State<EgzaminView> {
     bool poprawna,
   ) async {
     if (pytanieId <= 0) return;
-    final url = Uri.parse(
-      'https://egzaminy.zsel.edu.pl/egzaminy/zapis_trudnosci.php',
+    final result = await ApiService.instance.recordDifficulty(
+      pytanieId,
+      kwalifikacja,
+      poprawna,
     );
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $apiKey',
-      },
-      body: {
-        'pytanie_id': pytanieId.toString(),
-        'kwalifikacja': kwalifikacja.replaceAll(' ', ''),
-        'poprawna': poprawna ? '1' : '0',
-      },
-    );
-    if (response.statusCode != 200 && kDebugMode) {
-      debugPrint('Zapis trudności nie powiódł się: ${response.body}');
+    if (!result.isSuccess && mounted) {
+      debugPrint('Zapis trudności nie powiódł się: ${result.errorMessage}');
     }
   }
 
@@ -393,7 +355,7 @@ class _EgzaminViewState extends State<EgzaminView> {
     final bool isResultOption =
         showResult && (isCorrect || (!isCorrect && isSelected));
     final Color textColor =
-        isResultOption ? Colors.black : colorScheme.onSurface;
+        isResultOption ? colorScheme.onPrimary : colorScheme.onSurface;
 
     final Color? bgColor =
         !showResult && isSelected
@@ -570,8 +532,9 @@ class _EgzaminViewState extends State<EgzaminView> {
                     selectedAnswers[index] = litera;
                     if (widget.tryb == TrybEgzaminu.jednoPytanie) {
                       odpowiedzZatwierdzona = true;
+                      final id = int.tryParse(q['id']?.toString() ?? '') ?? 0;
                       zapiszTrudnoscDoBazy(
-                        int.parse(q['id']),
+                        id,
                         widget.kwalifikacja,
                         litera == poprawna,
                       );
@@ -642,37 +605,72 @@ class _EgzaminViewState extends State<EgzaminView> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            const Text("Egzamin"),
-
-            Expanded(
-              child: Center(
-                child:
-                    widget.tryb == TrybEgzaminu.czterdziesciPytan
-                        ? ExamTimer(endTime: _endTime)
-                        : const SizedBox.shrink(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (widget.tryb != TrybEgzaminu.czterdziesciPytan) {
+          Navigator.of(context).pop();
+          return;
+        }
+        final shouldLeave = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder:
+              (ctx) => AlertDialog(
+                title: const Text('Opuścić egzamin?'),
+                content: const Text(
+                  'Czy na pewno chcesz opuścić egzamin?\n'
+                  'Twój postęp zostanie utracony.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Zostań'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Opuść'),
+                  ),
+                ],
               ),
-            ),
+        );
+        if (shouldLeave == true && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Row(
+            children: [
+              const Text("Egzamin"),
 
-            const SizedBox(width: 48),
-          ],
+              Expanded(
+                child: Center(
+                  child:
+                      widget.tryb == TrybEgzaminu.czterdziesciPytan
+                          ? ExamTimer(endTime: _endTime)
+                          : const SizedBox.shrink(),
+                ),
+              ),
+
+              const SizedBox(width: 48),
+            ],
+          ),
+
+          iconTheme: IconThemeData(color: colorScheme.onPrimary),
+          titleTextStyle: TextStyle(color: colorScheme.onPrimary, fontSize: 22),
         ),
-
-        iconTheme: IconThemeData(color: colorScheme.onPrimary),
-        titleTextStyle: TextStyle(color: colorScheme.onPrimary, fontSize: 22),
+        body:
+            widget.tryb == TrybEgzaminu.jednoPytanie
+                ? _buildSingleQuestion(questions[current])
+                : _buildLazyList(),
+        bottomNavigationBar:
+            (widget.tryb == TrybEgzaminu.czterdziesciPytan ||
+                    widget.tryb == TrybEgzaminu.zTestu)
+                ? _buildFinishButton(context)
+                : null,
       ),
-      body:
-          widget.tryb == TrybEgzaminu.jednoPytanie
-              ? _buildSingleQuestion(questions[current])
-              : _buildLazyList(),
-      bottomNavigationBar:
-          (widget.tryb == TrybEgzaminu.czterdziesciPytan ||
-                  widget.tryb == TrybEgzaminu.zTestu)
-              ? _buildFinishButton(context)
-              : null,
     );
   }
 
@@ -750,7 +748,7 @@ class _EgzaminViewState extends State<EgzaminView> {
                 if (i >= items.length) return _buildShimmer(context);
 
                 final q = items[i];
-                final originalIndex = questions.indexOf(q);
+                final originalIndex = q['_originalIndex'] as int? ?? i;
 
                 return RepaintBoundary(
                   child: _buildQuestionCard(
@@ -796,7 +794,7 @@ class _EgzaminViewState extends State<EgzaminView> {
 
     final shouldFinish = await showDialog<bool>(
       context: context,
-      barrierDismissible: false, // kliknięcie obok nie zamknie okna
+      barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
           title: const Text('Zakończyć egzamin?'),
@@ -872,28 +870,13 @@ class _EgzaminViewState extends State<EgzaminView> {
         'questions': pytaniaDoBazy,
       };
 
-      final uri = Uri.parse(
-        'https://egzaminy.zsel.edu.pl/egzaminy/savePublishedResult.php',
-      );
+      final result = await ApiService.instance.savePublishedTestResult(payload);
 
-      final response = await http.post(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(payload),
-      );
-      if (kDebugMode) {
-        print("STATUS: ${response.statusCode}");
-        print("BODY: ${response.body}");
-      }
-
-      if (response.statusCode != 200 && mounted) {
+      if (!result.isSuccess && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Błąd zapisu wyniku testu nauczyciela: ${response.body}',
+              'Błąd zapisu wyniku testu nauczyciela: ${result.errorMessage}',
             ),
           ),
         );
@@ -912,21 +895,13 @@ class _EgzaminViewState extends State<EgzaminView> {
         'wybrane_odpowiedzi': selectedAnswers,
       };
 
-      final uri = Uri.parse(
-        'https://egzaminy.zsel.edu.pl/egzaminy/save_exam.php',
-      );
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode(payload),
-      );
+      final result = await ApiService.instance.saveExam(payload);
 
-      if (response.statusCode != 200 && mounted) {
+      if (!result.isSuccess && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd zapisu egzaminu: ${response.body}')),
+          SnackBar(
+            content: Text('Błąd zapisu egzaminu: ${result.errorMessage}'),
+          ),
         );
       }
     }
@@ -962,7 +937,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     }
     setState(() {
       current = newIndex;
-      selectedAnswer = null;
       odpowiedzZatwierdzona = false;
     });
   }

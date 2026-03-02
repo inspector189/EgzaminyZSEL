@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'questions_panel.dart';
+import 'question_panel.dart';
 import 'widgets/admin_tiles.dart';
 import 'admin_stats.dart';
-import 'manage_admins.dart';
-import 'CreatingTestsAndReportsPage.dart';
+import 'admin_management.dart';
+import 'test_and_report_creation.dart';
 
 class AdminPanelPage extends StatelessWidget {
   const AdminPanelPage({super.key});

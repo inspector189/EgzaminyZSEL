@@ -1,11 +1,11 @@
+import 'dart:async' show Timer;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/egzamin_podglad.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'report_selection_page.dart';
-import 'utils/helpers.dart' hide isValidQualification;
-import 'utils/search_bar.dart' as search_bar;
+import 'package:flutter_app/exam_preview.dart';
+import 'package:flutter_app/services/api_service.dart';
+import 'report_selection.dart';
+import 'widgets/search_bar.dart' as search_bar;
 
 class AdminStatsPage extends StatefulWidget {
   const AdminStatsPage({super.key});
@@ -25,11 +25,22 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
   TimeOfDay? endTime;
   String? selectedQualification;
   bool _studentsExpanded = false;
+  Timer? _searchDebounce;
+  List<dynamic> _filteredResults = [];
+  List<Map<String, dynamic>> _filteredUsers = [];
+  Map<String, List<dynamic>> _qualifications = {};
+  List<String> _allQualificationKeys = [];
 
   @override
   void initState() {
     super.initState();
     fetchAllStats();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 
   Future<void> fetchAllStats() async {
@@ -38,33 +49,15 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
       errorMessage = null;
     });
     try {
-      final url = Uri.parse('$apiBaseUrl/stats_all.php');
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: {'api_token': apiKey},
-      );
-      if (kDebugMode) {
-        debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
-      }
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is List) {
-          setState(() {
-            allResults = data;
-            isLoading = false;
-            errorMessage = null;
-          });
-        } else {
-          throw Exception(
-            '❌ Nieprawidłowy format - dane nie są listą, a: ${data.runtimeType}',
-          );
-        }
+      final result = await ApiService.instance.fetchAllStats();
+      if (result.isSuccess) {
+        final data = result.data!;
+        allResults = data;
+        isLoading = false;
+        errorMessage = null;
+        _recompute();
       } else {
-        throw Exception('❌ Kod błędu HTTP: ${response.statusCode}');
+        throw Exception('❌ Kod błędu HTTP: ${result.statusCode}');
       }
     } catch (e) {
       setState(() {
@@ -74,25 +67,92 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     }
   }
 
-  Map<String, List<dynamic>> groupByUser() {
-    final Map<String, List<dynamic>> grouped = {};
-    for (var r in allResults) {
-      String user = (r['userID'] ?? '').toString().trim();
-      if (user.isEmpty || user.toLowerCase() == 'anonymous') {
-        user = 'Użytkownik anonimowy';
-      }
-      grouped.putIfAbsent(user, () => []).add(r);
-    }
-    return grouped;
-  }
+  void _recompute() {
+    final filteredResults =
+        allResults.where((exam) {
+          final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
+          if (examDate == null) return false;
 
-  Map<String, List<dynamic>> groupByQualification() {
-    final Map<String, List<dynamic>> grouped = {};
-    for (var r in allResults) {
-      final q = (r['kwalifikacja'] ?? 'Nieznana').toString();
-      grouped.putIfAbsent(q, () => []).add(r);
+          final afterStartDate =
+              startDate == null ||
+              examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
+          final beforeEndDate =
+              endDate == null ||
+              examDate.isBefore(endDate!.add(const Duration(days: 1)));
+          final afterStartTime =
+              startTime == null ||
+              (examDate.hour > startTime!.hour ||
+                  (examDate.hour == startTime!.hour &&
+                      examDate.minute >= startTime!.minute));
+          final beforeEndTime =
+              endTime == null ||
+              (examDate.hour < endTime!.hour ||
+                  (examDate.hour == endTime!.hour &&
+                      examDate.minute <= endTime!.minute));
+          final matchesQualification =
+              selectedQualification == null ||
+              (exam['kwalifikacja'] ?? '').toString() == selectedQualification;
+
+          return afterStartDate &&
+              beforeEndDate &&
+              afterStartTime &&
+              beforeEndTime &&
+              matchesQualification;
+        }).toList();
+
+    final Map<String, List<dynamic>> usersByUid = {};
+    for (final exam in filteredResults) {
+      String uid = (exam['UID'] ?? '').toString().trim();
+      String name = (exam['userID'] ?? '').toString().trim();
+      if (name.isEmpty || name.toLowerCase() == 'anonymous') {
+        name = 'Użytkownik anonimowy';
+      }
+      final key = uid.isNotEmpty ? uid : name;
+      usersByUid.putIfAbsent(key, () => []).add(exam);
     }
-    return grouped;
+
+    final filteredUsers =
+        usersByUid.entries
+            .map((entry) {
+              final exams = entry.value;
+              final first = exams.first;
+              String name = (first['userID'] ?? '').toString().trim();
+              if (name.isEmpty || name.toLowerCase() == 'anonymous') {
+                name = 'Użytkownik anonimowy';
+              }
+              final uid = (first['UID'] ?? '').toString().trim();
+              return {'name': name, 'uid': uid, 'exams': exams};
+            })
+            .where((u) {
+              final q = searchQuery.toLowerCase();
+              return u['name'].toString().toLowerCase().contains(q) ||
+                  u['uid'].toString().toLowerCase().contains(q);
+            })
+            .toList()
+          ..sort((a, b) {
+            if (a['name'] == 'Użytkownik anonimowy') return 1;
+            if (b['name'] == 'Użytkownik anonimowy') return -1;
+            return a['name'].toString().compareTo(b['name'].toString());
+          });
+
+    final qualifications = <String, List<dynamic>>{};
+    for (final r in filteredResults) {
+      final q = (r['kwalifikacja'] ?? '').toString().trim();
+      if (isValidQualification(q)) {
+        qualifications.putIfAbsent(q, () => []).add(r);
+      }
+    }
+
+    setState(() {
+      _filteredResults = filteredResults;
+      _filteredUsers = filteredUsers;
+      _qualifications = qualifications;
+      _allQualificationKeys =
+          allResults
+              .map((r) => (r['kwalifikacja'] ?? 'Nieznana').toString())
+              .toSet()
+              .toList();
+    });
   }
 
   String _fmtDuration(int? seconds) {
@@ -127,89 +187,6 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final filteredResults =
-        allResults.where((exam) {
-          final examDate = DateTime.tryParse(exam['data_czas'] ?? '');
-          if (examDate == null) return false;
-
-          final afterStartDate =
-              startDate == null ||
-              examDate.isAfter(startDate!.subtract(const Duration(days: 1)));
-          final beforeEndDate =
-              endDate == null ||
-              examDate.isBefore(endDate!.add(const Duration(days: 1)));
-
-          final afterStartTime =
-              startTime == null ||
-              (examDate.hour > startTime!.hour ||
-                  (examDate.hour == startTime!.hour &&
-                      examDate.minute >= startTime!.minute));
-          final beforeEndTime =
-              endTime == null ||
-              (examDate.hour < endTime!.hour ||
-                  (examDate.hour == endTime!.hour &&
-                      examDate.minute <= endTime!.minute));
-
-          final matchesQualification =
-              selectedQualification == null ||
-              (exam['kwalifikacja'] ?? '').toString() == selectedQualification;
-
-          return afterStartDate &&
-              beforeEndDate &&
-              afterStartTime &&
-              beforeEndTime &&
-              matchesQualification;
-        }).toList();
-
-    final Map<String, List<dynamic>> usersByUid = {};
-    for (final exam in filteredResults) {
-      String uid = (exam['UID'] ?? '').toString().trim();
-      String name = (exam['userID'] ?? '').toString().trim();
-
-      if (name.isEmpty || name.toLowerCase() == 'anonymous') {
-        name = 'Użytkownik anonimowy';
-      }
-
-      final key = uid.isNotEmpty ? uid : name;
-
-      usersByUid.putIfAbsent(key, () => []).add(exam);
-    }
-
-    final List<Map<String, dynamic>> filteredUsers =
-        usersByUid.entries
-            .map((entry) {
-              final exams = entry.value;
-              final first = exams.first;
-
-              String name = (first['userID'] ?? '').toString().trim();
-              if (name.isEmpty || name.toLowerCase() == 'anonymous') {
-                name = 'Użytkownik anonimowy';
-              }
-
-              final uid = (first['UID'] ?? '').toString().trim();
-
-              return {'name': name, 'uid': uid, 'exams': exams};
-            })
-            .where((u) {
-              final q = searchQuery.toLowerCase();
-              return u['name'].toString().toLowerCase().contains(q) ||
-                  u['uid'].toString().toLowerCase().contains(q);
-            })
-            .toList()
-          ..sort((a, b) {
-            if (a['name'] == 'Użytkownik anonimowy') return 1;
-            if (b['name'] == 'Użytkownik anonimowy') return -1;
-            return a['name'].toString().compareTo(b['name'].toString());
-          });
-
-    final qualifications = <String, List<dynamic>>{};
-    for (final r in filteredResults) {
-      final q = (r['kwalifikacja'] ?? '').toString().trim();
-      if (isValidQualification(q)) {
-        qualifications.putIfAbsent(q, () => []).add(r);
-      }
-    }
-
     return Scaffold(
       appBar: AppBar(title: const Text('📊 Statystyki Egzaminów')),
       body:
@@ -223,13 +200,17 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     search_bar.SearchBar(
-                      onChanged:
-                          (value) => setState(() {
+                      onChanged: (value) {
+                        _searchDebounce?.cancel();
+                        _searchDebounce = Timer(
+                          const Duration(milliseconds: 200),
+                          () {
                             searchQuery = value;
-                            if (value.isNotEmpty) {
-                              _studentsExpanded = true;
-                            }
-                          }),
+                            if (value.isNotEmpty) _studentsExpanded = true;
+                            _recompute();
+                          },
+                        );
+                      },
                       onTap: () {
                         setState(() {
                           _studentsExpanded = true;
@@ -266,11 +247,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                 lastDate: DateTime.now(),
                               );
                               if (picked != null) {
-                                setState(() {
-                                  startDate = picked;
-                                  _studentsExpanded =
-                                      true; // 🔥 auto rozwijamy sekcję uczniów
-                                });
+                                startDate = picked;
+                                _studentsExpanded = true;
+                                _recompute();
                               }
                             },
                             child: Container(
@@ -321,10 +300,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                 lastDate: DateTime.now(),
                               );
                               if (picked != null) {
-                                setState(() {
-                                  endDate = picked;
-                                  _studentsExpanded = true;
-                                });
+                                endDate = picked;
+                                _studentsExpanded = true;
+                                _recompute();
                               }
                             },
 
@@ -384,10 +362,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                 initialEntryMode: TimePickerEntryMode.input,
                               );
                               if (picked != null) {
-                                setState(() {
-                                  startTime = picked;
-                                  _studentsExpanded = true; // 🔥
-                                });
+                                startTime = picked;
+                                _studentsExpanded = true;
+                                _recompute();
                               }
                             },
                             child: Container(
@@ -431,10 +408,9 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                 initialEntryMode: TimePickerEntryMode.input,
                               );
                               if (picked != null) {
-                                setState(() {
-                                  endTime = picked;
-                                  _studentsExpanded = true;
-                                });
+                                endTime = picked;
+                                _studentsExpanded = true;
+                                _recompute();
                               }
                             },
                             child: Container(
@@ -464,14 +440,13 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                       value: selectedQualification,
                       hint: const Text('Wybierz kwalifikację'),
                       items:
-                          groupByQualification().keys.map((q) {
+                          _allQualificationKeys.map((q) {
                             return DropdownMenuItem(value: q, child: Text(q));
                           }).toList(),
                       onChanged: (value) {
-                        setState(() {
-                          selectedQualification = value;
-                          _studentsExpanded = true; // 🔥
-                        });
+                        selectedQualification = value;
+                        _studentsExpanded = true;
+                        _recompute();
                       },
                     ),
                     const SizedBox(height: 8),
@@ -487,9 +462,8 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         ),
                       ),
                     ExpansionTile(
-                      key: ValueKey(_studentsExpanded),
                       title: Text(
-                        'Uczniowie (${filteredUsers.length})',
+                        'Uczniowie (${_filteredUsers.length})',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -499,7 +473,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                         setState(() => _studentsExpanded = val);
                       },
                       children: [
-                        if (filteredUsers.isEmpty)
+                        if (_filteredUsers.isEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
                             child: Text(
@@ -508,7 +482,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                             ),
                           )
                         else
-                          ...filteredUsers.map((userData) {
+                          ..._filteredUsers.map((userData) {
                             final String user = userData['name'] as String;
                             final String uid =
                                 (userData['uid'] ?? '').toString();
@@ -632,7 +606,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                                       MaterialPageRoute(
                                         builder:
                                             (context) => ReportSelectionPage(
-                                              data: filteredResults,
+                                              data: _filteredResults,
                                             ),
                                       ),
                                     );
@@ -681,7 +655,7 @@ class _AdminStatsPageState extends State<AdminStatsPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    ...qualifications.entries.map((entry) {
+                    ..._qualifications.entries.map((entry) {
                       final q = entry.key.toUpperCase();
                       final qStats = calculateStats(entry.value);
                       return Padding(
@@ -763,7 +737,7 @@ class _AnonymousUserCard extends StatelessWidget {
 
 class _UserExpansionTile extends StatelessWidget {
   final String user;
-  final String uid; // 🔹 dodane
+  final String uid;
   final Map<String, dynamic> userStats;
   final String lastExamScore;
   final String lastExamDate;
@@ -882,19 +856,15 @@ class _QualificationTile extends StatelessWidget {
     int durationSec,
   ) async {
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/podgladEgzaminu.php'),
-        body: {
-          'api_token': apiKey,
-          'exam_id': examId.toString(),
-          'userName': userName,
-          'exam_date': examDateTime,
-          'duration_sec': durationSec.toString(),
-        },
+      final result = await ApiService.instance.fetchExamPreviewAdmin(
+        examId: examId,
+        userName: userName,
+        examDateTime: examDateTime,
+        durationSec: durationSec,
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         if (data['success'] == true) {
           return {
             'questions': List<dynamic>.from(data['questions']),
@@ -904,7 +874,7 @@ class _QualificationTile extends StatelessWidget {
         }
       }
       if (kDebugMode) {
-        debugPrint('PHP error: ${response.body}');
+        debugPrint('PHP error: ${result.errorMessage ?? result.statusCode}');
       }
     } catch (e) {
       if (kDebugMode) {

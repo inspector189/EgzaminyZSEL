@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 
 <head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
   <meta name="description" content="Egzaminy zawodowe">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Egzaminy">
@@ -14,33 +13,27 @@
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="manifest" href="manifest.json">
-
   <title>Egzaminy</title>
-
   <style>
-    html {
-      background: #121212;
-    }
-
+    html,
     body {
       margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
       background: #121212;
       color: white;
-      font-family: 'Segoe UI', Arial, sans-serif;
     }
 
     #loader {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      inset: 0;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       background-color: #121212;
       z-index: 9999;
+      transition: opacity 0.5s ease;
     }
 
     #logo {
@@ -64,91 +57,8 @@
       display: inline-block;
       font-size: 32px;
       font-weight: bold;
-      opacity: 0;
-      transform: translateY(10px);
-      animation: letterFade 0.6s forwards;
-    }
-
-    .egzaminy span:nth-child(1) {
-      animation-delay: 0.05s;
-    }
-
-    .egzaminy span:nth-child(2) {
-      animation-delay: 0.1s;
-    }
-
-    .egzaminy span:nth-child(3) {
-      animation-delay: 0.15s;
-    }
-
-    .egzaminy span:nth-child(4) {
-      animation-delay: 0.2s;
-    }
-
-    .egzaminy span:nth-child(5) {
-      animation-delay: 0.25s;
-    }
-
-    .egzaminy span:nth-child(6) {
-      animation-delay: 0.3s;
-    }
-
-    .egzaminy span:nth-child(7) {
-      animation-delay: 0.35s;
-    }
-
-    .egzaminy span:nth-child(8) {
-      animation-delay: 0.4s;
-    }
-
-    .zawodowe span:nth-child(1) {
-      animation-delay: 0.45s;
-    }
-
-    .zawodowe span:nth-child(2) {
-      animation-delay: 0.5s;
-    }
-
-    .zawodowe span:nth-child(3) {
-      animation-delay: 0.55s;
-    }
-
-    .zawodowe span:nth-child(4) {
-      animation-delay: 0.6s;
-    }
-
-    .zawodowe span:nth-child(5) {
-      animation-delay: 0.65s;
-    }
-
-    .zawodowe span:nth-child(6) {
-      animation-delay: 0.7s;
-    }
-
-    .zawodowe span:nth-child(7) {
-      animation-delay: 0.75s;
-    }
-
-    .zawodowe span:nth-child(8) {
-      animation-delay: 0.8s;
-    }
-
-    .zawodowe span:nth-child(9) {
-      animation-delay: 0.85s;
-    }
-
-    @keyframes letterFade {
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @keyframes fadeOut {
-      to {
-        opacity: 0;
-        visibility: hidden;
-      }
+      opacity: 0.4;
+      animation: fadeWave 1.2s ease-in-out infinite;
     }
 
     @keyframes fadeIn {
@@ -157,22 +67,16 @@
       }
     }
 
-    @keyframes pulse {
-      0% {
-        opacity: 1;
-      }
+    @keyframes fadeWave {
 
-      50% {
+      0%,
+      100% {
         opacity: 0.4;
       }
 
-      100% {
+      50% {
         opacity: 1;
       }
-    }
-
-    .pulsing {
-      animation: pulse 1.5s ease-in-out infinite;
     }
   </style>
 </head>
@@ -180,30 +84,39 @@
 <body>
   <div id="loader">
     <img id="logo" src="logo.png" alt="Logo">
-
-    <div class="text-row egzaminy">
-      <span>E</span><span>G</span><span>Z</span><span>A</span><span>M</span><span>I</span><span>N</span><span>Y</span>
-    </div>
-
-    <div class="text-row zawodowe">
-      <span>Z</span><span>A</span><span>W</span><span>O</span><span>D</span><span>O</span><span>W</span><span>E</span>
-    </div>
+    <div class="text-row" data-text="EGZAMINY"></div>
+    <div class="text-row" data-text="ZAWODOWE"></div>
   </div>
 
   <script>
-    window.addEventListener('load', () => {
-      const loader = document.getElementById('loader');
-      const rows = document.querySelectorAll('.text-row');
+    const letterDelay = 0.16;
 
-      if (loader) {
-        setTimeout(() => {
-          rows.forEach(row => row.classList.add('pulsing'));
-        }, 1000);
-
-        setTimeout(() => {
-          loader.style.animation = 'fadeOut 0.5s forwards';
-        }, 2800);
+    document.querySelectorAll('.text-row').forEach(row => {
+      const text = row.dataset.text;
+      row.innerHTML = '';
+      for (let char of text) {
+        const span = document.createElement('span');
+        span.textContent = char;
+        row.appendChild(span);
       }
+    });
+
+    document.querySelectorAll('.text-row').forEach(row => {
+      const spans = row.querySelectorAll('span');
+      spans.forEach((span, i) => {
+        span.style.animationDelay = `${i * letterDelay}s`;
+      });
+    });
+
+    window.addEventListener('flutter-first-frame', () => {
+      const loader = document.getElementById('loader');
+      loader.style.opacity = '0';
+      setTimeout(() => loader.remove(), 500);
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const logo = document.getElementById('logo');
+      logo.style.animation = 'fadeIn 1s ease-out forwards';
     });
   </script>
 

@@ -1,13 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-//import 'package:flutter_app/widgets/question_tile.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'egzamin_podglad.dart';
-//import 'admin_stats.dart';
-
-import 'utils/helpers.dart';
+import 'exam_preview.dart';
 
 class StatisticsPage extends StatelessWidget {
   const StatisticsPage({super.key});
@@ -132,18 +127,11 @@ class StatisticsPage extends StatelessWidget {
     final userName = prefs.getString('userName') ?? 'anonymous';
     if (userName == 'anonymous') return [];
 
-    final response = await http.post(
-      Uri.parse('$apiBaseUrl/stats_all.php'),
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $apiKey',
-      },
-    );
+    final result = await ApiService.instance.fetchAllStats();
 
-    if (response.statusCode != 200) return [];
+    if (!result.isSuccess) return [];
 
-    final jsonData = jsonDecode(response.body);
-    if (jsonData is! List) return [];
+    final jsonData = result.data!;
 
     final exams =
         jsonData.where((e) => (e['userID'] ?? '') == userName).toList();
@@ -165,34 +153,21 @@ class StatisticsPage extends StatelessWidget {
       throw Exception('ℹ️ Funkcja statystyk wymaga zalogowania.');
     }
 
-    final url = Uri.parse('$apiBaseUrl/stats.php');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Bearer $apiKey',
-      },
-      body: {'userName': userName},
-    );
+    final result = await ApiService.instance.fetchUserStats(userName);
 
     if (kDebugMode) {
-      debugPrint('📥 Otrzymano odpowiedź od serwera: ${response.statusCode}');
-      debugPrint('Treść odpowiedzi: ${response.body}');
+      debugPrint('📥 Otrzymano odpowiedź od serwera.');
     }
 
     try {
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200) {
-        if (data is Map<String, dynamic>) {
-          if (data.containsKey('error')) throw Exception(data['error']);
-          return data;
-        } else {
-          throw Exception('❌ Format odpowiedzi jest niepoprawny!');
-        }
-      } else if (response.statusCode == 404) {
+      final data = result.data!;
+      if (result.isSuccess) {
+        if (data.containsKey('error')) throw Exception(data['error']);
+        return data;
+      } else if (result.isNotFound) {
         throw Exception('⚠️ Nie zrobiłeś(aś) jeszcze żadnego egzaminu!');
       } else {
-        throw Exception('❌ ${response.statusCode} - ${response.body}');
+        throw Exception('❌ ${result.statusCode} - ${result.data!}');
       }
     } catch (e) {
       throw Exception('❌ Błąd pobierania statystyk: $e');
@@ -535,28 +510,21 @@ class LastExamRow extends StatelessWidget {
     int durationSec,
   ) async {
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/podgladEgzaminu_user.php'),
-        body: {
-          'api_token': apiKey,
-          'exam_id': examId.toString(),
-          'exam_date': examDateTime,
-          'duration_sec': durationSec.toString(),
-        },
+      final result = await ApiService.instance.fetchExamPreviewUser(
+        examId: examId,
+        examDateTime: examDateTime,
+        durationSec: durationSec,
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          return {
-            'questions': List<dynamic>.from(data['questions']),
-            'selectedAnswers':
-                (data['selectedAnswers'] as List).cast<String?>(),
-          };
-        }
+      if (result.isSuccess) {
+        return {
+          'questions': List<dynamic>.from(result.data!['questions']),
+          'selectedAnswers':
+              (result.data!['selectedAnswers'] as List).cast<String?>(),
+        };
       }
       if (kDebugMode) {
-        debugPrint('Błąd PHP: ${response.body}');
+        debugPrint('Błąd PHP: ${result.statusCode}');
       }
     } catch (e) {
       if (kDebugMode) {

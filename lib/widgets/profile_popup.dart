@@ -93,11 +93,12 @@ class ProfilePopup extends StatelessWidget {
               ],
             ),
             const Divider(height: 20),
-            _ProfileMenuRow(
-              icon: Icons.admin_panel_settings,
-              text: 'Panel Administratora',
-              onTap: isAdmin ? onOpenAdminPanel : null,
-            ),
+            if (isAdmin)
+              _ProfileMenuRow(
+                icon: Icons.admin_panel_settings,
+                text: 'Panel Administratora',
+                onTap: isAdmin ? onOpenAdminPanel : null,
+              ),
             _ProfileMenuRow(
               icon: Icons.color_lens,
               text: 'Personalizacja',

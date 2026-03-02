@@ -1,10 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-
-import 'utils/helpers.dart';
 
 class AdminUser {
   final int id;
@@ -80,52 +77,34 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
 
   Future<void> _checkSuperAdminStatus(String email) async {
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/is_super_admin.php'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'email': email}),
-      );
+      final result = await ApiService.instance.checkSuperAdmin(email);
 
-      if (response.statusCode == 200 && mounted) {
-        final data = json.decode(response.body);
+      if (result.isSuccess && mounted) {
         setState(() {
-          isSuperAdmin = data['isSuperAdmin'] == true;
+          isSuperAdmin = result.data ?? false;
         });
       }
     } catch (e, st) {
-      if (kDebugMode) debugPrint('checkSuperAdmin error: $e\n$st');
-      if (mounted) setState(() => isSuperAdmin = false);
+      if (mounted) {
+        debugPrint('checkSuperAdmin error: $e\n$st');
+        setState(() => isSuperAdmin = false);
+      }
     }
   }
 
   Future<void> _fetchAdmins() async {
     try {
-      final uri = Uri.parse('$apiBaseUrl/showAdmins.php');
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: kDebugMode ? {'debugSecret': debugSecret} : null,
-      );
+      final result = await ApiService.instance.fetchAdmins();
 
-      if (!mounted) return;
-
-      if (response.statusCode != 200) {
-        _showSnackBar('Błąd serwera (${response.statusCode})', isError: true);
+      if (!result.isSuccess) {
+        _showSnackBar('Błąd serwera (${result.statusCode})', isError: true);
         return;
       }
-
-      final data = json.decode(response.body);
-      if (data is! List) {
-        _showSnackBar('Nieprawidłowa odpowiedź serwera', isError: true);
-        return;
+      if (mounted) {
+        setState(() {
+          admins = result.data!.map((e) => AdminUser.fromJson(e)).toList();
+        });
       }
-
-      setState(() {
-        admins = data.map((e) => AdminUser.fromJson(e)).toList();
-      });
     } catch (e, st) {
       if (kDebugMode) debugPrint('fetchAdmins error: $e\n$st');
       if (mounted) _showSnackBar('Nie udało się pobrać listy', isError: true);
@@ -139,28 +118,12 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     setState(() => isPerformingAction = true);
 
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/add_admin.php'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: {'email': email},
-      );
+      final result = await ApiService.instance.addAdmin(email);
 
       if (!mounted) return false;
 
-      if (response.statusCode != 200) {
-        _showSnackBar('Błąd serwera (${response.statusCode})', isError: true);
-        return false;
-      }
-
-      final result = json.decode(response.body);
-      if (result['success'] != true) {
-        _showSnackBar(
-          result['error'] ?? result['message'] ?? 'Nieznany błąd',
-          isError: true,
-        );
+      if (!result.isSuccess || result.data?['success'] != true) {
+        _showSnackBar(result.data?['error'] ?? 'Error', isError: true);
         return false;
       }
 
@@ -184,35 +147,21 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
       );
       return false;
     }
-
-    setState(() => isPerformingAction = true);
-
-    final endpoint =
-        user.isSuperAdmin
-            ? '$apiBaseUrl/demote_super_admin.php'
-            : '$apiBaseUrl/promote_super_admin.php';
+    if (mounted) {
+      setState(() => isPerformingAction = true);
+    }
 
     try {
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: {'id': user.id.toString()},
-      );
+      final result =
+          user.isSuperAdmin
+              ? await ApiService.instance.demoteSuperAdmin(user.id)
+              : await ApiService.instance.promoteToSuperAdmin(user.id);
 
       if (!mounted) return false;
 
-      if (response.statusCode != 200) {
-        _showSnackBar('Błąd serwera (${response.statusCode})', isError: true);
-        return false;
-      }
-
-      final result = json.decode(response.body);
-      if (result['success'] != true) {
+      if (!result.isSuccess || result.data?['success'] != true) {
         _showSnackBar(
-          result['error'] ?? result['message'] ?? 'Nieznany błąd',
+          result.data?['error'] ?? result.data?['message'] ?? 'Nieznany błąd',
           isError: true,
         );
         return false;
@@ -265,25 +214,12 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     setState(() => isPerformingAction = true);
 
     try {
-      final response = await http.post(
-        Uri.parse('$apiBaseUrl/delete_admin.php'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: {'id': user.id.toString()},
-      );
+      final result = await ApiService.instance.deleteAdmin(user.id);
 
       if (!mounted) return false;
 
-      if (response.statusCode != 200) {
-        _showSnackBar('Błąd serwera (${response.statusCode})', isError: true);
-        return false;
-      }
-
-      final result = json.decode(response.body);
-      if (result['success'] != true) {
-        _showSnackBar(result['error'] ?? 'Nieznany błąd', isError: true);
+      if (!result.isSuccess || result.data?['success'] != true) {
+        _showSnackBar(result.data?['error'] ?? 'Nieznany błąd', isError: true);
         return false;
       }
 

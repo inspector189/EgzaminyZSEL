@@ -3,10 +3,12 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
 
-import '../app_themes.dart';
+import '/utils/helpers.dart';
+import '/utils/app_themes.dart';
 
 class QuestionTile extends StatefulWidget {
   final IconData icon;
@@ -31,9 +33,13 @@ class QuestionTile extends StatefulWidget {
 class _QuestionTileState extends State<QuestionTile> {
   static final Map<String, _CacheEntry> _cache = {};
 
+  static void _evictExpired() {
+    final now = DateTime.now();
+    _cache.removeWhere((_, entry) => entry.expiresAt.isBefore(now));
+  }
+
   static const _cacheTtl = Duration(minutes: 15);
-  static const _baseUrl =
-      'https://egzaminy.zsel.edu.pl/egzaminy/count/countQuestions.php';
+  static const _baseUrl = '$apiBaseUrl/count/countQuestions.php';
 
   int? _count;
   bool _isLoading = false;
@@ -57,6 +63,7 @@ class _QuestionTileState extends State<QuestionTile> {
   }
 
   void _tryLoadFromCacheOrNetwork() {
+    _evictExpired();
     final cached = _cache[_cacheKey];
     final now = DateTime.now();
 
@@ -71,12 +78,13 @@ class _QuestionTileState extends State<QuestionTile> {
 
     if (_currentLoadFuture != null) return;
 
-    _currentLoadFuture = _fetchCount();
     setState(() {
       _isLoading = true;
       _hasError = false;
       _errorMessage = null;
     });
+
+    _currentLoadFuture = _fetchCount();
   }
 
   Future<void> _fetchCount() async {
@@ -95,7 +103,7 @@ class _QuestionTileState extends State<QuestionTile> {
       if (!mounted) return;
 
       if (response.statusCode != 200) {
-        throw HttpException('Serwer zwrócił kod ${response.statusCode}');
+        throw _HttpException('Serwer zwrócił kod ${response.statusCode}');
       }
 
       final decoded = jsonDecode(response.body);
@@ -226,6 +234,7 @@ class _QuestionTileState extends State<QuestionTile> {
           curve: Curves.easeOutCubic,
           child: Card(
             elevation: _isHovering ? 6 : 3,
+            color: scheme.surfaceContainerHighest,
             shadowColor: scheme.shadow.withValues(
               alpha: _isHovering ? 0.25 : 0.18,
             ),
@@ -342,9 +351,9 @@ class _CacheEntry {
   _CacheEntry({required this.value, required this.expiresAt});
 }
 
-class HttpException implements Exception {
+class _HttpException implements Exception {
   final String message;
-  HttpException(this.message);
+  _HttpException(this.message);
   @override
   String toString() => message;
 }

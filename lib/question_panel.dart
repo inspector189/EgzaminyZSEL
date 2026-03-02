@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/app_themes.dart';
+import 'package:flutter_app/services/api_service.dart';
+import 'package:flutter_app/utils/app_themes.dart';
 import 'package:video_player/video_player.dart';
-import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
-import 'dart:convert';
-import 'utils/zoomable_image.dart';
-import 'utils/helpers.dart';
+import 'widgets/zoomable_image.dart';
 
 class QuestionStatsPage extends StatefulWidget {
   const QuestionStatsPage({super.key});
@@ -68,36 +66,33 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
   }
 
   Future<void> fetchQuestionStats() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+        errorMessage = null;
+      });
+    }
 
     try {
-      final response = await http.get(
-        Uri.parse('$apiBaseUrl/wyswietl_trudnosci.php'),
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-      );
+      final result = await ApiService.instance.fetchDifficultyStats();
 
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
+      if (!result.isSuccess) {
+        throw Exception('HTTP ${result.statusCode}');
       }
 
-      final result = json.decode(response.body);
-      if (result is! List) throw Exception('Invalid format');
-
-      setState(() {
-        questionStats = result;
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          questionStats = result.data!;
+          isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = 'Błąd: $e';
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Błąd: $e';
+        });
+      }
     }
   }
 
@@ -116,47 +111,42 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
     setState(() => isLoadingQual[kwal] = true);
 
     try {
-      final res = await http.get(
-        Uri.parse('$apiBaseUrl/${kwal.replaceAll(" ", "")}.php'),
-      );
+      final result = await ApiService.instance.fetchQuestions(kwal);
 
-      if (res.statusCode == 200) {
-        final parsed = json.decode(res.body);
-        if (parsed is List) {
-          final stats =
-              questionStats
-                  .where(
-                    (item) =>
-                        (item['kwalifikacja'] ?? '').replaceAll(' ', '') ==
-                        kwal,
-                  )
-                  .toList();
+      if (result.isSuccess) {
+        final parsed = result.data!;
+        final stats =
+            questionStats
+                .where(
+                  (item) =>
+                      (item['kwalifikacja'] ?? '').replaceAll(' ', '') == kwal,
+                )
+                .toList();
 
-          final List<Map<String, dynamic>> enriched = [];
-          for (final s in stats) {
-            final q = parsed.firstWhere(
-              (p) => p['id'].toString() == s['pytanie_id'].toString(),
-              orElse: () => null,
-            );
-            if (q != null) enriched.add({...s, ...q});
-          }
-
-          enriched.sort(
-            (a, b) => int.tryParse(
-              a['pytanie_id'].toString(),
-            )!.compareTo(int.tryParse(b['pytanie_id'].toString())!),
+        final List<Map<String, dynamic>> enriched = [];
+        for (final s in stats) {
+          final q = parsed.firstWhere(
+            (p) => p['id'].toString() == s['pytanie_id'].toString(),
+            orElse: () => null,
           );
-
-          setState(() {
-            loadedQuestions[kwal] = enriched;
-            visibleCounts[kwal] = enriched.length < 30 ? enriched.length : 30;
-            isLoadingMore[kwal] = false;
-
-            final scroll = ScrollController();
-            scroll.addListener(() => _onScroll(kwal));
-            controllers[kwal] = scroll;
-          });
+          if (q != null) enriched.add({...s, ...q});
         }
+
+        enriched.sort(
+          (a, b) => int.tryParse(
+            a['pytanie_id'].toString(),
+          )!.compareTo(int.tryParse(b['pytanie_id'].toString())!),
+        );
+
+        setState(() {
+          loadedQuestions[kwal] = enriched;
+          visibleCounts[kwal] = enriched.length < 30 ? enriched.length : 30;
+          isLoadingMore[kwal] = false;
+
+          final scroll = ScrollController();
+          scroll.addListener(() => _onScroll(kwal));
+          controllers[kwal] = scroll;
+        });
       }
     } catch (e) {
       debugPrint('Error loading $kwal: $e');

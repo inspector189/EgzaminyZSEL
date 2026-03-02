@@ -1,10 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:html_unescape/html_unescape.dart';
-import 'CreatingTestsAndReportsPage.dart';
-import 'utils/helpers.dart';
+import 'test_and_report_creation.dart';
 
 enum TestCreationMode { random, manual }
 
@@ -36,16 +34,15 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
   }
 
   Future<void> _fetchQuestions() async {
-    final url = Uri.parse('$apiBaseUrl/${widget.qualification}.php');
-
     try {
-      final response = await http.get(url);
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        final List<dynamic> data = json.decode(response.body);
+      final result = await ApiService.instance.fetchQuestions(
+        widget.qualification,
+      );
+      if (result.isSuccess && result.data != null) {
+        final List<dynamic> data = result.data!;
         final unescape = HtmlUnescape();
 
         for (var q in data) {
-          // Teksty
           q['pytanie_text'] = unescape.convert(q['pytanie'] ?? '');
           for (int i = 1; i <= 4; i++) {
             q['odp${i}_text'] = unescape.convert(q['odp$i'] ?? '');
@@ -129,29 +126,11 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
       'questions': selectedQuestions,
     };
 
-    // Pobieramy istniejące testy
-    /*final String? existingJson = prefs.getString('saved_tests');
-    List<dynamic> allTests = [];
-    if (existingJson != null && existingJson.isNotEmpty) {
-      try {
-        allTests = json.decode(existingJson) as List<dynamic>;
-      } catch (e) {
-        allTests = [];
-      }
-    }*/
-
     try {
-      final response = await http.post(
-        Uri.parse(publishedTestsUrl),
-        headers: {
-          'Authorization': 'Bearer $apiToken',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({'action': 'create', 'test': newTest}),
-      );
+      final result = await ApiService.instance.createTest(newTest);
 
       if (mounted) {
-        if (response.statusCode == 200) {
+        if (result.isSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
@@ -162,23 +141,17 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
             ),
           );
           Navigator.pop(context);
-        } else if (response.statusCode == 409) {
-          String msg =
+        } else if (result.isConflict) {
+          final msg =
+              result.errorMessage ??
               'Test o tej nazwie już istnieje dla tej kwalifikacji i autora.';
-          try {
-            final body = json.decode(response.body);
-            if (body is Map && body['message'] is String) {
-              msg = body['message'];
-            }
-          } catch (_) {}
-
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(msg), backgroundColor: Colors.red),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Błąd zapisu testu (${response.statusCode})'),
+              content: Text('Błąd zapisu testu (${result.statusCode})'),
               backgroundColor: Colors.red,
             ),
           );

@@ -1,6 +1,7 @@
+import 'package:flutter_app/services/api_service.dart';
+
 import 'widgets/question_tile.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:web/web.dart' as web;
@@ -12,18 +13,16 @@ import 'widgets/home_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'admin_panel.dart';
-import 'utils/qualifications.dart';
-import 'app_themes.dart';
+import 'utils/qualifications_class.dart';
+import 'utils/app_themes.dart';
 import 'widgets/profile_popup.dart';
-import 'oauth2_service.dart';
-import 'personalisation_page.dart';
-import 'qualification_page.dart';
-import 'statistics.dart';
-import 'theme_manager.dart';
-import 'utils/http_service.dart';
-import 'utils/helpers.dart';
-import 'utils/quotes.dart';
-import 'AboutUsPage.dart';
+import 'services/oauth2_service.dart';
+import 'theme_personalisation.dart';
+import 'qualification_test_selection.dart';
+import 'user_stats.dart';
+import 'utils/theme_manager.dart';
+import 'utils/quotes_array.dart';
+import 'about_us.dart';
 
 //Debug data here (use your data to login in debug)
 const String userName = "";
@@ -129,51 +128,42 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _closeProfilePopup();
+    _profileOverlay?.remove();
+    _profileOverlay = null;
+    _profileController?.dispose();
+    _profileController = null;
     super.dispose();
   }
 
   Future<void> _syncWithServerSession() async {
     if (kDebugMode) return;
-
     if (!_isLoggedIn || _userEmail == null) return;
-
     if (!kIsWeb) return;
 
     try {
-      final url = Uri.parse('$apiBaseUrl/session-status.php');
+      final result = await ApiService.instance.checkSession();
 
-      final response = await HttpService.postJson(url, {});
+      if (result.statusCode == 401 || result.isNetworkError) {
+        await _signOut(showSnack: false);
+        if (kDebugMode) debugPrint('ℹ️ 401 z session-status - logout lokalny');
+        return;
+      }
 
-      if (response == null) return;
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final ok = data['ok'] == true;
-
+      if (result.isSuccess) {
+        final ok = result.data?['ok'] == true;
         if (!ok) {
           await _signOut(showSnack: false);
           if (kDebugMode) {
             debugPrint('ℹ️ Sesja na serwerze nie istnieje - logout lokalny');
           }
         } else {
-          final bool adminFromServer = data['isAdmin'] == true;
           if (mounted) {
-            setState(() {
-              _isAdmin = adminFromServer;
-            });
+            setState(() => _isAdmin = result.data?['isAdmin'] == true);
           }
-        }
-      } else if (response.statusCode == 401) {
-        await _signOut(showSnack: false);
-        if (kDebugMode) {
-          debugPrint('ℹ️ 401 z session-status - logout lokalny');
         }
       }
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Błąd sprawdzania sesji na serwerze: $e');
-      }
+      if (kDebugMode) debugPrint('❌ Błąd sprawdzania sesji na serwerze: $e');
     }
   }
 
@@ -201,48 +191,6 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
 
     await _syncWithServerSession();
   }
-  /*
-  Future<void> _verifyEmail(String email) async {
-    try {
-      final url = Uri.parse(
-        '$apiBaseUrl/verify-email.php',
-      );
-      final response = await HttpService.postJson(url, {'email': email});
-
-      if (response != null && response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final bool admin = data['isValid'] == true;
-
-        if (mounted) {
-          setState(() {
-            _isAdmin = admin;
-          });
-        }
-
-        if (kDebugMode) {
-          debugPrint('✅ Weryfikacja email: isAdmin=$_isAdmin');
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _isAdmin = false;
-          });
-        }
-        if (kDebugMode) {
-          debugPrint(
-            '❌ Weryfikacja email nie powiodła się: ${response?.statusCode}',
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isAdmin = false;
-        });
-      }
-      if (kDebugMode) debugPrint('❌ Błąd weryfikacji email: $e');
-    } finally {}
-  }*/
 
   Future<void> _showLoginInfoAndStart() async {
     final shouldLogin = await showDialog<bool>(
@@ -295,8 +243,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   Future<void> _signOut({bool showSnack = true}) async {
     if (kIsWeb) {
       try {
-        final url = Uri.parse('$apiBaseUrl/logout.php');
-        await HttpService.postJson(url, {});
+        await ApiService.instance.logout();
       } catch (e) {
         if (kDebugMode) {
           debugPrint('⚠️ Błąd przy wylogowaniu: $e');
@@ -465,7 +412,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6.0),
       child: PopupMenuButton<Qualification>(
-        tooltip: title,
+        tooltip: "technik $title",
         offset: const Offset(0, kToolbarHeight),
         color: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -488,7 +435,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
               value: q,
               child: Row(
                 children: [
-                  Icon(q.icon, size: 20),
+                  Icon(q.icon, size: 20, color: colorScheme.onPrimary),
                   const SizedBox(width: 8),
                   Text(q.code),
                 ],
@@ -576,10 +523,11 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
 
                     ...professions.map(
                       (profession) => ExpansionTile(
-                        title: Text(profession.name),
+                        title: Text("technik ${profession.name}"),
                         children:
                             profession.qualifications.map((q) {
                               return ListTile(
+                                leading: Icon(q.icon),
                                 title: Text(q.code),
                                 onTap: () {
                                   Navigator.pop(context);
