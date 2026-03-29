@@ -25,8 +25,8 @@ import 'utils/quotes_array.dart';
 import 'about_us.dart';
 
 //Debug data here (use your data to login in debug)
-const String userName = "";
-const String userEmail = "";
+const String userName = "Krzysztof Konieczny";
+const String userEmail = "kkonieczny1@zselektr.onmicrosoft.com";
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -176,10 +176,17 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     final bool isLoggedIn = userName != null && userEmail != null;
 
     if (kDebugMode) {
-      debugPrint(
-        'ℹ️ Sprawdzanie statusu logowania: '
-        'userName=$userName, userEmail=$userEmail, isAdmin=$isAdmin',
-      );
+      if (isLoggedIn) {
+        debugPrint(
+          'ℹ️ Dane logowania: '
+          'userName=$userName, userEmail=$userEmail, isAdmin=$isAdmin.',
+        );
+      } else {
+        debugPrint(
+          'ℹ️ Użytkownik nie jest zalogowany.'
+          'isAdmin=$isAdmin',
+        );
+      }
     }
 
     setState(() {
@@ -282,35 +289,57 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
 
     _profileController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 220),
     );
 
-    final animation = CurvedAnimation(
+    // Fade
+    final fade = CurvedAnimation(
       parent: _profileController!,
       curve: Curves.easeOut,
     );
 
+    // Slide — straight down only, short travel
     final slide = Tween<Offset>(
-      begin: const Offset(0.2, -0.2),
+      begin: const Offset(0.0, -0.08),
       end: Offset.zero,
-    ).animate(animation);
+    ).animate(
+      CurvedAnimation(parent: _profileController!, curve: Curves.easeOutCubic),
+    );
+
+    // Scale — expand from top-right corner
+    final scale = Tween<double>(begin: 0.92, end: 1.0).animate(
+      CurvedAnimation(parent: _profileController!, curve: Curves.easeOutCubic),
+    );
 
     _profileOverlay = OverlayEntry(
-      builder:
-          (_) => Stack(
-            children: [
-              GestureDetector(
+      builder: (_) {
+        // Recalculate safe top on every build so it's correct even if
+        // orientation changes while the popup is open.
+        final topPadding = MediaQuery.of(context).padding.top;
+        final appBarHeight = kToolbarHeight;
+        final popupTop = topPadding + appBarHeight + 8.0;
+
+        return Stack(
+          children: [
+            // Dismiss on tap-outside
+            Positioned.fill(
+              child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTap: _closeProfilePopup,
               ),
-              Positioned(
-                top: kToolbarHeight + 16,
-                right: 16,
-                width: 300,
-                child: FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: slide,
+            ),
+
+            Positioned(
+              top: popupTop,
+              right: 12,
+              width: 300,
+              child: FadeTransition(
+                opacity: fade,
+                child: SlideTransition(
+                  position: slide,
+                  child: ScaleTransition(
+                    scale: scale,
+                    alignment: Alignment.topRight, // expands from the button
                     child: ProfilePopup(
                       userName: _userName!,
                       userEmail: _userEmail!,
@@ -345,8 +374,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
+        );
+      },
     );
 
     overlay.insert(_profileOverlay!);
@@ -693,46 +724,99 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
-      children: [
-        HomeHeader(selectedQuote: selectedQuote),
-        const SizedBox(height: 40),
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final width = MediaQuery.of(context).size.width;
+    final hPad = width < 600 ? 20.0 : (width < 1000 ? 32.0 : width * 0.08);
 
+    return ListView(
+      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 32),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 32, bottom: 8),
+          child: HomeHeader(selectedQuote: selectedQuote),
+        ),
+
+        const SizedBox(height: 32),
         ...professions.map((profession) {
-          return _buildGrid(
-            '${profession.emoji} Technik ${profession.name}',
-            profession.qualifications.map((q) {
-              return QuestionTile(
-                icon: q.icon,
-                code: q.code,
-                label: q.description,
-                onTap: () => onQualificationTap(q.code),
-              );
-            }).toList(),
+          final tiles =
+              profession.qualifications.map((q) {
+                return QuestionTile(
+                  icon: q.icon,
+                  code: q.code,
+                  label: q.description,
+                  onTap: () => onQualificationTap(q.code),
+                );
+              }).toList();
+
+          return _ProfessionSection(
+            emoji: profession.emoji,
+            name: profession.name,
+            tiles: tiles,
+            cs: cs,
+            tt: tt,
           );
         }),
       ],
     );
   }
+}
 
-  Widget _buildGrid(String title, List<QuestionTile> items) {
+class _ProfessionSection extends StatelessWidget {
+  const _ProfessionSection({
+    required this.emoji,
+    required this.name,
+    required this.tiles,
+    required this.cs,
+    required this.tt,
+  });
+
+  final String emoji;
+  final String name;
+  final List<Widget> tiles;
+  final ColorScheme cs;
+  final TextTheme tt;
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.only(bottom: 36),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 3,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: cs.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Row(
+                children: [
+                  const SizedBox(width: 12),
+                  Text(emoji, style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Technik $name',
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                      color: cs.onSurface,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 20,
-            runSpacing: 20,
-            children: items,
-          ),
+          Wrap(spacing: 16, runSpacing: 16, children: tiles),
         ],
       ),
     );

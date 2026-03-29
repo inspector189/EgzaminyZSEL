@@ -1,9 +1,3 @@
-bool isValidQualification(String? qual) {
-  if (qual == null) return false;
-  final trimmed = qual.trim().toLowerCase();
-  return RegExp(r'^[a-z]{3}\d{2}$').hasMatch(trimmed);
-}
-
 const String clientId = '67af475e-082d-4187-b1ef-5fa26fa0fe77';
 const String tenantId = 'de78aefd-fda9-4eaf-a2d1-cf8492188649';
 const String redirectUri = 'https://egzaminy.zsel.edu.pl/redirect.html';

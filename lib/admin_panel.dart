@@ -11,96 +11,171 @@ class AdminPanelPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final width = MediaQuery.of(context).size.width;
+    final hPad = width < 600 ? 16.0 : 24.0;
 
     final adminTiles = <AdminTileData>[
       AdminTileData(
         icon: Icons.people,
         label: 'Administratorzy',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ManageAdminsPage()),
-          );
-        },
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ManageAdminsPage()),
+            ),
       ),
       AdminTileData(
         icon: Icons.bar_chart,
         label: 'Raporty i statystyki',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => AdminStatsPage()),
-          );
-        },
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => AdminStatsPage()),
+            ),
       ),
       AdminTileData(
         icon: Icons.troubleshoot_rounded,
         label: 'Statystyki trudności pytań',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => QuestionStatsPage()),
-          );
-        },
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => QuestionStatsPage()),
+            ),
       ),
       AdminTileData(
         icon: Icons.play_circle_fill,
         label: 'Przeprowadź test',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const CreatingTestsAndReportsPage(),
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CreatingTestsAndReportsPage(),
+              ),
             ),
-          );
-        },
       ),
     ];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Panel Administratora'),
-        backgroundColor: theme.colorScheme.primary,
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
+        iconTheme: IconThemeData(color: cs.onPrimary),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
         children: [
-          Text(
-            'Witaj w panelu administratora',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(hPad, 28, hPad, 28),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              boxShadow: [
+                BoxShadow(
+                  color: cs.primary.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.admin_panel_settings_rounded,
+                    color: cs.onPrimary,
+                    size: 48,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Witaj, Administratorze',
+                        style: tt.headlineLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: cs.onPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Zarządzaj użytkownikami, pytaniami i raportami.',
+                        style: tt.bodyLarge?.copyWith(
+                          color: cs.onPrimary.withValues(alpha: 0.78),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 32),
 
-          LayoutBuilder(
-            builder: (context, constraints) {
-              int columns = 1;
-              if (constraints.maxWidth > 1000) {
-                columns = 3;
-              } else if (constraints.maxWidth > 700) {
-                columns = 2;
-              }
+          // ── Tiles ────────────────────────────────────────────────
+          Padding(
+            padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'NARZĘDZIA',
+                      style: tt.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
 
-              final availableWidth =
-                  constraints.maxWidth - (20 * (columns - 1));
-              final tileWidth =
-                  (availableWidth / columns).clamp(0, 300).toDouble();
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    int columns = 1;
+                    if (constraints.maxWidth > 1000) {
+                      columns = 4;
+                    } else if (constraints.maxWidth > 700) {
+                      columns = 2;
+                    }
 
-              return Wrap(
-                spacing: 20,
-                runSpacing: 20,
-                alignment: WrapAlignment.center,
-                children:
-                    adminTiles.map((data) {
-                      return SizedBox(
-                        width: tileWidth,
-                        child: AdminTile(data: data),
-                      );
-                    }).toList(),
-              );
-            },
+                    final ratio = columns == 1 ? 4.8 : 3.0;
+
+                    return GridView.count(
+                      crossAxisCount: columns,
+                      crossAxisSpacing: 36,
+                      mainAxisSpacing: 36,
+                      childAspectRatio: ratio,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children:
+                          adminTiles
+                              .map((data) => AdminTile(data: data))
+                              .toList(),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),

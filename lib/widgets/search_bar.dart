@@ -1,18 +1,4 @@
-import 'package:flutter/material.dart'
-    show
-        StatelessWidget,
-        ValueChanged,
-        VoidCallback,
-        BuildContext,
-        Widget,
-        Icon,
-        Theme,
-        Icons,
-        BorderRadius,
-        BorderSide,
-        OutlineInputBorder,
-        InputDecoration,
-        TextField;
+import 'package:flutter/material.dart';
 
 class SearchBar extends StatelessWidget {
   final ValueChanged<String> onChanged;

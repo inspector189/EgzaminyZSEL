@@ -9,13 +9,10 @@ import '../utils/helpers.dart';
 
 class OAuth2Service {
 
-  static String? _codeVerifier;
-  static String? _state;
-
   static String _generateCodeVerifier() {
     final random = Random.secure();
-    final values = List<int>.generate(128, (_) => random.nextInt(256));
-    return base64UrlEncode(values).replaceAll('=', '').substring(0, 128);
+    final values = List<int>.generate(64, (_) => random.nextInt(256));
+    return base64UrlEncode(values).replaceAll('=', '');
   }
 
   static String _generateCodeChallenge(String verifier) {
@@ -25,12 +22,16 @@ class OAuth2Service {
   }
 
   static void startLogin() {
-    _codeVerifier = _generateCodeVerifier();
-    final codeChallenge = _generateCodeChallenge(_codeVerifier!);
-    _state = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+    final codeVerifier = _generateCodeVerifier();
+    final codeChallenge = _generateCodeChallenge(codeVerifier);
+    final stateBytes = List<int>.generate(
+      32,
+      (_) => Random.secure().nextInt(256),
+    );
+    final state = base64UrlEncode(stateBytes).replaceAll('=', '');
 
-    web.window.localStorage.setItem('code_verifier', _codeVerifier!);
-    web.window.localStorage.setItem('oauth_state', _state!);
+    web.window.localStorage.setItem('code_verifier', codeVerifier);
+    web.window.localStorage.setItem('oauth_state', state);
 
     final authUrl = Uri.parse(authorizeUrl).replace(
       queryParameters: {
@@ -38,7 +39,7 @@ class OAuth2Service {
         'response_type': 'code',
         'redirect_uri': redirectUri,
         'scope': scopes.join(' '),
-        'state': _state!,
+        'state': state,
         'response_mode': 'query',
         'code_challenge': codeChallenge,
         'code_challenge_method': 'S256',
@@ -118,21 +119,27 @@ class OAuth2Service {
   static Future<void> _saveUserFromIdToken(String? idToken) async {
     if (idToken == null) return;
 
-    final parts = idToken.split('.');
-    if (parts.length != 3) return;
+    try {
+      final parts = idToken.split('.');
+      if (parts.length != 3) return;
 
-    final payload = parts[1];
-    final normalized = base64Url.normalize(payload);
-    final jsonStr = utf8.decode(base64Url.decode(normalized));
-    final json = jsonDecode(jsonStr);
+      final payload = parts[1];
+      final normalized = base64Url.normalize(payload);
+      final jsonStr = utf8.decode(base64Url.decode(normalized));
+      final json = jsonDecode(jsonStr);
 
-    final name = json['name'] as String?;
-    final email = json['email'] ?? json['preferred_username'] as String?;
+      final name = json['name'] as String?;
+      final email = (json['email'] ?? json['preferred_username']) as String?;
 
-    if (name != null && email != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userName', name);
-      await prefs.setString('userEmail', email);
+      if (name != null && email != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userName', name);
+        await prefs.setString('userEmail', email);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to parse id_token: $e');
+      }
     }
   }
 }

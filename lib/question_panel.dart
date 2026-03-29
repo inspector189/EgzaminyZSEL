@@ -4,9 +4,99 @@ import 'package:flutter_app/utils/app_themes.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shimmer/shimmer.dart';
 import 'widgets/zoomable_image.dart';
+import 'widgets/shim_box.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Design tokens
+// ─────────────────────────────────────────────────────────────────────────────
+
+const double _kHardThreshold = 50.0;
+const int _kPageSize = 30;
+const double _kCardRadius = 12.0;
+const double _kAccentWidth = 4.0;
+const double _kGridBreakpoint = 680.0;
+
+String _stripAnswerPrefix(String text) =>
+    text.replaceFirst(RegExp(r'^\s*[A-Da-d][.)]\s*'), '').trimLeft();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-qualification state
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _QualState {
+  List<dynamic> questions = [];
+  bool isLoading = false;
+  bool isLoadingMore = false;
+  bool loaded = false;
+  int visibleCount = _kPageSize;
+  ScrollController? controller;
+
+  void dispose() {
+    controller?.dispose();
+    controller = null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VideoPlayerWidget
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _VideoPlayerWidget extends StatefulWidget {
+  const _VideoPlayerWidget({required this.url});
+  final String url;
+
+  @override
+  State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+}
+
+class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
+  late final VideoPlayerController _ctrl;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = VideoPlayerController.networkUrl(widget.url as Uri)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _ready = true);
+        _ctrl
+          ..setLooping(false)
+          ..play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready) {
+      return const AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: AspectRatio(
+        aspectRatio: _ctrl.value.aspectRatio,
+        child: VideoPlayer(_ctrl),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QuestionStatsPage
+// ─────────────────────────────────────────────────────────────────────────────
 
 class QuestionStatsPage extends StatefulWidget {
   const QuestionStatsPage({super.key});
+
   @override
   QuestionStatsPageState createState() => QuestionStatsPageState();
 }
@@ -15,13 +105,9 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
     with AutomaticKeepAliveClientMixin {
   bool isLoading = true;
   String? errorMessage;
-  List<dynamic> questionStats = [];
-
-  final Map<String, List<dynamic>> loadedQuestions = {};
-  final Map<String, bool> isLoadingQual = {};
-  final Map<String, ScrollController> controllers = {};
-  final Map<String, int> visibleCounts = {};
-  final Map<String, bool> isLoadingMore = {};
+  List<dynamic> _stats = [];
+  Map<String, List<dynamic>> _grouped = {};
+  final Map<String, _QualState> _qualState = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -29,60 +115,32 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
   @override
   void initState() {
     super.initState();
-    fetchQuestionStats();
+    _fetchStats();
   }
 
   @override
   void dispose() {
-    for (final c in controllers.values) {
-      c.dispose();
+    for (final s in _qualState.values) {
+      s.dispose();
     }
     super.dispose();
   }
 
-  Map<String, dynamic> parseQuestionHtml(String html) {
-    final List<String> images = [];
-    final imgRegex = RegExp(
-      r'<img[^>]+src="([^">]+)"',
-      caseSensitive: false,
-      multiLine: true,
-    );
+  // ── Data ──────────────────────────────────────────────────────────────────
 
-    for (final match in imgRegex.allMatches(html)) {
-      final src = match.group(1);
-      if (src != null && src.isNotEmpty) images.add(src);
-    }
-
-    final text =
-        html
-            .replaceAll(RegExp(r'<img[^>]*>', caseSensitive: false), '')
-            .replaceAll(RegExp(r'<[^>]*>', caseSensitive: false), '')
-            .replaceAll('&nbsp;', ' ')
-            .replaceAll('&lt;', '<')
-            .replaceAll('&gt;', '>')
-            .trim();
-
-    return {'text': text, 'images': images};
-  }
-
-  Future<void> fetchQuestionStats() async {
-    if (mounted) {
-      setState(() {
-        isLoading = true;
-        errorMessage = null;
-      });
-    }
-
+  Future<void> _fetchStats() async {
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
     try {
       final result = await ApiService.instance.fetchDifficultyStats();
-
-      if (!result.isSuccess) {
-        throw Exception('HTTP ${result.statusCode}');
-      }
-
+      if (!result.isSuccess) throw Exception('HTTP ${result.statusCode}');
       if (mounted) {
         setState(() {
-          questionStats = result.data!;
+          _stats = result.data!;
+          _grouped = _group();
           isLoading = false;
         });
       }
@@ -96,247 +154,390 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
     }
   }
 
-  Map<String, List<dynamic>> groupByQualification() {
-    final Map<String, List<dynamic>> grouped = {};
-    for (var r in questionStats) {
-      final q = (r['kwalifikacja'] ?? 'Nieznana').toString();
-      grouped.putIfAbsent(q, () => []);
-      grouped[q]!.add(r);
+  Map<String, List<dynamic>> _group() {
+    final out = <String, List<dynamic>>{};
+    for (final r in _stats) {
+      final k = (r['kwalifikacja'] ?? 'Nieznana').toString();
+      out.putIfAbsent(k, () => []).add(r);
     }
-    return grouped;
+    return out;
   }
 
-  Future<void> loadQualification(String kwal) async {
-    if (loadedQuestions.containsKey(kwal)) return;
-    setState(() => isLoadingQual[kwal] = true);
+  Future<void> _loadQualification(String kwal) async {
+    final s = _qualState.putIfAbsent(kwal, () => _QualState());
+    if (s.loaded || s.isLoading) return;
+    setState(() => s.isLoading = true);
 
     try {
-      final result = await ApiService.instance.fetchQuestions(kwal);
+      final norm = kwal.replaceAll(' ', '');
+      final result = await ApiService.instance.fetchQuestions(norm);
+      if (!result.isSuccess) throw Exception('HTTP ${result.statusCode}');
 
-      if (result.isSuccess) {
-        final parsed = result.data!;
-        final stats =
-            questionStats
-                .where(
-                  (item) =>
-                      (item['kwalifikacja'] ?? '').replaceAll(' ', '') == kwal,
-                )
-                .toList();
+      final parsed = result.data!;
+      final stats =
+          _stats
+              .where(
+                (item) =>
+                    (item['kwalifikacja'] ?? '').toString().replaceAll(
+                      ' ',
+                      '',
+                    ) ==
+                    norm,
+              )
+              .toList();
 
-        final List<Map<String, dynamic>> enriched = [];
-        for (final s in stats) {
-          final q = parsed.firstWhere(
-            (p) => p['id'].toString() == s['pytanie_id'].toString(),
-            orElse: () => null,
-          );
-          if (q != null) enriched.add({...s, ...q});
-        }
-
-        enriched.sort(
-          (a, b) => int.tryParse(
-            a['pytanie_id'].toString(),
-          )!.compareTo(int.tryParse(b['pytanie_id'].toString())!),
+      final enriched = <Map<String, dynamic>>[];
+      for (final st in stats) {
+        final match = parsed.where(
+          (p) => p['id'].toString() == st['pytanie_id'].toString(),
         );
+        if (match.isNotEmpty) {
+          enriched.add({...st as Map, ...match.first as Map});
+        }
+      }
 
+      enriched.sort(
+        (a, b) => (int.tryParse(a['pytanie_id'].toString()) ?? 0).compareTo(
+          int.tryParse(b['pytanie_id'].toString()) ?? 0,
+        ),
+      );
+
+      if (mounted) {
         setState(() {
-          loadedQuestions[kwal] = enriched;
-          visibleCounts[kwal] = enriched.length < 30 ? enriched.length : 30;
-          isLoadingMore[kwal] = false;
-
-          final scroll = ScrollController();
-          scroll.addListener(() => _onScroll(kwal));
-          controllers[kwal] = scroll;
+          s.questions = enriched;
+          s.visibleCount = enriched.length.clamp(0, _kPageSize);
+          s.loaded = true;
+          s.isLoading = false;
+          final sc = ScrollController()..addListener(() => _onScroll(kwal));
+          s.controller = sc;
         });
       }
     } catch (e) {
       debugPrint('Error loading $kwal: $e');
-    } finally {
-      setState(() => isLoadingQual[kwal] = false);
+      if (mounted) setState(() => s.isLoading = false);
     }
   }
 
   void _onScroll(String kwal) {
-    final controller = controllers[kwal];
-    if (controller == null || isLoadingMore[kwal] == true) return;
+    final s = _qualState[kwal];
+    final sc = s?.controller;
+    if (s == null || sc == null || s.isLoadingMore) return;
+    if (sc.position.pixels < sc.position.maxScrollExtent - 200) return;
+    if (s.visibleCount >= s.questions.length) return;
 
-    if (controller.position.pixels >=
-        controller.position.maxScrollExtent - 200) {
-      final currentCount = visibleCounts[kwal] ?? 30;
-      final total = loadedQuestions[kwal]?.length ?? 0;
-      if (currentCount >= total) return;
-
-      setState(() => isLoadingMore[kwal] = true);
-      {
-        if (!mounted) return;
-        setState(() {
-          visibleCounts[kwal] = (currentCount + 30).clamp(0, total);
-          isLoadingMore[kwal] = false;
-        });
-      }
-    }
+    setState(() => s.isLoadingMore = true);
+    Future.microtask(() {
+      if (!mounted) return;
+      setState(() {
+        s.visibleCount = (s.visibleCount + _kPageSize).clamp(
+          0,
+          s.questions.length,
+        );
+        s.isLoadingMore = false;
+      });
+    });
   }
 
-  Widget _buildDifficultyBadge(BuildContext context, dynamic stat) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final extras = theme.extension<ExtraColors>()!;
-    final trudnosc =
-        (stat['trudnosc'] is num)
-            ? (stat['trudnosc'] as num).toDouble()
-            : double.tryParse(stat['trudnosc'].toString()) ?? 0.0;
-    final color = trudnosc > 50 ? extras.incorrect : extras.correct;
-    final label = trudnosc > 50 ? 'TRUDNE' : 'ŁATWE';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '$label (${trudnosc.toStringAsFixed(1)}%)',
-        style: TextStyle(color: colorScheme.surface, fontSize: 12),
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  double _trud(dynamic stat) =>
+      stat['trudnosc'] is num
+          ? (stat['trudnosc'] as num).toDouble()
+          : double.tryParse(stat['trudnosc'].toString()) ?? 0.0;
+
+  ({int hard, int easy}) _agg(List<dynamic> stats) {
+    final hard = stats.where((s) => _trud(s) > _kHardThreshold).length;
+    return (hard: hard, easy: stats.length - hard);
+  }
+
+  // ── Qualification panel header ─────────────────────────────────────────────
+
+  Widget _buildQualHeader(
+    BuildContext context,
+    String kwal,
+    List<dynamic> stats,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final extra = Theme.of(context).extension<ExtraColors>()!;
+    final a = _agg(stats);
+    final total = stats.length;
+    final hardFrac = total > 0 ? a.hard / total : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  kwal,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _Chip(label: '${a.hard} trudnych', color: extra.incorrect),
+              const SizedBox(width: 6),
+              _Chip(label: '${a.easy} łatwych', color: extra.correct),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: hardFrac,
+              minHeight: 6,
+              backgroundColor: extra.correct.withValues(alpha: 0.28),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                extra.incorrect.withValues(alpha: 0.72),
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '$total pytań łącznie',
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildQuestionCard(dynamic q) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final extras = theme.extension<ExtraColors>()!;
-    final questionId = q['pytanie_id'] ?? '-';
-    final qualification = q['kwalifikacja'] ?? '-';
-    final totalAnswers = int.tryParse(q['ilosc_odpowiedzi'].toString()) ?? 0;
-    final correctAnswers =
+  // ── Question card ─────────────────────────────────────────────────────────
+
+  Widget _buildCard(BuildContext context, dynamic q) {
+    final cs = Theme.of(context).colorScheme;
+    final extra = Theme.of(context).extension<ExtraColors>()!;
+
+    final id = q['pytanie_id'] ?? '-';
+    final total = int.tryParse(q['ilosc_odpowiedzi'].toString()) ?? 0;
+    final correct =
         int.tryParse(q['ilosc_poprawnych_odpowiedzi'].toString()) ?? 0;
-    final successRate =
-        totalAnswers > 0
-            ? ((correctAnswers / totalAnswers) * 100).toStringAsFixed(1)
-            : '0.0';
-    final pytanie = q['pytanie'] ?? '';
-    final odp1 = q['odp1'] ?? '';
-    final odp2 = q['odp2'] ?? '';
-    final odp3 = q['odp3'] ?? '';
-    final odp4 = q['odp4'] ?? '';
+    final rate = total > 0 ? correct / total : 0.0;
+    final ratePct = (rate * 100).toStringAsFixed(1);
+
+    final pytanie = q['pytanie']?.toString() ?? '';
+    // Strip leading letter prefix (e.g. "A. ") — the circle badge shows it.
+    final answers = {
+      'A': _stripAnswerPrefix(q['odp1']?.toString() ?? ''),
+      'B': _stripAnswerPrefix(q['odp2']?.toString() ?? ''),
+      'C': _stripAnswerPrefix(q['odp3']?.toString() ?? ''),
+      'D': _stripAnswerPrefix(q['odp4']?.toString() ?? ''),
+    };
     final poprawna = q['poprawna']?.toString() ?? '';
-    final List<String> images = List<String>.from(q['images'] ?? []);
-    final List<String> videos = List<String>.from(q['videos'] ?? []);
+    final images = List<String>.from(q['images'] ?? []);
+    final videos = List<String>.from(q['videos'] ?? []);
 
-    Widget buildVideoPlayer(String url) {
-      final controller = VideoPlayerController.networkUrl(url as Uri);
-      controller.initialize();
-      controller.setLooping(false);
-      controller.play();
-
-      return AspectRatio(
-        aspectRatio:
-            controller.value.aspectRatio > 0
-                ? controller.value.aspectRatio
-                : 16 / 9,
-        child: VideoPlayer(controller),
-      );
-    }
+    final trud = _trud(q);
+    final isHard = trud > _kHardThreshold;
+    final accent = isHard ? extra.incorrect : extra.correct;
 
     return RepaintBoundary(
-      child: Card(
-        margin: const EdgeInsets.symmetric(vertical: 2),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(_kCardRadius),
+          //border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.6),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: _kAccentWidth,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(_kCardRadius),
+                  bottomLeft: Radius.circular(_kCardRadius),
+                ),
+                child: ColoredBox(color: accent),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                _kAccentWidth + 14,
+                12,
+                14,
+                14,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '#$id',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                            color: cs.primary,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      _DiffBadge(trud: trud, isHard: isHard, color: accent),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
                   Text(
-                    'Pytanie #$questionId',
+                    pytanie,
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: colorScheme.primary,
+                      fontSize: 14,
+                      height: 1.5,
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  _buildDifficultyBadge(context, q),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                pytanie,
-                style: TextStyle(fontSize: 16, color: colorScheme.onPrimary),
-              ),
-              if (images.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Column(
-                  children:
-                      images
-                          .map(
-                            (url) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: buildZoomableImage(context, url),
-                            ),
-                          )
-                          .toList(),
-                ),
-              ],
-              if (videos.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Column(
-                  children:
-                      videos
-                          .map(
-                            (url) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: buildVideoPlayer(url),
-                            ),
-                          )
-                          .toList(),
-                ),
-              ],
-              const SizedBox(height: 8),
-              ...['A', 'B', 'C', 'D'].map((litera) {
-                final odp =
-                    {'A': odp1, 'B': odp2, 'C': odp3, 'D': odp4}[litera] ?? '';
-                final isCorrect = litera == poprawna;
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 6),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isCorrect ? extras.correct : null,
-                      alignment: Alignment.centerLeft,
-                    ),
-                    onPressed: () {},
-                    child: Text(
-                      odp,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color:
-                            isCorrect
-                                ? colorScheme.surface
-                                : colorScheme.onSurface,
+
+                  if (images.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    ...images.map(
+                      (url) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: buildZoomableImage(context, url),
+                        ),
                       ),
                     ),
+                  ],
+
+                  if (videos.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    ...videos.map(
+                      (url) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _VideoPlayerWidget(url: url),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
+
+                  ...answers.entries.map(
+                    (e) => _AnswerTile(
+                      letter: e.key,
+                      text: e.value,
+                      isCorrect: e.key == poprawna,
+                      correctColor: extra.correct,
+                      cs: cs,
+                    ),
                   ),
-                );
-              }),
-              const SizedBox(height: 4),
-              Text(
-                '✅ Poprawna: $poprawna',
-                style: TextStyle(
-                  color: extras.correct,
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
+
+                  const SizedBox(height: 12),
+                  Divider(
+                    height: 1,
+                    color: cs.outlineVariant.withValues(alpha: 0.35),
+                  ),
+                  const SizedBox(height: 10),
+
+                  _RateBar(
+                    rate: rate,
+                    total: total,
+                    correct: correct,
+                    pct: ratePct,
+                    cs: cs,
+                    extra: extra,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Shimmer card ──────────────────────────────────────────────────────────
+
+  Widget _buildShimmer(BuildContext context) {
+    final extra = Theme.of(context).extension<ExtraColors>()!;
+    final cs = Theme.of(context).colorScheme;
+
+    return RepaintBoundary(
+      child: Shimmer.fromColors(
+        baseColor: extra.shimmerBase,
+        highlightColor: extra.shimmerHighlight,
+        period: const Duration(milliseconds: 900),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(_kCardRadius),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: _kAccentWidth,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(_kCardRadius),
+                    bottomLeft: Radius.circular(_kCardRadius),
+                  ),
+                  child: ColoredBox(color: extra.shimmerHighlight),
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Kwalifikacja: $qualification',
-                style: TextStyle(color: colorScheme.onSurface, fontSize: 13),
-              ),
-              Text(
-                'Odpowiedzi: $totalAnswers, Poprawne: $correctAnswers ($successRate%)',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  _kAccentWidth + 14,
+                  12,
+                  14,
+                  14,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        ShimBox(w: 48, h: 20, cs: cs, radius: 6),
+                        const Spacer(),
+                        ShimBox(w: 90, h: 20, cs: cs, radius: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ShimBox(w: double.infinity, h: 14, cs: cs),
+                    const SizedBox(height: 6),
+                    ShimBox(w: double.infinity, h: 14, cs: cs),
+                    const SizedBox(height: 6),
+                    ShimBox(w: 160, h: 14, cs: cs),
+                    const SizedBox(height: 14),
+                    for (int i = 0; i < 4; i++) ...[
+                      ShimBox(w: double.infinity, h: 36, cs: cs, radius: 8),
+                      const SizedBox(height: 5),
+                    ],
+                    const SizedBox(height: 8),
+                    ShimBox(w: double.infinity, h: 7, cs: cs, radius: 4),
+                  ],
                 ),
               ),
             ],
@@ -346,100 +547,504 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
     );
   }
 
-  Widget _buildAnimatedShimmer() {
-    final extras = Theme.of(context).extension<ExtraColors>()!;
-    return RepaintBoundary(
-      child: Shimmer.fromColors(
-        baseColor: extras.shimmerBase,
-        highlightColor: extras.shimmerHighlight,
-        period: const Duration(milliseconds: 1000),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          height: 110,
-          decoration: BoxDecoration(
-            color: extras.shimmerBase,
-            borderRadius: BorderRadius.circular(8),
+  // ── Qualification content ─────────────────────────────────────────────────
+
+  Widget _buildQualContent(BuildContext context, String kwal) {
+    final s = _qualState[kwal];
+    final cs = Theme.of(context).colorScheme;
+
+    if (s == null || s.isLoading) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        child: Center(
+          child: CircularProgressIndicator(color: cs.primary, strokeWidth: 2),
+        ),
+      );
+    }
+    if (s.loaded && s.questions.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Center(
+          child: Text(
+            'Brak pytań dla tej kwalifikacji.',
+            style: TextStyle(color: cs.onSurfaceVariant),
           ),
+        ),
+      );
+    }
+    if (!s.loaded) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'Kliknij, by załadować pytania...',
+          style: TextStyle(color: cs.onSurfaceVariant),
+        ),
+      );
+    }
+
+    final visible = s.visibleCount;
+    final shimmers = s.isLoadingMore ? 3 : 0;
+    final total = visible + shimmers;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= _kGridBreakpoint;
+        final listH = (MediaQuery.of(context).size.height * 0.72).clamp(
+          300.0,
+          720.0,
+        );
+
+        if (isWide) {
+          final rowCount = (total / 2).ceil();
+          return SizedBox(
+            height: listH,
+            child: ListView.builder(
+              controller: s.controller,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+              addRepaintBoundaries: true,
+              itemCount: rowCount,
+              itemBuilder: (ctx, row) {
+                final l = row * 2;
+                final r = l + 1;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child:
+                          l < visible
+                              ? _buildCard(ctx, s.questions[l])
+                              : l < total
+                              ? _buildShimmer(ctx)
+                              : const SizedBox(),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child:
+                          r < visible
+                              ? _buildCard(ctx, s.questions[r])
+                              : r < total
+                              ? _buildShimmer(ctx)
+                              : const SizedBox(),
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
+        }
+
+        return SizedBox(
+          height: listH,
+          child: ListView.builder(
+            controller: s.controller,
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+            addAutomaticKeepAlives: false,
+            addRepaintBoundaries: true,
+            itemCount: total,
+            itemBuilder:
+                (ctx, i) =>
+                    i < visible
+                        ? _buildCard(ctx, s.questions[i])
+                        : _buildShimmer(ctx),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── AppBar summary chip ───────────────────────────────────────────────────
+
+  Widget _buildSummaryChip(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final total = _stats.length;
+    final hard = _stats.where((s) => _trud(s) > _kHardThreshold).length;
+
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: cs.onPrimary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: cs.onPrimary.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.analytics_outlined, size: 15, color: cs.onPrimary),
+          const SizedBox(width: 5),
+          Text(
+            '$total pytań',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onPrimary,
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            width: 1,
+            height: 12,
+            color: cs.onPrimary.withValues(alpha: 0.4),
+          ),
+          Icon(Icons.trending_up_rounded, size: 18, color: cs.onPrimary),
+          const SizedBox(width: 3),
+          Text(
+            '$hard trudnych',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Error state ───────────────────────────────────────────────────────────
+
+  Widget _buildError(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 36,
+                color: cs.onErrorContainer,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: cs.onSurface),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _fetchStats,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Spróbuj ponownie'),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  // ── build() ───────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final grouped = groupByQualification();
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('📉 Statystyki Trudności Pytań'),
+        elevation: 2,
+        title: Text(
+          'Statystyki Trudności Pytań',
+        ),
+        iconTheme: IconThemeData(color: cs.onPrimary),
+        actionsIconTheme: IconThemeData(color: cs.onPrimary),
         actions: [
+          if (!isLoading && errorMessage == null && _stats.isNotEmpty)
+            _buildSummaryChip(context),
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: fetchQuestionStats,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Odśwież',
+            onPressed: isLoading ? null : _fetchStats,
           ),
         ],
       ),
       body:
           isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(child: CircularProgressIndicator(color: cs.primary))
               : errorMessage != null
-              ? Center(child: Text(errorMessage!))
+              ? _buildError(context)
               : RefreshIndicator(
-                onRefresh: fetchQuestionStats,
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: grouped.length,
-                  itemBuilder: (context, index) {
-                    final entry = grouped.entries.elementAt(index);
-                    final kwal = entry.key;
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ExpansionTile(
-                        title: Text(
-                          '$kwal (${entry.value.length} pytań)',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        onExpansionChanged: (expanded) {
-                          if (expanded) loadQualification(kwal);
-                        },
-                        children: [
-                          if (isLoadingQual[kwal] == true)
-                            const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Center(child: CircularProgressIndicator()),
-                            )
-                          else if (loadedQuestions[kwal] == null)
-                            const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Text('Kliknij, by załadować pytania...'),
-                            )
-                          else
-                            SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.8,
-                              child: ListView.builder(
-                                controller: controllers[kwal],
-                                addAutomaticKeepAlives: false,
-                                addRepaintBoundaries: true,
-                                itemCount:
-                                    (visibleCounts[kwal] ?? 0) +
-                                    ((isLoadingMore[kwal] ?? false) ? 3 : 0),
-                                itemBuilder: (context, i) {
-                                  final questions = loadedQuestions[kwal]!;
-                                  if (i < (visibleCounts[kwal] ?? 0)) {
-                                    return _buildQuestionCard(questions[i]);
-                                  } else {
-                                    return _buildAnimatedShimmer();
-                                  }
-                                },
+                color: cs.primary,
+                onRefresh: _fetchStats,
+                child:
+                    _grouped.isEmpty
+                        ? const Center(child: Text('Brak danych.'))
+                        : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                          itemCount: _grouped.length,
+                          itemBuilder: (context, index) {
+                            final entry = _grouped.entries.elementAt(index);
+                            final kwal = entry.key;
+                            final stats = entry.value;
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: cs.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: cs.shadow.withValues(alpha: 0.6),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Theme(
+                                  data: Theme.of(
+                                    context,
+                                  ).copyWith(dividerColor: Colors.transparent),
+                                  child: ExpansionTile(
+                                    tilePadding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      8,
+                                      16,
+                                      4,
+                                    ),
+                                    childrenPadding: EdgeInsets.zero,
+                                    expandedCrossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    iconColor: cs.primary,
+                                    collapsedIconColor: cs.primary,
+                                    title: _buildQualHeader(
+                                      context,
+                                      kwal,
+                                      stats,
+                                    ),
+                                    onExpansionChanged: (expanded) {
+                                      if (expanded) _loadQualification(kwal);
+                                    },
+                                    children: [
+                                      Divider(
+                                        height: 1,
+                                        color: cs.primary.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                      ),
+                                      _buildQualContent(context, kwal),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
               ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withValues(alpha: 0.45)),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+    ),
+  );
+}
+
+class _DiffBadge extends StatelessWidget {
+  const _DiffBadge({
+    required this.trud,
+    required this.isHard,
+    required this.color,
+  });
+  final double trud;
+  final bool isHard;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withValues(alpha: 0.5)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          isHard ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+          size: 12,
+          color: color,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '${isHard ? "TRUDNE" : "ŁATWE"} ${trud.toStringAsFixed(0)}%',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+            color: color,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _AnswerTile extends StatelessWidget {
+  const _AnswerTile({
+    required this.letter,
+    required this.text,
+    required this.isCorrect,
+    required this.correctColor,
+    required this.cs,
+  });
+  final String letter;
+  final String text;
+  final bool isCorrect;
+  final Color correctColor;
+  final ColorScheme cs;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 5),
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+    decoration: BoxDecoration(
+      color:
+          isCorrect
+              ? correctColor.withValues(alpha: 0.10)
+              : cs.surfaceContainerHighest.withValues(alpha: 0.42),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color:
+            isCorrect
+                ? correctColor.withValues(alpha: 0.50)
+                : cs.outlineVariant.withValues(alpha: 0.28),
+        width: isCorrect ? 1.5 : 1.0,
+      ),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color:
+                isCorrect
+                    ? correctColor
+                    : cs.outlineVariant.withValues(alpha: 0.35),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            letter,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: isCorrect ? cs.surface : cs.onPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.45,
+              color: isCorrect ? cs.onSurface : cs.onSurfaceVariant,
+              fontWeight: isCorrect ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+        if (isCorrect)
+          Padding(
+            padding: const EdgeInsets.only(left: 6, top: 2),
+            child: Icon(
+              Icons.check_circle_rounded,
+              size: 15,
+              color: correctColor,
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _RateBar extends StatelessWidget {
+  const _RateBar({
+    required this.rate,
+    required this.total,
+    required this.correct,
+    required this.pct,
+    required this.cs,
+    required this.extra,
+  });
+  final double rate;
+  final int total;
+  final int correct;
+  final String pct;
+  final ColorScheme cs;
+  final ExtraColors extra;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Text(
+            'Poprawność odpowiedzi',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '$correct / $total  ($pct%)',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 5),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: LinearProgressIndicator(
+          value: rate,
+          minHeight: 7,
+          backgroundColor: extra.incorrect.withValues(alpha: 0.17),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            extra.correct.withValues(alpha: 0.75),
+          ),
+        ),
+      ),
+    ],
+  );
 }

@@ -1,24 +1,6 @@
-import 'package:chewie/chewie.dart' show ChewieController, Chewie;
-import 'package:flutter/material.dart'
-    show
-        StatefulWidget,
-        State,
-        AutomaticKeepAliveClientMixin,
-        BuildContext,
-        Widget,
-        SizedBox,
-        EdgeInsets,
-        Theme,
-        TextStyle,
-        Text,
-        CircularProgressIndicator,
-        Center,
-        BoxFit,
-        FittedBox,
-        AspectRatio,
-        Padding,
-        RepaintBoundary;
-import 'package:video_player/video_player.dart' show VideoPlayerController;
+import 'package:chewie/chewie.dart';
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 class InlineVideoPlayer extends StatefulWidget {
   const InlineVideoPlayer({super.key, required this.url, this.height});

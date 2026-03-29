@@ -11,9 +11,22 @@ import 'utils/app_themes.dart';
 import 'widgets/exam_timer.dart';
 import 'widgets/video_player.dart';
 import 'widgets/zoomable_image.dart';
+import 'widgets/shim_box.dart';
 
 const double _minImageHeight = 100;
 const double _maxImageHeight = 500;
+
+// ──────────────
+// Design tokens
+// ──────────────
+
+const double _kCardRadius = 12.0;
+const double _kAccentWidth = 4.0;
+const double _kHardTreshold = 50.0;
+
+String _stripAnswerPrefix(String text) {
+  return text.replaceFirst(RegExp(r'^\s*[A-Da-d][.)]\s*'), '').trimLeft();
+}
 
 enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie, zTestu }
 
@@ -86,13 +99,13 @@ class _EgzaminViewState extends State<EgzaminView> {
       final b = (e['odp2_text']?.toString() ?? '').toLowerCase();
       final c = (e['odp3_text']?.toString() ?? '').toLowerCase();
       final d = (e['odp4_text']?.toString() ?? '').toLowerCase();
-      final idStr = (e['id']?.toString() ?? '').toLowerCase();
+      final id = (e['id']?.toString() ?? '').toLowerCase();
       return txt.contains(q) ||
           a.contains(q) ||
           b.contains(q) ||
           c.contains(q) ||
           d.contains(q) ||
-          idStr.contains(q);
+          id.contains(q);
     }).toList();
   }
 
@@ -132,7 +145,6 @@ class _EgzaminViewState extends State<EgzaminView> {
   void _onScroll() {
     if (_scrollDebounce?.isActive ?? false) return;
     if (_visibleCount >= _totalQuestions) return;
-
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 300) {
       _scrollDebounce = Timer(const Duration(milliseconds: 200), () {
@@ -149,15 +161,10 @@ class _EgzaminViewState extends State<EgzaminView> {
     final testData = args?['testData'] as Map<String, dynamic>?;
 
     if (testData != null) {
-      // ==========================
-      // TEST NAUCZYCIELA – pobierz pytania z published_tests
-      // ==========================
       try {
         final result = await ApiService.instance.fetchPublishedTests();
         if (result.isSuccess && result.data != null) {
           final List<dynamic> allPublished = result.data ?? [];
-
-          // Znajdź test o dokładnie tych parametrach
           final matching = allPublished.firstWhere(
             (t) =>
                 t['name'] == testData['name'] &&
@@ -165,19 +172,16 @@ class _EgzaminViewState extends State<EgzaminView> {
                 t['qualification'] == testData['qualification'],
             orElse: () => null,
           );
-
           if (matching != null) {
-            final List<dynamic> fetchedQuestions = List.from(
+            final List<dynamic> fetched = List.from(
               matching['test_json'] ?? [],
             );
-
-            for (var q in fetchedQuestions) {
+            for (var q in fetched) {
               q['pytanie_text'] = _clean(q['pytanie']);
               q['pytanie_images'] =
                   (q['images'] as List?)?.cast<String>() ?? [];
               q['pytanie_videos'] =
                   (q['videos'] as List?)?.cast<String>() ?? [];
-
               for (int i = 1; i <= 4; i++) {
                 final key = 'odp$i';
                 q['${key}_text'] = _clean(q[key]);
@@ -187,17 +191,15 @@ class _EgzaminViewState extends State<EgzaminView> {
                     (q['${key}_videos'] as List?)?.cast<String>() ?? [];
               }
             }
-
-            for (int i = 0; i < fetchedQuestions.length; i++) {
-              fetchedQuestions[i]['_originalIndex'] = i;
+            for (int i = 0; i < fetched.length; i++) {
+              fetched[i]['_originalIndex'] = i;
             }
-
             if (mounted) {
               setState(() {
-                questions = fetchedQuestions;
-                selectedAnswers = List.filled(fetchedQuestions.length, null);
+                questions = fetched;
+                selectedAnswers = List.filled(fetched.length, null);
                 isLoading = false;
-                _visibleCount = 30.clamp(0, fetchedQuestions.length);
+                _visibleCount = 30.clamp(0, fetched.length);
               });
             }
             if (widget.tryb == TrybEgzaminu.czterdziesciPytan) {
@@ -211,30 +213,25 @@ class _EgzaminViewState extends State<EgzaminView> {
         }
       } catch (e) {
         if (kDebugMode) {
-          debugPrint("Pobranie pytań nauczyciela nie powiodło się: $e");
+          debugPrint('Pobranie pytań nauczyciela nie powiodło się: $e');
         }
       }
     } else {
-      // ==========================
-      // Normalny egzamin – losuj pytania
-      // ==========================
       final kwalifikacja = widget.kwalifikacja.replaceAll(' ', '');
       try {
         final result = await ApiService.instance.fetchQuestions(kwalifikacja);
         if (result.isSuccess && result.data != null) {
-          final List<dynamic> allQuestions = result.data!;
+          final List<dynamic> all = result.data!;
           List<dynamic> selected = [];
-
           switch (widget.tryb) {
             case TrybEgzaminu.jednoPytanie:
-              selected = List.from(allQuestions)..shuffle();
+              selected = List.from(all)..shuffle();
               break;
             case TrybEgzaminu.czterdziesciPytan:
-              selected = List.from(allQuestions)..shuffle();
-              selected = selected.take(40).toList();
+              selected = (List.from(all)..shuffle()).take(40).toList();
               break;
             case TrybEgzaminu.wszystkie:
-              selected = allQuestions;
+              selected = all;
               break;
             case TrybEgzaminu.zTestu:
               if (widget.testData == null) {
@@ -243,12 +240,10 @@ class _EgzaminViewState extends State<EgzaminView> {
               selected = List.from(widget.testData!['questions'] ?? []);
               break;
           }
-
           for (var q in selected) {
             q['pytanie_text'] = _clean(q['pytanie']);
             q['pytanie_images'] = (q['images'] as List?)?.cast<String>() ?? [];
             q['pytanie_videos'] = (q['videos'] as List?)?.cast<String>() ?? [];
-
             for (int i = 1; i <= 4; i++) {
               final key = 'odp$i';
               q['${key}_text'] = _clean(q[key]);
@@ -258,11 +253,9 @@ class _EgzaminViewState extends State<EgzaminView> {
                   (q['${key}_videos'] as List?)?.cast<String>() ?? [];
             }
           }
-
           for (int i = 0; i < selected.length; i++) {
             selected[i]['_originalIndex'] = i;
           }
-
           if (mounted) {
             setState(() {
               questions = selected;
@@ -278,7 +271,7 @@ class _EgzaminViewState extends State<EgzaminView> {
           }
         }
       } catch (e) {
-        if (kDebugMode) debugPrint("Pobranie pytań nie powiodło się: $e");
+        if (kDebugMode) debugPrint('Pobranie pytań nie powiodło się: $e');
       }
     }
   }
@@ -299,30 +292,46 @@ class _EgzaminViewState extends State<EgzaminView> {
     }
   }
 
-  Widget _buildDifficultyBadge(
-    BuildContext context,
-    double? trudnosc,
-    int? ilosc,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildDifficultyBadge(BuildContext context, dynamic q) {
     final extras = Theme.of(context).extension<ExtraColors>()!;
-    if (trudnosc == null || ilosc == null || ilosc < 5) {
-      return const SizedBox.shrink();
-    }
-    final isHard = trudnosc > 50;
+
+    final ilosc = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
+    final trudnosc =
+        q['trudnosc'] is num
+            ? (q['trudnosc'] as num).toDouble()
+            : double.tryParse(q['trudnosc']?.toString() ?? '') ?? 0.0;
+
+    if (ilosc < 5) return const SizedBox.shrink();
+
+    final isHard = trudnosc > _kHardTreshold;
+    final color = isHard ? extras.incorrect : extras.correct;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isHard ? extras.incorrect : extras.correct,
-        borderRadius: BorderRadius.circular(8),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        '${isHard ? 'TRUDNE' : 'ŁATWE'} (${trudnosc.toStringAsFixed(1)}%)',
-        style: TextStyle(
-          color: colorScheme.surface,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isHard ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${isHard ? "TRUDNE" : "ŁATWE"} ${trudnosc.toStringAsFixed(0)}%',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -338,78 +347,154 @@ class _EgzaminViewState extends State<EgzaminView> {
     required bool showResult,
     required VoidCallback onTap,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final extras = Theme.of(context).extension<ExtraColors>()!;
-    Color? disabledBg;
+
+    final Color borderColor;
+    final Color bgColor;
+    final Color circleColor;
+    final Color textColor;
+    Widget? trailingIcon;
 
     if (showResult) {
       if (isCorrect) {
-        disabledBg = extras.correct;
-      } else if (isSelected && !isCorrect) {
-        disabledBg = extras.incorrect;
+        borderColor = extras.correct.withValues(alpha: 0.6);
+        bgColor = extras.correct.withValues(alpha: 0.12);
+        circleColor = extras.correct;
+        textColor = cs.onSurface;
+        trailingIcon = Icon(
+          Icons.check_circle_rounded,
+          size: 16,
+          color: extras.correct,
+        );
+      } else if (isSelected) {
+        borderColor = extras.incorrect.withValues(alpha: 0.6);
+        bgColor = extras.incorrect.withValues(alpha: 0.10);
+        circleColor = extras.incorrect;
+        textColor = cs.onSurface;
+        trailingIcon = Icon(
+          Icons.cancel_rounded,
+          size: 16,
+          color: extras.incorrect,
+        );
       } else {
-        disabledBg = colorScheme.surface;
+        borderColor = cs.outlineVariant.withValues(alpha: 0.28);
+        bgColor = cs.surfaceContainerHighest.withValues(alpha: 0.35);
+        circleColor = cs.outlineVariant.withValues(alpha: 0.3);
+        textColor = cs.onSurfaceVariant;
       }
+    } else if (isSelected) {
+      borderColor = cs.primary.withValues(alpha: 0.6);
+      bgColor = cs.primary.withValues(alpha: 0.10);
+      circleColor = cs.primary;
+      textColor = cs.onSurface;
+    } else {
+      borderColor = cs.outlineVariant.withValues(alpha: 0.28);
+      bgColor = cs.surfaceContainerHighest.withValues(alpha: 0.42);
+      circleColor = cs.outlineVariant.withValues(alpha: 0.3);
+      textColor = cs.onSurfaceVariant;
     }
 
-    final bool isResultOption =
-        showResult && (isCorrect || (!isCorrect && isSelected));
-    final Color textColor =
-        isResultOption ? colorScheme.onPrimary : colorScheme.onSurface;
-
-    final Color? bgColor =
-        !showResult && isSelected
-            ? colorScheme.primary.withValues(alpha: 0.8)
-            : null;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 6),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bgColor,
-          disabledBackgroundColor: disabledBg,
-          foregroundColor: colorScheme.onSurface,
-          disabledForegroundColor: textColor,
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    return GestureDetector(
+      onTap: showResult ? null : onTap,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: borderColor,
+            width: (isSelected || (showResult && isCorrect)) ? 1.5 : 1.0,
+          ),
         ),
-        onPressed: showResult ? null : onTap,
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(text, style: const TextStyle(fontSize: 15)),
-            ...images.map(
-              (url) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minHeight: _minImageHeight,
-                      maxHeight: _maxImageHeight,
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: circleColor,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                litera,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? cs.surface : cs.onPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.4,
+                      color: textColor,
+                      fontWeight:
+                          isSelected || (showResult && isCorrect)
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                     ),
-                    child: buildZoomableImage(context, url),
                   ),
-                ),
+                  ...images.map(
+                    (url) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minHeight: _minImageHeight,
+                            maxHeight: _maxImageHeight,
+                          ),
+                          child: buildZoomableImage(context, url),
+                        ),
+                      ),
+                    ),
+                  ),
+                  ...videos.map(
+                    (url) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: SizedBox(
+                        height: 400,
+                        child: InlineVideoPlayer(url: url, height: 400),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-
-            ...videos.map(
-              (url) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Center(
-                  child: SizedBox(
-                    height: 400,
-                    child: InlineVideoPlayer(url: url, height: 400),
-                  ),
-                ),
+            if (trailingIcon != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 8, top: 3),
+                child: trailingIcon,
               ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  String _questionLabel(int index, dynamic q) {
+    final id = q['id'] != null ? ' (ID ${q['id']})' : '';
+    switch (widget.tryb) {
+      case TrybEgzaminu.jednoPytanie:
+        return 'Pytanie';
+      case TrybEgzaminu.wszystkie:
+        return 'Pytanie ${index + 1}$id';
+      case TrybEgzaminu.czterdziesciPytan:
+        return 'Pytanie ${index + 1}';
+      case TrybEgzaminu.zTestu:
+        return 'Pytanie ${index + 1}$id';
+    }
   }
 
   Widget _buildQuestionCard(
@@ -418,170 +503,284 @@ class _EgzaminViewState extends State<EgzaminView> {
     required int index,
     required bool showResult,
   }) {
-    final pytanieText = q['pytanie_text'] ?? '';
+    final cs = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
+
+    final pytanieText = q['pytanie_text'] as String? ?? '';
     final pytanieImages = List<String>.from(q['pytanie_images'] ?? []);
     final pytanieVideos = List<String>.from(q['pytanie_videos'] ?? []);
     final poprawna = q['poprawna']?.toString() ?? '';
     final selected = selectedAnswers[index];
 
-    final colorScheme = Theme.of(context).colorScheme;
-    final extras = Theme.of(context).extension<ExtraColors>()!;
+    final Color accent;
+    if (!showResult || selected == null) {
+      accent = cs.primary;
+    } else {
+      accent = selected == poprawna ? extras.correct : extras.incorrect;
+    }
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(_kCardRadius),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.6),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: _kAccentWidth,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(_kCardRadius),
+                bottomLeft: Radius.circular(_kCardRadius),
+              ),
+              child: ColoredBox(color: accent),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(_kAccentWidth + 12, 12, 12, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (widget.tryb == TrybEgzaminu.wszystkie)
-                  Text(
-                    'Pytanie ${index + 1}${q['id'] != null ? ' (ID ${q['id']})' : ''}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: colorScheme.primary,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _questionLabel(index, q),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
+                          color: cs.primary,
+                        ),
+                      ),
                     ),
-                  ),
-                if (widget.tryb == TrybEgzaminu.czterdziesciPytan)
-                  Text(
-                    'Pytanie ${index + 1}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                if (widget.tryb == TrybEgzaminu.jednoPytanie)
-                  Text(
-                    'Pytanie',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                if (widget.tryb == TrybEgzaminu.zTestu)
-                  Text(
-                    'Pytanie ${index + 1}${q['id'] != null ? ' (ID: ${q['id']})' : ''}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                _buildDifficultyBadge(
-                  context,
-                  q['trudnosc']?.toDouble(),
-                  int.tryParse(q['ilosc_odpowiedzi'].toString()),
+                    const Spacer(),
+                    _buildDifficultyBadge(context, q),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(pytanieText, style: const TextStyle(fontSize: 16)),
-            ...pytanieImages.map(
-              (url) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minHeight: _minImageHeight,
-                      maxHeight: _maxImageHeight,
-                    ),
-                    child: buildZoomableImage(context, url),
+
+                const SizedBox(height: 10),
+
+                Text(
+                  pytanieText,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
-            ),
 
-            ...pytanieVideos.map(
-              (url) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Center(
-                  child: SizedBox(
-                    height: 400,
-                    child: InlineVideoPlayer(url: url, height: 400),
+                ...pytanieImages.map(
+                  (url) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minHeight: _minImageHeight,
+                          maxHeight: _maxImageHeight,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: buildZoomableImage(context, url),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            const SizedBox(height: 12),
-            ...['A', 'B', 'C', 'D'].map((litera) {
-              final key = 'odp${'ABCD'.indexOf(litera) + 1}';
-              final text = q['${key}_text'] ?? '';
-              final images = List<String>.from(q['${key}_images'] ?? []);
-              final videos = List<String>.from(q['${key}_videos'] ?? []);
-              final isCorrect = litera == poprawna;
-              final isSelected = selected == litera;
+                ...pytanieVideos.map(
+                  (url) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: SizedBox(
+                      height: 400,
+                      child: InlineVideoPlayer(url: url, height: 400),
+                    ),
+                  ),
+                ),
 
-              return _buildAnswerButton(
-                context,
-                litera,
-                text,
-                images,
-                videos,
-                isSelected: isSelected,
-                isCorrect: isCorrect,
-                showResult: showResult,
-                onTap: () {
-                  setState(() {
-                    selectedAnswers[index] = litera;
-                    if (widget.tryb == TrybEgzaminu.jednoPytanie) {
-                      odpowiedzZatwierdzona = true;
-                      final id = int.tryParse(q['id']?.toString() ?? '') ?? 0;
-                      zapiszTrudnoscDoBazy(
-                        id,
-                        widget.kwalifikacja,
-                        litera == poprawna,
-                      );
-                    }
-                  });
-                },
-              );
-            }),
-            if (showResult && selected != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child:
-                    selected == poprawna
-                        ? Text(
-                          'Wybrano poprawną odpowiedź: $selected.',
-                          style: TextStyle(
-                            color: extras.correct,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        )
-                        : Text(
-                          'Wybrano niepoprawną odpowiedź: $selected.\nPoprawna odpowiedź: $poprawna.',
-                          style: TextStyle(
-                            color: extras.incorrect,
-                            fontStyle: FontStyle.italic,
+                const SizedBox(height: 12),
+
+                ...['A', 'B', 'C', 'D'].map((litera) {
+                  final key = 'odp${'ABCD'.indexOf(litera) + 1}';
+                  final text = _stripAnswerPrefix(
+                    q['${key}_text'] as String? ?? '',
+                  );
+                  final images = List<String>.from(q['${key}_images'] ?? []);
+                  final videos = List<String>.from(q['${key}_videos'] ?? []);
+                  final isCorrect = litera == poprawna;
+                  final isSelected = selected == litera;
+
+                  return _buildAnswerButton(
+                    context,
+                    litera,
+                    text,
+                    images,
+                    videos,
+                    isSelected: isSelected,
+                    isCorrect: isCorrect,
+                    showResult: showResult,
+                    onTap: () {
+                      setState(() {
+                        selectedAnswers[index] = litera;
+                        if (widget.tryb == TrybEgzaminu.jednoPytanie) {
+                          odpowiedzZatwierdzona = true;
+                          final id =
+                              int.tryParse(q['id']?.toString() ?? '') ?? 0;
+                          zapiszTrudnoscDoBazy(
+                            id,
+                            widget.kwalifikacja,
+                            litera == poprawna,
+                          );
+                        }
+                      });
+                    },
+                  );
+                }),
+
+                if (showResult && selected != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          selected == poprawna
+                              ? extras.correct.withValues(alpha: 0.10)
+                              : extras.incorrect.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color:
+                            selected == poprawna
+                                ? extras.correct.withValues(alpha: 0.4)
+                                : extras.incorrect.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected == poprawna
+                              ? Icons.check_circle_rounded
+                              : Icons.cancel_rounded,
+                          size: 16,
+                          color:
+                              selected == poprawna
+                                  ? extras.correct
+                                  : extras.incorrect,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            selected == poprawna
+                                ? 'Wybrano poprawną odpowiedź: $selected.'
+                                : 'Niepoprawna: $selected.  Poprawna: $poprawna.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontStyle: FontStyle.italic,
+                              color:
+                                  selected == poprawna
+                                      ? extras.correct
+                                      : extras.incorrect,
+                            ),
                           ),
                         ),
-              ),
-          ],
-        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildShimmer(BuildContext context) {
     final extras = Theme.of(context).extension<ExtraColors>()!;
+    final cs = Theme.of(context).colorScheme;
+
     return RepaintBoundary(
       child: Shimmer.fromColors(
         baseColor: extras.shimmerBase,
         highlightColor: extras.shimmerHighlight,
-        period: const Duration(milliseconds: 1000),
+        period: const Duration(milliseconds: 900),
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 6),
-          height: 180,
           decoration: BoxDecoration(
-            color: extras.shimmerHighlight,
-            borderRadius: BorderRadius.circular(8),
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(_kCardRadius),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: _kAccentWidth,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(_kCardRadius),
+                    bottomLeft: Radius.circular(_kCardRadius),
+                  ),
+                  child: ColoredBox(color: extras.shimmerHighlight),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  _kAccentWidth + 12,
+                  12,
+                  12,
+                  14,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        ShimBox(w: 100, h: 20, cs: cs, radius: 6),
+                        const Spacer(),
+                        ShimBox(w: 80, h: 20, cs: cs, radius: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ShimBox(w: double.infinity, h: 15, cs: cs),
+                    const SizedBox(height: 6),
+                    ShimBox(w: double.infinity, h: 15, cs: cs),
+                    const SizedBox(height: 6),
+                    ShimBox(w: 200, h: 15, cs: cs),
+                    const SizedBox(height: 14),
+                    for (int i = 0; i < 4; i++) ...[
+                      ShimBox(w: double.infinity, h: 44, cs: cs, radius: 8),
+                      const SizedBox(height: 6),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -590,17 +789,26 @@ class _EgzaminViewState extends State<EgzaminView> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
+
     if (isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Egzamin')),
-        body: const Center(child: CircularProgressIndicator()),
+        appBar: AppBar(
+          title: const Text('Egzamin'),
+          backgroundColor: cs.primary,
+          foregroundColor: cs.onPrimary,
+        ),
+        body: Center(child: CircularProgressIndicator(color: cs.primary)),
       );
     }
 
     if (questions.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Egzamin')),
+        appBar: AppBar(
+          title: const Text('Egzamin'),
+          backgroundColor: cs.primary,
+          foregroundColor: cs.onPrimary,
+        ),
         body: const Center(child: Text('Brak pytań.')),
       );
     }
@@ -641,10 +849,19 @@ class _EgzaminViewState extends State<EgzaminView> {
       },
       child: Scaffold(
         appBar: AppBar(
+          backgroundColor: cs.primary,
+          foregroundColor: cs.onPrimary,
+          iconTheme: IconThemeData(color: cs.onPrimary),
+          actionsIconTheme: IconThemeData(color: cs.onPrimary),
           title: Row(
             children: [
-              const Text("Egzamin"),
-
+              Text(
+                'Egzamin',
+                style: TextStyle(
+                  color: cs.onPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               Expanded(
                 child: Center(
                   child:
@@ -653,14 +870,11 @@ class _EgzaminViewState extends State<EgzaminView> {
                           : const SizedBox.shrink(),
                 ),
               ),
-
               const SizedBox(width: 48),
             ],
           ),
-
-          iconTheme: IconThemeData(color: colorScheme.onPrimary),
-          titleTextStyle: TextStyle(color: colorScheme.onPrimary, fontSize: 22),
         ),
+        backgroundColor: cs.surfaceContainerLowest,
         body:
             widget.tryb == TrybEgzaminu.jednoPytanie
                 ? _buildSingleQuestion(questions[current])
@@ -686,12 +900,12 @@ class _EgzaminViewState extends State<EgzaminView> {
         ),
         const SizedBox(height: 20),
         Center(
-          child: ElevatedButton.icon(
+          child: FilledButton.icon(
             onPressed: _losujNowePytanie,
-            icon: const Icon(Icons.refresh),
-            label: const Text("Losuj kolejne"),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            icon: const Icon(Icons.shuffle_rounded),
+            label: const Text('Losuj kolejne'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
             ),
           ),
         ),
@@ -733,7 +947,8 @@ class _EgzaminViewState extends State<EgzaminView> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Znalezione: ${_filteredQuestions.length} / ${questions.length}',
+                      'Znalezione: ${_filteredQuestions.length}'
+                      ' / ${questions.length}',
                     ),
                   ],
                 ),
@@ -746,10 +961,8 @@ class _EgzaminViewState extends State<EgzaminView> {
             delegate: SliverChildBuilderDelegate(
               (context, i) {
                 if (i >= items.length) return _buildShimmer(context);
-
                 final q = items[i];
                 final originalIndex = q['_originalIndex'] as int? ?? i;
-
                 return RepaintBoundary(
                   child: _buildQuestionCard(
                     context,
@@ -771,19 +984,19 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Widget _buildFinishButton(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: ElevatedButton(
+      child: FilledButton(
         onPressed: _isButtonDisabled ? null : _confirmFinishExam,
-        style: ElevatedButton.styleFrom(
+        style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          foregroundColor: colorScheme.onPrimary,
-          backgroundColor: colorScheme.primary,
+          backgroundColor: cs.primary,
+          foregroundColor: cs.onPrimary,
         ),
         child: Text(
-          _isButtonDisabled ? "Wysyłanie..." : "Zakończ egzamin",
-          style: const TextStyle(fontSize: 16),
+          _isButtonDisabled ? 'Wysyłanie...' : 'Zakończ egzamin',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -791,34 +1004,29 @@ class _EgzaminViewState extends State<EgzaminView> {
 
   Future<void> _confirmFinishExam() async {
     if (_isButtonDisabled) return;
-
     final shouldFinish = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Zakończyć egzamin?'),
-          content: const Text(
-            'Czy na pewno chcesz zakończyć egzamin?\n'
-            'Po zakończeniu nie będzie można zmienić odpowiedzi.',
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Zakończyć egzamin?'),
+            content: const Text(
+              'Czy na pewno chcesz zakończyć egzamin?\n'
+              'Po zakończeniu nie będzie można zmienić odpowiedzi.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Anuluj'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Zakończ'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Anuluj'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Zakończ'),
-            ),
-          ],
-        );
-      },
     );
-
-    if (shouldFinish == true) {
-      await _finishExam();
-    }
+    if (shouldFinish == true) await _finishExam();
   }
 
   Future<void> _finishExam() async {
@@ -826,39 +1034,30 @@ class _EgzaminViewState extends State<EgzaminView> {
 
     int correct = 0;
     for (int i = 0; i < questions.length; i++) {
-      if (selectedAnswers[i] == questions[i]['poprawna']) {
-        correct++;
-      }
+      if (selectedAnswers[i] == questions[i]['poprawna']) correct++;
     }
 
     final percent = (correct / questions.length) * 100;
     final endTime = DateTime.now();
     final duration = endTime.difference(startTime).inSeconds;
     final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString("userName") ?? "anonymous";
+    final userName = prefs.getString('userName') ?? 'anonymous';
 
-    // ==============================
-    // Część wspólna – pytania do payload
-    // ==============================
-    final List<Map<String, dynamic>> pytaniaDoBazy = [];
-    for (var q in questions) {
-      pytaniaDoBazy.add({
-        'id': q['id'],
-        'pytanie': q['pytanie'],
-        'poprawna': q['poprawna'],
-      });
-    }
-
-    // ==============================
-    // Sprawdzenie, czy to test nauczyciela
-    // ==============================
+    final List<Map<String, dynamic>> pytaniaDoBazy =
+        questions
+            .map(
+              (q) => {
+                'id': q['id'],
+                'pytanie': q['pytanie'],
+                'poprawna': q['poprawna'],
+              },
+            )
+            .toList();
 
     final testData = widget.testData;
-
     if (testData != null) {
       final testKey =
           '${testData['name']}||${testData['author']}||${testData['qualification']}';
-
       final payload = {
         'userName': userName,
         'test_key': testKey,
@@ -869,9 +1068,7 @@ class _EgzaminViewState extends State<EgzaminView> {
         'selectedAnswers': selectedAnswers,
         'questions': pytaniaDoBazy,
       };
-
       final result = await ApiService.instance.savePublishedTestResult(payload);
-
       if (!result.isSuccess && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -882,10 +1079,7 @@ class _EgzaminViewState extends State<EgzaminView> {
         );
       }
     } else {
-      // ==============================
-      // EGZAMIN 40 PYTAŃ – wysyłka na serwer
-      // ==============================
-      final Map<String, dynamic> payload = {
+      final payload = {
         'kwalifikacja': widget.kwalifikacja,
         'wynik': percent,
         'data_czas': endTime.toIso8601String(),
@@ -894,9 +1088,7 @@ class _EgzaminViewState extends State<EgzaminView> {
         'pytania': pytaniaDoBazy,
         'wybrane_odpowiedzi': selectedAnswers,
       };
-
       final result = await ApiService.instance.saveExam(payload);
-
       if (!result.isSuccess && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -906,9 +1098,6 @@ class _EgzaminViewState extends State<EgzaminView> {
       }
     }
 
-    // ==============================
-    // Widok wyniku końcowego
-    // ==============================
     if (mounted) {
       Navigator.push(
         context,
@@ -924,7 +1113,6 @@ class _EgzaminViewState extends State<EgzaminView> {
         ),
       );
     }
-
     setState(() => _isButtonDisabled = false);
   }
 
@@ -941,6 +1129,10 @@ class _EgzaminViewState extends State<EgzaminView> {
     });
   }
 }
+
+// ───────────────
+// _SearchHeader
+// ───────────────
 
 class _SearchHeader extends SliverPersistentHeaderDelegate {
   final Widget child;
