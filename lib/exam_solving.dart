@@ -269,6 +269,12 @@ class _EgzaminViewState extends State<EgzaminView> {
             startTime = DateTime.now();
             _startTimer();
           }
+          if (widget.tryb == TrybEgzaminu.zTestu)
+          {
+            _endTime = DateTime.now().add(Duration(minutes: minutesToEndExam));
+            startTime = DateTime.now();
+            _startTimer();
+          }
         }
       } catch (e) {
         if (kDebugMode) debugPrint('Pobranie pytań nie powiodło się: $e');

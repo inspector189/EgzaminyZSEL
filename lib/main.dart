@@ -25,8 +25,8 @@ import 'utils/quotes_array.dart';
 import 'about_us.dart';
 
 //Debug data here (use your data to login in debug)
-const String userName = "Krzysztof Konieczny";
-const String userEmail = "kkonieczny1@zselektr.onmicrosoft.com";
+const String userName = "";
+const String userEmail = "";
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
