@@ -145,7 +145,7 @@ Celem projektu jest stworzenie nowoczesnego, bezpiecznego i wygodnego środowisk
 
 Dodaj tutaj zrzuty ekranu aplikacji:
 
-```
+```md
 ![Strona główna](assets/screenshots/MainPage.png)
 
 ![Kwalifikacja](assets/screenshots/QualificationSelected.png)
