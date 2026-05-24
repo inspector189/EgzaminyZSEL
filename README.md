@@ -143,9 +143,6 @@ Celem projektu jest stworzenie nowoczesnego, bezpiecznego i wygodnego środowisk
 
 # 📷 Screeny aplikacji
 
-Dodaj tutaj zrzuty ekranu aplikacji:
-
-```md
 ![Strona główna](assets/screenshots/MainPage.png)
 
 ![Kwalifikacja](assets/screenshots/QualificationSelected.png)
@@ -179,8 +176,6 @@ Dodaj tutaj zrzuty ekranu aplikacji:
 ![Statystyki ucznia](assets/screenshots/StudentStats.png)
 
 ![Ostatnie egzaminy](assets/screenshots/LastExams.png)
-```
-
 ---
 
 # 🌐 Dostępność projektu
