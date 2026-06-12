@@ -42,12 +42,11 @@ class _AdminTileState extends State<AdminTile> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final scale =
-        _pressed
-            ? 0.97
-            : _hovered
-            ? 1.02
-            : 1.0;
+    final scale = _pressed
+        ? 0.97
+        : _hovered
+        ? 1.02
+        : 1.0;
 
     return FocusableActionDetector(
       onShowHoverHighlight: _setHovered,

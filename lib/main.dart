@@ -145,7 +145,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
 
       if (result.statusCode == 401 || result.isNetworkError) {
         await _signOut(showSnack: false);
-        if (kDebugMode) debugPrint('ℹ️ 401 z session-status - logout lokalny');
+        if (kDebugMode) debugPrint('ℹ️ ${result.statusCode} - logout lokalny');
         return;
       }
 
@@ -154,7 +154,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         if (!ok) {
           await _signOut(showSnack: false);
           if (kDebugMode) {
-            debugPrint('ℹ️ Sesja na serwerze nie istnieje - logout lokalny');
+            debugPrint('ℹ️ Brak sesji na serwerze - logout lokalny');
           }
         } else {
           if (mounted) {
@@ -163,7 +163,9 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         }
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('❌ Błąd sprawdzania sesji na serwerze: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Wystąpił błąd podczas sprawdzania sesji na serwerze: $e');
+      }
     }
   }
 
@@ -202,25 +204,24 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   Future<void> _showLoginInfoAndStart() async {
     final shouldLogin = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text("Zaloguj się"),
-            content: const Text(
-              "Zaloguj się przy pomocy maila z domeną @zselektr.onmicrosoft.com.\n\n"
-              "Dzięki zalogowaniu się jako uczeń będziesz miał możliwość "
-              "sprawdzenia swoich statystyk oraz robienia testów z zestawu od nauczyciela.",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text("Anuluj"),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text("OK"),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text("Zaloguj się"),
+        content: const Text(
+          "Zaloguj się przy pomocy maila z domeną @zselektr.onmicrosoft.com.\n\n"
+          "Dzięki zalogowaniu się jako uczeń będziesz miał możliwość "
+          "sprawdzenia swoich statystyk oraz robienia testów z zestawu od nauczyciela.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Anuluj"),
           ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
     );
 
     if (shouldLogin != true) return;
@@ -253,7 +254,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         await ApiService.instance.logout();
       } catch (e) {
         if (kDebugMode) {
-          debugPrint('⚠️ Błąd przy wylogowaniu: $e');
+          debugPrint('❌ Wystąpił błąd przy wylogowaniu: $e');
         }
       }
     }
@@ -292,36 +293,34 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 220),
     );
 
-    // Fade
     final fade = CurvedAnimation(
       parent: _profileController!,
       curve: Curves.easeOut,
     );
 
-    // Slide — straight down only, short travel
-    final slide = Tween<Offset>(
-      begin: const Offset(0.0, -0.08),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _profileController!, curve: Curves.easeOutCubic),
-    );
+    final slide =
+        Tween<Offset>(
+          begin: const Offset(0.0, -0.08),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _profileController!,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
-    // Scale — expand from top-right corner
     final scale = Tween<double>(begin: 0.92, end: 1.0).animate(
       CurvedAnimation(parent: _profileController!, curve: Curves.easeOutCubic),
     );
 
     _profileOverlay = OverlayEntry(
       builder: (_) {
-        // Recalculate safe top on every build so it's correct even if
-        // orientation changes while the popup is open.
         final topPadding = MediaQuery.of(context).padding.top;
         final appBarHeight = kToolbarHeight;
         final popupTop = topPadding + appBarHeight + 8.0;
 
         return Stack(
           children: [
-            // Dismiss on tap-outside
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
@@ -339,7 +338,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                   position: slide,
                   child: ScaleTransition(
                     scale: scale,
-                    alignment: Alignment.topRight, // expands from the button
+                    alignment: Alignment.topRight,
                     child: ProfilePopup(
                       userName: _userName!,
                       userEmail: _userEmail!,
@@ -450,12 +449,11 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         onSelected: (qualification) {
           _navigatorKey.currentState?.pushAndRemoveUntil(
             MaterialPageRoute(
-              builder:
-                  (_) => QualificationPage(
-                    qualification: qualification.code,
-                    isAdmin: _isAdmin,
-                    isLoggedIn: _isLoggedIn,
-                  ),
+              builder: (_) => QualificationPage(
+                qualification: qualification.code,
+                isAdmin: _isAdmin,
+                isLoggedIn: _isLoggedIn,
+              ),
             ),
             ModalRoute.withName('/home'),
           );
@@ -516,12 +514,11 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         } else {
           _navigatorKey.currentState?.push(
             MaterialPageRoute(
-              builder:
-                  (context) => QualificationPage(
-                    qualification: title,
-                    isAdmin: _isAdmin,
-                    isLoggedIn: _isLoggedIn,
-                  ),
+              builder: (context) => QualificationPage(
+                qualification: title,
+                isAdmin: _isAdmin,
+                isLoggedIn: _isLoggedIn,
+              ),
             ),
           );
         }
@@ -531,180 +528,181 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Scaffold(
-      drawer:
-          MediaQuery.of(context).size.width <= 900
-              ? Drawer(
-                child: ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
-                    DrawerHeader(
-                      decoration: BoxDecoration(color: colorScheme.primary),
-                      child: Text(
-                        'Menu',
-                        style: TextStyle(
-                          color: colorScheme.onPrimary,
-                          fontSize: 24,
-                        ),
-                      ),
-                    ),
-                    _drawerItem(context, 'Strona Główna'),
 
-                    ...professions.map(
-                      (profession) => ExpansionTile(
-                        title: Text("technik ${profession.name}"),
-                        children:
-                            profession.qualifications.map((q) {
-                              return ListTile(
-                                leading: Icon(q.icon),
-                                title: Text(q.code),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _navigatorKey.currentState?.push(
-                                    MaterialPageRoute(
-                                      builder:
-                                          (_) => QualificationPage(
-                                            qualification: q.code,
-                                            isAdmin: _isAdmin,
-                                            isLoggedIn: _isLoggedIn,
-                                          ),
-                                    ),
-                                  );
-                                },
-                              );
-                            }).toList(),
+    return Scaffold(
+      drawer: MediaQuery.of(context).size.width <= 900
+          ? Drawer(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  DrawerHeader(
+                    decoration: BoxDecoration(color: colorScheme.primary),
+                    child: Text(
+                      'Menu',
+                      style: TextStyle(
+                        color: colorScheme.onPrimary,
+                        fontSize: 24,
                       ),
                     ),
-                    const Divider(),
-                    ListTile(
-                      leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
-                      title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        if (_isLoggedIn) {
-                          _toggleProfilePopup();
-                        } else {
-                          if (!kIsWeb) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  "Logowanie dostępne tylko na webie",
+                  ),
+                  _drawerItem(context, 'Strona Główna'),
+
+                  ...professions.map(
+                    (profession) => ExpansionTile(
+                      title: Text("technik ${profession.name}"),
+                      children: profession.qualifications.map((q) {
+                        return ListTile(
+                          leading: Icon(q.icon),
+                          title: Text(q.code),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigatorKey.currentState?.push(
+                              MaterialPageRoute(
+                                builder: (_) => QualificationPage(
+                                  qualification: q.code,
+                                  isAdmin: _isAdmin,
+                                  isLoggedIn: _isLoggedIn,
                                 ),
                               ),
                             );
-                            return;
-                          }
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            _showLoginInfoAndStart();
-                          });
-                        }
-                      },
+                          },
+                        );
+                      }).toList(),
                     ),
-
-                    ListTile(
-                      leading: Icon(
-                        theme.brightness == Brightness.dark
-                            ? Icons.wb_sunny
-                            : Icons.nightlight_round,
-                        color: colorScheme.onSurface,
-                      ),
-                      title: const Text('Przełącz motyw'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Provider.of<ThemeProvider>(
-                          context,
-                          listen: false,
-                        ).toggleTheme();
-                      },
-                    ),
-                  ],
-                ),
-              )
-              : null,
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: colorScheme.primary,
-        actions:
-            MediaQuery.of(context).size.width > 900
-                ? [
-                  const Spacer(),
-                  buildPopupMenu('Strona Główna'),
-                  ...professions.map((p) => buildPopupMenu(p.name)),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.info_outline),
-                    tooltip: 'O nas',
-                    color: colorScheme.onPrimary,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AboutPage()),
-                      );
-                    },
                   ),
-                  IconButton(
-                    icon: Icon(_isLoggedIn ? Icons.person : Icons.login),
-                    tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
-                    color: colorScheme.onPrimary,
-                    onPressed: () async {
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(_isLoggedIn ? Icons.person : Icons.login),
+                    title: Text(_isLoggedIn ? 'Profil' : 'Logowanie'),
+                    onTap: () async {
+                      Navigator.pop(context);
                       if (_isLoggedIn) {
                         _toggleProfilePopup();
                       } else {
                         if (!kIsWeb) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Logowanie tylko na webie'),
+                              content: Text(
+                                "Logowanie dostępne tylko na przeglądarce!",
+                              ),
                             ),
                           );
                           return;
                         }
-
-                        _showLoginInfoAndStart();
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _showLoginInfoAndStart();
+                        });
                       }
                     },
                   ),
 
-                  IconButton(
-                    icon: Icon(
-                      theme.brightness == Brightness.dark
-                          ? Icons.wb_sunny
-                          : Icons.nightlight_round,
-                      color: colorScheme.onPrimary,
-                    ),
-                    tooltip: 'Przełącz motyw',
-                    onPressed: () {
-                      Provider.of<ThemeProvider>(
-                        context,
-                        listen: false,
-                      ).toggleTheme();
+                  ListTile(
+                    leading: Icon(switch (themeProvider.themeMode) {
+                      ThemeMode.light => Icons.wb_sunny_rounded,
+                      ThemeMode.dark => Icons.nightlight_rounded,
+                      ThemeMode.system => Icons.brightness_auto_rounded,
+                    }),
+                    title: Text(switch (themeProvider.themeMode) {
+                      ThemeMode.light => 'Motyw jasny',
+                      ThemeMode.dark => 'Motyw ciemny',
+                      ThemeMode.system => 'Motyw systemowy',
+                    }),
+                    onTap: () {
+                      Navigator.pop(context);
+                      themeProvider.toggleTheme();
                     },
                   ),
-                ]
-                : null,
+                ],
+              ),
+            )
+          : null,
+      appBar: AppBar(
+        title: Text(widget.title),
+        backgroundColor: colorScheme.primary,
+        actions: MediaQuery.of(context).size.width > 900
+            ? [
+                const Spacer(),
+                buildPopupMenu('Strona Główna'),
+                ...professions.map((p) => buildPopupMenu(p.name)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.info_outline_rounded),
+                  tooltip: 'O nas',
+                  color: colorScheme.onPrimary,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AboutPage()),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: Icon(_isLoggedIn ? Icons.person_rounded : Icons.login_rounded),
+                  tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
+                  color: colorScheme.onPrimary,
+                  onPressed: () async {
+                    if (_isLoggedIn) {
+                      _toggleProfilePopup();
+                    } else {
+                      if (!kIsWeb) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Logowanie dostępne tylko na przeglądarce!',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      _showLoginInfoAndStart();
+                    }
+                  },
+                ),
+
+                IconButton(
+                  icon: Icon(switch (themeProvider.themeMode) {
+                    ThemeMode.light => Icons.wb_sunny_rounded,
+                    ThemeMode.dark => Icons.nightlight_rounded,
+                    ThemeMode.system => Icons.brightness_auto_rounded,
+                  }),
+                  tooltip: (switch (themeProvider.themeMode) {
+                    ThemeMode.light => 'Motyw jasny',
+                    ThemeMode.dark => 'Motyw ciemny',
+                    ThemeMode.system => 'Motyw systemowy',
+                  }),
+                  onPressed: () {
+                    Provider.of<ThemeProvider>(
+                      context,
+                      listen: false,
+                    ).toggleTheme();
+                  },
+                ),
+              ]
+            : null,
       ),
       body: Navigator(
         key: _navigatorKey,
         onGenerateRoute: (settings) {
           return MaterialPageRoute(
             settings: const RouteSettings(name: '/home'),
-            builder:
-                (context) => HomeContent(
-                  onQualificationTap: (qualification) {
-                    _navigatorKey.currentState?.push(
-                      MaterialPageRoute(
-                        builder:
-                            (context) => QualificationPage(
-                              qualification: qualification,
-                              isAdmin: _isAdmin,
-                              isLoggedIn: _isLoggedIn,
-                            ),
-                      ),
-                    );
-                  },
-                  selectedQuote: selectedQuote,
-                ),
+            builder: (context) => HomeContent(
+              onQualificationTap: (qualification) {
+                _navigatorKey.currentState?.push(
+                  MaterialPageRoute(
+                    builder: (context) => QualificationPage(
+                      qualification: qualification,
+                      isAdmin: _isAdmin,
+                      isLoggedIn: _isLoggedIn,
+                    ),
+                  ),
+                );
+              },
+              selectedQuote: selectedQuote,
+            ),
           );
         },
       ),
@@ -739,15 +737,14 @@ class HomeContent extends StatelessWidget {
 
         const SizedBox(height: 32),
         ...professions.map((profession) {
-          final tiles =
-              profession.qualifications.map((q) {
-                return QuestionTile(
-                  icon: q.icon,
-                  code: q.code,
-                  label: q.description,
-                  onTap: () => onQualificationTap(q.code),
-                );
-              }).toList();
+          final tiles = profession.qualifications.map((q) {
+            return QuestionTile(
+              icon: q.icon,
+              code: q.code,
+              label: q.description,
+              onTap: () => onQualificationTap(q.code),
+            );
+          }).toList();
 
           return _ProfessionSection(
             emoji: profession.emoji,

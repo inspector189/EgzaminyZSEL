@@ -20,40 +20,36 @@ class AdminPanelPage extends StatelessWidget {
       AdminTileData(
         icon: Icons.people,
         label: 'Administratorzy',
-        onTap:
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ManageAdminsPage()),
-            ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ManageAdminsPage()),
+        ),
       ),
       AdminTileData(
         icon: Icons.bar_chart,
         label: 'Raporty i statystyki',
-        onTap:
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => AdminStatsPage()),
-            ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => AdminStatsPage()),
+        ),
       ),
       AdminTileData(
         icon: Icons.troubleshoot_rounded,
-        label: 'Statystyki trudności pytań',
-        onTap:
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => QuestionStatsPage()),
-            ),
+        label: 'Dane trudności pytań',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => QuestionStatsPage()),
+        ),
       ),
       AdminTileData(
         icon: Icons.play_circle_fill,
         label: 'Przeprowadź test',
-        onTap:
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const CreatingTestsAndReportsPage(),
-              ),
-            ),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const CreatingTestsAndReportsPage(),
+          ),
+        ),
       ),
     ];
 
@@ -167,10 +163,9 @@ class AdminPanelPage extends StatelessWidget {
                       childAspectRatio: ratio,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      children:
-                          adminTiles
-                              .map((data) => AdminTile(data: data))
-                              .toList(),
+                      children: adminTiles
+                          .map((data) => AdminTile(data: data))
+                          .toList(),
                     );
                   },
                 ),

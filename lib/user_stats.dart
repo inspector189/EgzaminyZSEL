@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'exam_preview.dart';
+import 'utils/async_state_view.dart';
 
 class StatisticsPage extends StatelessWidget {
   const StatisticsPage({super.key});
@@ -18,11 +19,17 @@ class StatisticsPage extends StatelessWidget {
         future: fetchStatistics(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return AsyncStateView.loading(subtitle: 'Pobieranie statystyk...');
           } else if (snapshot.hasError) {
-            return Center(child: Text('❌ Błąd: ${snapshot.error}'));
+            return AsyncStateView.error(
+              message: 'Błąd ładowania',
+              subtitle: snapshot.error.toString(),
+            );
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Brak danych statystycznych.'));
+            return AsyncStateView.empty(
+              message: 'Brak danych statystycznych',
+              icon: Icons.bar_chart_outlined,
+            );
           }
 
           final stats = snapshot.data!;
@@ -73,13 +80,19 @@ class StatisticsPage extends StatelessWidget {
                 future: fetchUserExams(),
                 builder: (context, snapshot2) {
                   if (snapshot2.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return AsyncStateView.loading(
+                      subtitle: 'Pobieranie egzaminów...',
+                    );
                   }
 
                   if (!snapshot2.hasData || snapshot2.data!.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.only(top: 10),
-                      child: Text('Brak zapisanych egzaminów użytkownika.'),
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: AsyncStateView.empty(
+                        message: 'Brak zapisanych egzaminów',
+                        subtitle: 'Nie zrobiłeś(aś) jeszcze żadnego egzaminu.',
+                        icon: Icons.assignment_outlined,
+                      ),
                     );
                   }
 
@@ -91,13 +104,12 @@ class StatisticsPage extends StatelessWidget {
                   }
 
                   return Column(
-                    children:
-                        examsByQual.entries.map((entry) {
-                          return LastExamCard(
-                            title: entry.key,
-                            exams: entry.value.cast(),
-                          );
-                        }).toList(),
+                    children: examsByQual.entries.map((entry) {
+                      return LastExamCard(
+                        title: entry.key,
+                        exams: entry.value.cast(),
+                      );
+                    }).toList(),
                   );
                 },
               );
@@ -133,8 +145,9 @@ class StatisticsPage extends StatelessWidget {
 
     final jsonData = result.data!;
 
-    final exams =
-        jsonData.where((e) => (e['userID'] ?? '') == userName).toList();
+    final exams = jsonData
+        .where((e) => (e['userID'] ?? '') == userName)
+        .toList();
 
     exams.sort((a, b) {
       final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
@@ -169,8 +182,8 @@ class StatisticsPage extends StatelessWidget {
       } else {
         throw Exception('❌ ${result.statusCode} - ${result.data!}');
       }
-    } catch (e) {
-      throw Exception('❌ Błąd pobierania statystyk: $e');
+    } on Exception catch (e) {
+      throw Exception("$e");
     }
   }
 }
@@ -274,14 +287,13 @@ class _StatRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
       decoration: BoxDecoration(
-        border:
-            isLast
-                ? null
-                : Border(
-                  bottom: BorderSide(
-                    color: colorScheme.onSurface.withValues(alpha: 0.08),
-                  ),
+        border: isLast
+            ? null
+            : Border(
+                bottom: BorderSide(
+                  color: colorScheme.onSurface.withValues(alpha: 0.08),
                 ),
+              ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -366,16 +378,15 @@ class LastExamCard extends StatelessWidget {
                     ),
                   ),
                   child: Column(
-                    children:
-                        exams.asMap().entries.map((e) {
-                          final index = e.key;
-                          final exam = e.value;
+                    children: exams.asMap().entries.map((e) {
+                      final index = e.key;
+                      final exam = e.value;
 
-                          return LastExamRow(
-                            exam: exam,
-                            showBorder: index != exams.length - 1,
-                          );
-                        }).toList(),
+                      return LastExamRow(
+                        exam: exam,
+                        showBorder: index != exams.length - 1,
+                      );
+                    }).toList(),
                   ),
                 ),
               ],
@@ -403,10 +414,9 @@ class LastExamRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // pełna data+czas z bazy (np. "2025-12-04 08:15:45")
+    // (np. "2025-12-04 08:15:45")
     final fullDateTime = (exam['data_czas'] ?? '') as String;
 
-    // tylko data do wyświetlenia
     final date = fullDateTime.split(' ').first;
 
     final wynikRaw = exam['wynik']?.toString() ?? '';
@@ -416,19 +426,15 @@ class LastExamRow extends StatelessWidget {
     if (wynikDouble == null) {
       wynik = '-';
     } else {
-      wynik =
-          (wynikDouble % 1 == 0)
-              ? wynikDouble.toInt().toString()
-              : wynikDouble.toStringAsFixed(1);
+      wynik = (wynikDouble % 1 == 0)
+          ? wynikDouble.toInt().toString()
+          : wynikDouble.toStringAsFixed(1);
     }
 
-    // surowe sekundy z bazy
-    final int durationSec =
-        (exam['czas_trwania_sec'] is int)
-            ? exam['czas_trwania_sec'] as int
-            : int.tryParse('${exam['czas_trwania_sec'] ?? '0'}') ?? 0;
+    final int durationSec = (exam['czas_trwania_sec'] is int)
+        ? exam['czas_trwania_sec'] as int
+        : int.tryParse('${exam['czas_trwania_sec'] ?? '0'}') ?? 0;
 
-    // ładny tekst do wyświetlenia
     final czas = _fmtDuration(durationSec);
 
     final examId = int.tryParse(exam['id']?.toString() ?? '') ?? 0;
@@ -436,14 +442,13 @@ class LastExamRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        border:
-            showBorder
-                ? Border(
-                  bottom: BorderSide(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
-                  ),
-                )
-                : null,
+        border: showBorder
+            ? Border(
+                bottom: BorderSide(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                ),
+              )
+            : null,
       ),
       child: Row(
         children: [
@@ -466,37 +471,35 @@ class LastExamRow extends StatelessWidget {
           ),
 
           ElevatedButton(
-            onPressed:
-                examId == 0
-                    ? null
-                    : () async {
-                      final data = await fetchExamDetailsFull(
-                        examId,
-                        fullDateTime,
-                        durationSec,
-                      );
-                      if (!context.mounted) return;
+            onPressed: examId == 0
+                ? null
+                : () async {
+                    final data = await fetchExamDetailsFull(
+                      examId,
+                      fullDateTime,
+                      durationSec,
+                    );
+                    if (!context.mounted) return;
 
-                      if (data != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (_) => EgzaminPodgladView(
-                                  questions: data['questions'],
-                                  selectedAnswers:
-                                      (data['selectedAnswers']).cast<String?>(),
-                                ),
+                    if (data != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EgzaminPodgladView(
+                            questions: data['questions'],
+                            selectedAnswers: (data['selectedAnswers'])
+                                .cast<String?>(),
                           ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Nie udało się wczytać podglądu."),
-                          ),
-                        );
-                      }
-                    },
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Nie udało się wczytać podglądu."),
+                        ),
+                      );
+                    }
+                  },
             child: const Text("Podgląd"),
           ),
         ],
@@ -519,8 +522,8 @@ class LastExamRow extends StatelessWidget {
       if (result.isSuccess) {
         return {
           'questions': List<dynamic>.from(result.data!['questions']),
-          'selectedAnswers':
-              (result.data!['selectedAnswers'] as List).cast<String?>(),
+          'selectedAnswers': (result.data!['selectedAnswers'] as List)
+              .cast<String?>(),
         };
       }
       if (kDebugMode) {

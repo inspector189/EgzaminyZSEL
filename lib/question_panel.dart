@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/services/api_service.dart';
 import 'package:flutter_app/utils/app_themes.dart';
+import 'package:flutter_app/utils/async_state_view.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shimmer/shimmer.dart';
 import 'widgets/zoomable_image.dart';
@@ -174,17 +175,13 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
       if (!result.isSuccess) throw Exception('HTTP ${result.statusCode}');
 
       final parsed = result.data!;
-      final stats =
-          _stats
-              .where(
-                (item) =>
-                    (item['kwalifikacja'] ?? '').toString().replaceAll(
-                      ' ',
-                      '',
-                    ) ==
-                    norm,
-              )
-              .toList();
+      final stats = _stats
+          .where(
+            (item) =>
+                (item['kwalifikacja'] ?? '').toString().replaceAll(' ', '') ==
+                norm,
+          )
+          .toList();
 
       final enriched = <Map<String, dynamic>>[];
       for (final st in stats) {
@@ -240,10 +237,9 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  double _trud(dynamic stat) =>
-      stat['trudnosc'] is num
-          ? (stat['trudnosc'] as num).toDouble()
-          : double.tryParse(stat['trudnosc'].toString()) ?? 0.0;
+  double _trud(dynamic stat) => stat['trudnosc'] is num
+      ? (stat['trudnosc'] as num).toDouble()
+      : double.tryParse(stat['trudnosc'].toString()) ?? 0.0;
 
   ({int hard, int easy}) _agg(List<dynamic> stats) {
     final hard = stats.where((s) => _trud(s) > _kHardThreshold).length;
@@ -551,33 +547,36 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
 
   Widget _buildQualContent(BuildContext context, String kwal) {
     final s = _qualState[kwal];
-    final cs = Theme.of(context).colorScheme;
 
     if (s == null || s.isLoading) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        child: Center(
-          child: CircularProgressIndicator(color: cs.primary, strokeWidth: 2),
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: AsyncStateView.loading()),
       );
     }
+
     if (s.loaded && s.questions.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         child: Center(
-          child: Text(
-            'Brak pytań dla tej kwalifikacji.',
-            style: TextStyle(color: cs.onSurfaceVariant),
+          child: AsyncStateView.empty(
+            message: 'Brak pytań',
+            subtitle: 'Ta kwalifikacja nie zawiera żadnych pytań.',
+            icon: Icons.quiz_outlined,
           ),
         ),
       );
     }
+
     if (!s.loaded) {
       return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          'Kliknij, by załadować pytania...',
-          style: TextStyle(color: cs.onSurfaceVariant),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: AsyncStateView.empty(
+            message: 'Pytania nie zostały załadowane',
+            subtitle: 'Kliknij, aby załadować pytania.',
+            icon: Icons.touch_app_outlined,
+          ),
         ),
       );
     }
@@ -610,21 +609,19 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child:
-                          l < visible
-                              ? _buildCard(ctx, s.questions[l])
-                              : l < total
-                              ? _buildShimmer(ctx)
-                              : const SizedBox(),
+                      child: l < visible
+                          ? _buildCard(ctx, s.questions[l])
+                          : l < total
+                          ? _buildShimmer(ctx)
+                          : const SizedBox(),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child:
-                          r < visible
-                              ? _buildCard(ctx, s.questions[r])
-                              : r < total
-                              ? _buildShimmer(ctx)
-                              : const SizedBox(),
+                      child: r < visible
+                          ? _buildCard(ctx, s.questions[r])
+                          : r < total
+                          ? _buildShimmer(ctx)
+                          : const SizedBox(),
                     ),
                   ],
                 );
@@ -641,11 +638,9 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
             addAutomaticKeepAlives: false,
             addRepaintBoundaries: true,
             itemCount: total,
-            itemBuilder:
-                (ctx, i) =>
-                    i < visible
-                        ? _buildCard(ctx, s.questions[i])
-                        : _buildShimmer(ctx),
+            itemBuilder: (ctx, i) => i < visible
+                ? _buildCard(ctx, s.questions[i])
+                : _buildShimmer(ctx),
           ),
         );
       },
@@ -701,47 +696,6 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
     );
   }
 
-  // ── Error state ───────────────────────────────────────────────────────────
-
-  Widget _buildError(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: cs.errorContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.error_outline_rounded,
-                size: 36,
-                color: cs.onErrorContainer,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              errorMessage!,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: cs.onSurface),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: _fetchStats,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Spróbuj ponownie'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ── build() ───────────────────────────────────────────────────────────────
 
   @override
@@ -752,9 +706,7 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
     return Scaffold(
       appBar: AppBar(
         elevation: 2,
-        title: Text(
-          'Statystyki Trudności Pytań',
-        ),
+        title: Text('Statystyki Trudności Pytań'),
         iconTheme: IconThemeData(color: cs.onPrimary),
         actionsIconTheme: IconThemeData(color: cs.onPrimary),
         actions: [
@@ -767,80 +719,86 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
           ),
         ],
       ),
-      body:
-          isLoading
-              ? Center(child: CircularProgressIndicator(color: cs.primary))
-              : errorMessage != null
-              ? _buildError(context)
-              : RefreshIndicator(
-                color: cs.primary,
-                onRefresh: _fetchStats,
-                child:
-                    _grouped.isEmpty
-                        ? const Center(child: Text('Brak danych.'))
-                        : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                          itemCount: _grouped.length,
-                          itemBuilder: (context, index) {
-                            final entry = _grouped.entries.elementAt(index);
-                            final kwal = entry.key;
-                            final stats = entry.value;
+      body: isLoading
+          ? Center(
+              child: AsyncStateView.loading(subtitle: 'Pobieranie danych...'),
+            )
+          : errorMessage != null
+          ? Center(
+              child: AsyncStateView.error(
+                message: 'Błąd ładowania',
+                subtitle: errorMessage,
+                icon: Icons.cloud_off_rounded,
+              ),
+            )
+          : RefreshIndicator(
+              color: cs.primary,
+              onRefresh: _fetchStats,
+              child: _grouped.isEmpty
+                  ? Center(
+                      child: AsyncStateView.empty(
+                        message: 'Brak danych',
+                        subtitle: 'Nie znaleziono żadnych wyników.',
+                        icon: Icons.inbox_outlined,
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      itemCount: _grouped.length,
+                      itemBuilder: (context, index) {
+                        final entry = _grouped.entries.elementAt(index);
+                        final kwal = entry.key;
+                        final stats = entry.value;
 
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: cs.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: cs.shadow.withValues(alpha: 0.6),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 3),
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: cs.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: cs.shadow.withValues(alpha: 0.6),
+                                blurRadius: 12,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Theme(
+                              data: Theme.of(
+                                context,
+                              ).copyWith(dividerColor: Colors.transparent),
+                              child: ExpansionTile(
+                                tilePadding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  8,
+                                  16,
+                                  4,
+                                ),
+                                childrenPadding: EdgeInsets.zero,
+                                expandedCrossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                iconColor: cs.primary,
+                                collapsedIconColor: cs.primary,
+                                title: _buildQualHeader(context, kwal, stats),
+                                onExpansionChanged: (expanded) {
+                                  if (expanded) _loadQualification(kwal);
+                                },
+                                children: [
+                                  Divider(
+                                    height: 1,
+                                    color: cs.primary.withValues(alpha: 0.15),
                                   ),
+                                  _buildQualContent(context, kwal),
                                 ],
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Theme(
-                                  data: Theme.of(
-                                    context,
-                                  ).copyWith(dividerColor: Colors.transparent),
-                                  child: ExpansionTile(
-                                    tilePadding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      8,
-                                      16,
-                                      4,
-                                    ),
-                                    childrenPadding: EdgeInsets.zero,
-                                    expandedCrossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    iconColor: cs.primary,
-                                    collapsedIconColor: cs.primary,
-                                    title: _buildQualHeader(
-                                      context,
-                                      kwal,
-                                      stats,
-                                    ),
-                                    onExpansionChanged: (expanded) {
-                                      if (expanded) _loadQualification(kwal);
-                                    },
-                                    children: [
-                                      Divider(
-                                        height: 1,
-                                        color: cs.primary.withValues(
-                                          alpha: 0.15,
-                                        ),
-                                      ),
-                                      _buildQualContent(context, kwal),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
     );
   }
 }
@@ -929,16 +887,14 @@ class _AnswerTile extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 5),
     padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
     decoration: BoxDecoration(
-      color:
-          isCorrect
-              ? correctColor.withValues(alpha: 0.10)
-              : cs.surfaceContainerHighest.withValues(alpha: 0.42),
+      color: isCorrect
+          ? correctColor.withValues(alpha: 0.10)
+          : cs.surfaceContainerHighest.withValues(alpha: 0.42),
       borderRadius: BorderRadius.circular(8),
       border: Border.all(
-        color:
-            isCorrect
-                ? correctColor.withValues(alpha: 0.50)
-                : cs.outlineVariant.withValues(alpha: 0.28),
+        color: isCorrect
+            ? correctColor.withValues(alpha: 0.50)
+            : cs.outlineVariant.withValues(alpha: 0.28),
         width: isCorrect ? 1.5 : 1.0,
       ),
     ),
@@ -949,10 +905,9 @@ class _AnswerTile extends StatelessWidget {
           width: 22,
           height: 22,
           decoration: BoxDecoration(
-            color:
-                isCorrect
-                    ? correctColor
-                    : cs.outlineVariant.withValues(alpha: 0.35),
+            color: isCorrect
+                ? correctColor
+                : cs.outlineVariant.withValues(alpha: 0.35),
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,

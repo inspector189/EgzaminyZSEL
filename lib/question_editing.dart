@@ -5,23 +5,20 @@ import 'dart:typed_data';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
-import 'package:html_unescape/html_unescape.dart';
+import 'package:flutter_app/utils/async_state_view.dart';
+import 'package:flutter_app/widgets/zoomable_image.dart';
+import 'package:html_unescape_xx/html_unescape.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:universal_html/html.dart' as html;
 
 import 'package:flutter_app/services/api_service.dart';
 import 'package:flutter_app/utils/app_themes.dart';
-import 'widgets/admin_video_player.dart';
+import 'widgets/difficulty_badge.dart';
+import 'widgets/exam_question_card.dart';
+import 'widgets/inline_video_player.dart';
 import 'widgets/shim_box.dart';
 import 'utils/helpers.dart';
-
-// ─────────────────────────────────────────────
-//                Design tokens
-// ─────────────────────────────────────────────
-
-const double _kAccentWidth = 4.0;
-const double _kHardThreshold = 50.0;
 
 // ─────────────────────────────────────────────
 //                    Enums
@@ -78,13 +75,12 @@ class EditQuestionsPage extends StatefulWidget {
 }
 
 class _EditQuestionsPageState extends State<EditQuestionsPage> {
-  late final String _kval =
-      widget.qualification
-          .replaceAll('.', '')
-          .replaceAll(' ', '')
-          .toLowerCase();
+  late final String _kval = widget.qualification
+      .replaceAll('.', '')
+      .replaceAll(' ', '')
+      .toLowerCase();
 
-  final _unescape = HtmlUnescape();
+  final _unescape = HtmlUnescapeSmall();
   String _clean(String? s) => _unescape.convert(s?.toString() ?? '');
   String _unescapeLtGt(String s) =>
       s.replaceAll('&lt;', '<').replaceAll('&gt;', '>');
@@ -144,7 +140,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   bool isLoading = true;
   List<dynamic> questions = [];
   int _displayCount = 20;
-  final bool _isLoadingMore = false;
+  //final bool _isLoadingMore = false;
   String searchText = '';
 
   int? editingId;
@@ -173,8 +169,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   );
 
   final TextEditingController _contentCtrl = TextEditingController();
-  final TextEditingController _imageCtrl = TextEditingController();
-  final TextEditingController _imageHeightCtrl = TextEditingController();
   final TextEditingController _opisPoprawneCtrl = TextEditingController();
   final TextEditingController _opisNiepoprawneCtrl = TextEditingController();
   final TextEditingController _textSearchCtrl = TextEditingController();
@@ -275,10 +269,17 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     return ids.isEmpty ? 1 : ids.last + 1;
   }
 
+  List<dynamic>? _cachedFiltered;
+  String? _cachedSearchText;
+
   List<dynamic> get _filteredQuestions {
-    if (searchText.isEmpty) return questions;
+    if (_cachedSearchText == searchText && _cachedFiltered != null) {
+      return _cachedFiltered!;
+    }
+    _cachedSearchText = searchText;
+    if (searchText.isEmpty) return _cachedFiltered = questions;
     final q = searchText.toLowerCase();
-    return questions.where((e) {
+    return _cachedFiltered = questions.where((e) {
       return (e['id']?.toString() ?? '').toLowerCase().contains(q) ||
           (e['pytanie']?.toString() ?? '').toLowerCase().contains(q) ||
           (e['odp1']?.toString() ?? '').toLowerCase().contains(q) ||
@@ -301,7 +302,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     _scrollListener = () {
       final pos = _listController.position;
       if (pos.pixels >= pos.maxScrollExtent - 300 &&
-          !_isLoadingMore &&
           _displayCount < questions.length) {
         setState(() {
           _displayCount = (_displayCount + 20).clamp(0, questions.length);
@@ -318,8 +318,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     _listController.dispose();
     _textSearchCtrl.dispose();
     _leftPanelScroll.dispose();
-    _imageCtrl.dispose();
-    _imageHeightCtrl.dispose();
     _contentCtrl.dispose();
     _opisPoprawneCtrl.dispose();
     _opisNiepoprawneCtrl.dispose();
@@ -388,18 +386,16 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     if (!res.isSuccess) return {};
     final Map<int, Map<String, dynamic>> result = {};
     for (final item in res.data!) {
-      final String itemKval =
-          (item['kwalifikacja'] ?? '')
-              .toString()
-              .replaceAll(' ', '')
-              .toLowerCase();
+      final String itemKval = (item['kwalifikacja'] ?? '')
+          .toString()
+          .replaceAll(' ', '')
+          .toLowerCase();
       if (itemKval != _kval) continue;
       final int? id = int.tryParse('${item['pytanie_id']}');
       if (id == null) continue;
-      final double trud =
-          (item['trudnosc'] is num)
-              ? (item['trudnosc'] as num).toDouble()
-              : double.tryParse('${item['trudnosc']}') ?? 0.0;
+      final double trud = (item['trudnosc'] is num)
+          ? (item['trudnosc'] as num).toDouble()
+          : double.tryParse('${item['trudnosc']}') ?? 0.0;
       final int ilosc = int.tryParse('${item['ilosc_odpowiedzi']}') ?? 0;
       result[id] = {'trudnosc': trud, 'ilosc_odpowiedzi': ilosc};
     }
@@ -416,8 +412,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     _isUploading = false;
     _showPreview = false;
     _contentCtrl.clear();
-    _imageCtrl.clear();
-    _imageHeightCtrl.clear();
     _opisPoprawneCtrl.clear();
     _opisNiepoprawneCtrl.clear();
     _imageHeightPx = null;
@@ -434,7 +428,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     for (final a in _answers) {
       a.reset();
     }
-    _disposeLocalTempVideo();
   }
 
   void _startNewQuestion() => setState(_resetEditorState);
@@ -451,7 +444,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     a.imageName = null;
   }
 
-  void _openForEdit(Map<String, dynamic> q) {
+  void _openForEdit(Map<String, dynamic> q) async {
+    await _disposeLocalTempVideo();
+    if (!mounted) return;
     setState(() {
       _resetEditorState();
       editingId = int.tryParse(q['id']?.toString() ?? '');
@@ -459,19 +454,16 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       final rawHtml = q['pytanie']?.toString() ?? '';
       final unescapedHtml = _unescapeLtGt(rawHtml);
 
-      final rawImages =
-          (q['images'] is List)
-              ? (q['images'] as List).cast<String>()
-              : <String>[];
-      final rawVideos =
-          (q['videos'] is List)
-              ? (q['videos'] as List).cast<String>()
-              : <String>[];
+      final rawImages = (q['images'] is List)
+          ? (q['images'] as List).cast<String>()
+          : <String>[];
+      final rawVideos = (q['videos'] is List)
+          ? (q['videos'] as List).cast<String>()
+          : <String>[];
 
-      final vidUrl =
-          rawVideos.isNotEmpty
-              ? rawVideos.first
-              : _extractFirstVideoSrcSmart(unescapedHtml);
+      final vidUrl = rawVideos.isNotEmpty
+          ? rawVideos.first
+          : _extractFirstVideoSrcSmart(unescapedHtml);
 
       final questionImages = List<String>.from(rawImages.take(5));
       _questionImageFilenames.addAll(
@@ -484,12 +476,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _uploadedVideoFilename = _filenameFromUrl(vidUrl);
       } else if (_questionImageFilenames.isNotEmpty) {
         _mediaKind = MediaKind.image;
-        _uploadedImageUrl =
-            questionImages.isNotEmpty ? questionImages.first : null;
-        _uploadedImageFilename =
-            _uploadedImageUrl != null
-                ? _filenameFromUrl(_uploadedImageUrl!)
-                : _questionImageFilenames.first;
+        _uploadedImageUrl = questionImages.isNotEmpty
+            ? questionImages.first
+            : null;
+        _uploadedImageFilename = _uploadedImageUrl != null
+            ? _filenameFromUrl(_uploadedImageUrl!)
+            : _questionImageFilenames.first;
       }
 
       final cleaned = _stripStyleAndImage(rawHtml);
@@ -509,6 +501,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   String _stripStyleAndImage(String rawHtml) {
+    //String escapedDomain = "https://egzaminy\.zsel\.edu\.pl";
     var out = rawHtml;
     out = out.replaceAll(
       RegExp(r'<style\b[^>]*>.*?</style>', caseSensitive: false, dotAll: true),
@@ -705,7 +698,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       _imageName = null;
       _uploadedImageUrl = null;
       _uploadedImageFilename = null;
-      _imageCtrl.clear();
       _videoBytes = null;
       _videoName = null;
       _uploadedVideoUrl = null;
@@ -913,10 +905,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         throw result.data?['error'] ?? 'Nieznany błąd serwera';
       }
       final isEdit = editingId != null;
-      final int? savedId =
-          (result.data!['id'] is int)
-              ? result.data!['id'] as int
-              : int.tryParse('${result.data!['id']}');
+      final int? savedId = (result.data!['id'] is int)
+          ? result.data!['id'] as int
+          : int.tryParse('${result.data!['id']}');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -968,23 +959,22 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final ok =
         await showDialog<bool>(
           context: context,
-          builder:
-              (ctx) => AlertDialog(
-                title: const Text('Resetować trudności wszystkich pytań?'),
-                content: const Text(
-                  'Ta operacja wyczyści statystyki trudności dla całej kwalifikacji.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Anuluj'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Resetuj'),
-                  ),
-                ],
+          builder: (ctx) => AlertDialog(
+            title: const Text('Resetować trudności wszystkich pytań?'),
+            content: const Text(
+              'Ta operacja wyczyści statystyki trudności dla całej kwalifikacji.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Anuluj'),
               ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Resetuj'),
+              ),
+            ],
+          ),
         ) ??
         false;
     if (!ok) return;
@@ -1015,23 +1005,20 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final ok =
         await showDialog<bool>(
           context: context,
-          builder:
-              (ctx) => AlertDialog(
-                title: Text('Resetować trudność pytania ID $id?'),
-                content: const Text(
-                  'Wyzeruje statystyki dla tego jednego pytania.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Anuluj'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Resetuj'),
-                  ),
-                ],
+          builder: (ctx) => AlertDialog(
+            title: Text('Resetować trudność pytania ID $id?'),
+            content: const Text('Wyzeruje trudność dla tego pytania.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Anuluj'),
               ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Resetuj'),
+              ),
+            ],
+          ),
         ) ??
         false;
     if (!ok) return;
@@ -1062,64 +1049,94 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final colorScheme = theme.colorScheme;
     final isEditing = editingId != null;
 
-    final rightPanel =
-        isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _showPreview
-            ? _buildLivePreview(context)
-            : Column(
-              children: [
-                _buildRightToolbar(context),
-                const Divider(height: 1),
-                Expanded(child: _buildList()),
-              ],
-            );
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Edytor pytań — ${widget.qualification.toUpperCase()}'),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Edytor pytań — ${widget.qualification.toUpperCase()}'),
+              if (isEditing)
+                Text(
+                  'Edytujesz ID $editingId',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                  ),
+                ),
+            ],
+          ),
+          backgroundColor: colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
+          actions: [
             if (isEditing)
-              Text(
-                'Edytujesz ID $editingId',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                  color: colorScheme.onPrimary.withValues(alpha: 0.75),
+              TextButton.icon(
+                onPressed: _startNewQuestion,
+                icon: Icon(Icons.close, color: colorScheme.onPrimary, size: 18),
+                label: Text(
+                  'Anuluj edycję',
+                  style: TextStyle(color: colorScheme.onPrimary),
                 ),
               ),
+            IconButton(
+              tooltip: 'Odśwież',
+              onPressed: isLoading ? null : _loadAll,
+              icon: const Icon(Icons.refresh),
+            ),
           ],
         ),
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        actions: [
-          if (isEditing)
-            TextButton.icon(
-              onPressed: _startNewQuestion,
-              icon: Icon(Icons.close, color: colorScheme.onPrimary, size: 18),
-              label: Text(
-                'Anuluj edycję',
-                style: TextStyle(color: colorScheme.onPrimary),
-              ),
-            ),
-          IconButton(
-            tooltip: 'Odśwież',
-            onPressed: isLoading ? null : _loadAll,
-            icon: const Icon(Icons.refresh),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 720) {
+              return _buildMobileLayout(context);
+            }
+            final theme = Theme.of(context);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 440, child: _buildLeftPanel(context)),
+                Container(width: 1, color: theme.dividerColor),
+                Expanded(child: _buildRightPanel(context)),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        TabBar(
+          tabs: const [
+            Tab(text: 'Edytor'),
+            Tab(text: 'Lista'),
+          ],
+          labelColor: theme.colorScheme.primary,
+        ),
+        Expanded(
+          child: TabBarView(
+            children: [_buildLeftPanel(context), _buildRightPanel(context)],
           ),
-        ],
-      ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 440, child: _buildLeftPanel(context)),
-          Container(width: 1, color: theme.dividerColor),
-          Expanded(child: rightPanel),
-        ],
-      ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRightPanel(BuildContext context) {
+    if (isLoading) return Center(child: AsyncStateView.loading());
+    if (_showPreview) return _buildLivePreview(context);
+    return Column(
+      children: [
+        _buildRightToolbar(context),
+        const Divider(height: 1),
+        Expanded(child: _buildList()),
+      ],
     );
   }
 
@@ -1128,8 +1145,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   // ─────────────────────────────────────────
 
   Widget _buildRightToolbar(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final found = _filteredQuestions.length;
     final total = questions.length;
 
@@ -1138,41 +1154,88 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       elevation: 1,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: Row(
-          children: [
-            Icon(Icons.filter_alt, size: 20, color: colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              'Wyniki: $found / $total',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            if (searchText.isNotEmpty)
-              TextButton.icon(
-                onPressed: () {
-                  _textSearchCtrl.clear();
-                  setState(() => searchText = '');
-                },
-                icon: const Icon(Icons.clear),
-                label: const Text('Wyczyść filtr'),
-              ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 500;
+            final countWidget = Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.filter_alt, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Wyniki: $found / $total',
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (!narrow && searchText.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      _textSearchCtrl.clear();
+                      setState(() => searchText = '');
+                    },
+                    icon: const Icon(Icons.clear),
+                    label: const Text('Wyczyść filtr'),
+                  ),
+                ],
+              ],
+            );
+
+            final buttonWidget = FilledButton.icon(
               onPressed: _busyResetAll ? null : _resetTrudnoscAll,
-              icon:
-                  _busyResetAll
-                      ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : const Icon(Icons.refresh),
-              label: const Text('Resetuj trudności (wszystkie)'),
-            ),
-          ],
+              icon: _busyResetAll
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: const Text('Resetuj trudności'),
+            );
+
+            if (narrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  countWidget,
+                  if (searchText.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    TextButton.icon(
+                      onPressed: () {
+                        _textSearchCtrl.clear();
+                        setState(() => searchText = '');
+                      },
+                      icon: const Icon(Icons.clear),
+                      label: const Text('Wyczyść filtr'),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  SizedBox(width: double.infinity, child: buttonWidget),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                countWidget,
+                const Spacer(),
+                if (searchText.isNotEmpty) ...[
+                  TextButton.icon(
+                    onPressed: () {
+                      _textSearchCtrl.clear();
+                      setState(() => searchText = '');
+                    },
+                    icon: const Icon(Icons.clear),
+                    label: const Text('Wyczyść filtr'),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                buttonWidget,
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1185,7 +1248,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     return ListView.builder(
       controller: _listController,
       padding: const EdgeInsets.all(16),
-      itemCount: count + (_isLoadingMore ? 3 : 0),
+      itemCount: count,
       itemBuilder: (context, index) {
         if (index >= count) return _buildShimmerCard(context);
         return _buildQuestionCard(
@@ -1212,300 +1275,290 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
     );
 
-    return Container(
-      color: colorScheme.surface,
-      child: Scrollbar(
+    return Scrollbar(
+      controller: _leftPanelScroll,
+      thumbVisibility: true,
+      child: SingleChildScrollView(
         controller: _leftPanelScroll,
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          controller: _leftPanelScroll,
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _SectionCard(
-                icon: Icons.search,
-                title: 'Szukaj',
-                colorScheme: colorScheme,
-                child: TextField(
-                  controller: _textSearchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Treść, odpowiedzi lub ID…',
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    border: const OutlineInputBorder(),
-                    enabledBorder: enabledBorder(),
-                    focusedBorder: focusedBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.4,
-                    ),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionCard(
+              icon: Icons.search,
+              title: 'Szukaj',
+              colorScheme: colorScheme,
+              child: TextField(
+                controller: _textSearchCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Treść, odpowiedzi lub ID…',
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: colorScheme.onSurfaceVariant,
                   ),
-                  onChanged: (v) => setState(() => searchText = v.trim()),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color:
-                      isEditing
-                          ? colorScheme.primaryContainer.withValues(alpha: 0.35)
-                          : colorScheme.surfaceContainerHighest.withValues(
-                            alpha: 0.25,
-                          ),
-                  border: Border.all(
-                    color:
-                        isEditing
-                            ? colorScheme.primary.withValues(alpha: 0.5)
-                            : colorScheme.outline.withValues(alpha: 0.2),
+                  border: const OutlineInputBorder(),
+                  enabledBorder: enabledBorder(),
+                  focusedBorder: focusedBorder(),
+                  isDense: true,
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.4,
                   ),
-                  borderRadius: BorderRadius.circular(10),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isEditing ? Icons.edit_note : Icons.add_circle_outline,
-                      size: 20,
-                      color:
-                          isEditing
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        isEditing
-                            ? 'Edytujesz pytanie ID $editingId'
-                            : 'Nowe pytanie${_nextId != null ? ' (szac. ID $_nextId)' : ''}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              isEditing
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: _startNewQuestion,
-                      icon: Icon(isEditing ? Icons.close : Icons.add, size: 16),
-                      label: Text(isEditing ? 'Anuluj' : 'Nowe'),
-                      style: TextButton.styleFrom(
-                        foregroundColor:
-                            isEditing ? colorScheme.error : colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                  ],
-                ),
+                onChanged: (v) => setState(() => searchText = v.trim()),
               ),
-              const SizedBox(height: 12),
+            ),
+            const SizedBox(height: 12),
 
-              _SectionCard(
-                icon: Icons.perm_media_outlined,
-                title: 'Multimedia',
-                colorScheme: colorScheme,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        _mediaChip(
-                          'Brak',
-                          MediaKind.none,
-                          colorScheme,
-                          onSelected: _removeMedia,
-                        ),
-                        _mediaChip(
-                          'Obrazek',
-                          MediaKind.image,
-                          colorScheme,
-                          onSelected:
-                              () => setState(() {
-                                _mediaKind = MediaKind.image;
-                                _videoBytes = null;
-                                _videoName = null;
-                                _uploadedVideoUrl = null;
-                                _uploadedVideoFilename = null;
-                                _disposeLocalTempVideo();
-                              }),
-                        ),
-                        _mediaChip(
-                          'Film',
-                          MediaKind.video,
-                          colorScheme,
-                          onSelected:
-                              () => setState(() {
-                                _mediaKind = MediaKind.video;
-                                _imageBytes = null;
-                                _imageName = null;
-                                _uploadedImageUrl = null;
-                                _uploadedImageFilename = null;
-                                _imageCtrl.clear();
-                              }),
-                        ),
-                      ],
-                    ),
-                    if (_mediaKind != MediaKind.none) ...[
-                      const SizedBox(height: 12),
-                      _buildMediaBody(colorScheme),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              _SectionCard(
-                icon: Icons.help_outline,
-                title: 'Treść pytania',
-                colorScheme: colorScheme,
-                child: TextField(
-                  controller: _contentCtrl,
-                  onChanged: (_) => _refreshTextPreview(),
-                  decoration: InputDecoration(
-                    hintText: 'Wpisz treść pytania…',
-                    border: const OutlineInputBorder(),
-                    enabledBorder: enabledBorder(),
-                    focusedBorder: focusedBorder(),
-                    filled: true,
-                    fillColor: colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.3,
-                    ),
-                  ),
-                  maxLines: 7,
-                  minLines: 5,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              _SectionCard(
-                icon: Icons.checklist_rtl,
-                title: 'Odpowiedzi',
-                colorScheme: colorScheme,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Poprawna: ',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.onSurfaceVariant,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: isEditing
+                    ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+                    : colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.25,
                       ),
-                    ),
-                    DropdownButton<String>(
-                      value: _correct,
-                      isDense: true,
-                      underline: const SizedBox.shrink(),
-                      onChanged: (v) => setState(() => _correct = v ?? 'A'),
-                      items: const [
-                        DropdownMenuItem(value: 'A', child: Text('A')),
-                        DropdownMenuItem(value: 'B', child: Text('B')),
-                        DropdownMenuItem(value: 'C', child: Text('C')),
-                        DropdownMenuItem(value: 'D', child: Text('D')),
-                      ],
-                      dropdownColor: colorScheme.surface,
-                    ),
-                  ],
+                border: Border.all(
+                  color: isEditing
+                      ? colorScheme.primary.withValues(alpha: 0.5)
+                      : colorScheme.outline.withValues(alpha: 0.2),
                 ),
-                child: Column(
-                  children: [
-                    for (int i = 0; i < 4; i++) ...[
-                      _buildAnswerEditor(i, colorScheme),
-                      if (i < 3) const SizedBox(height: 10),
-                    ],
-                  ],
-                ),
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(height: 12),
-
-              _SectionCard(
-                icon: Icons.info_outline,
-                title: 'Wyjaśnienia (opcjonalne)',
-                colorScheme: colorScheme,
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _opisPoprawneCtrl,
-                      onChanged: (_) => _refreshTextPreview(),
-                      decoration: InputDecoration(
-                        labelText: 'Po poprawnej odpowiedzi',
-                        border: const OutlineInputBorder(),
-                        enabledBorder: enabledBorder(),
-                        focusedBorder: focusedBorder(),
-                        filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.3),
-                      ),
-                      maxLines: 3,
-                      minLines: 2,
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _opisNiepoprawneCtrl,
-                      onChanged: (_) => _refreshTextPreview(),
-                      decoration: InputDecoration(
-                        labelText: 'Po niepoprawnej odpowiedzi',
-                        border: const OutlineInputBorder(),
-                        enabledBorder: enabledBorder(),
-                        focusedBorder: focusedBorder(),
-                        filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.3),
-                      ),
-                      maxLines: 3,
-                      minLines: 2,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              Row(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => setState(() => _showPreview = true),
-                      icon: const Icon(Icons.visibility_outlined),
-                      label: const Text('Podgląd'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                          color: colorScheme.outline.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
+                  Icon(
+                    isEditing ? Icons.edit_note : Icons.add_circle_outline,
+                    size: 20,
+                    color: isEditing
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: _saveQuestion,
-                      icon: const Icon(Icons.save_outlined),
-                      label: Text(isEditing ? 'Zaktualizuj' : 'Zapisz pytanie'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Text(
+                      isEditing
+                          ? 'Edytujesz pytanie ID $editingId'
+                          : 'Nowe pytanie${_nextId != null ? ' (szac. ID ~$_nextId)' : ''}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isEditing
+                            ? colorScheme.primary
+                            : colorScheme.onSurface,
                       ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _startNewQuestion,
+                    icon: Icon(isEditing ? Icons.close : Icons.add, size: 16),
+                    label: Text(isEditing ? 'Anuluj' : 'Nowe'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: isEditing
+                          ? colorScheme.error
+                          : colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+
+            _SectionCard(
+              icon: Icons.perm_media_outlined,
+              title: 'Multimedia',
+              colorScheme: colorScheme,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _mediaChip(
+                        'Brak',
+                        MediaKind.none,
+                        colorScheme,
+                        onSelected: _removeMedia,
+                      ),
+                      _mediaChip(
+                        'Obrazek',
+                        MediaKind.image,
+                        colorScheme,
+                        onSelected: () => setState(() {
+                          _mediaKind = MediaKind.image;
+                          _videoBytes = null;
+                          _videoName = null;
+                          _uploadedVideoUrl = null;
+                          _uploadedVideoFilename = null;
+                          _disposeLocalTempVideo();
+                        }),
+                      ),
+                      _mediaChip(
+                        'Film',
+                        MediaKind.video,
+                        colorScheme,
+                        onSelected: () => setState(() {
+                          _mediaKind = MediaKind.video;
+                          _imageBytes = null;
+                          _imageName = null;
+                          _uploadedImageUrl = null;
+                          _uploadedImageFilename = null;
+                        }),
+                      ),
+                    ],
+                  ),
+                  if (_mediaKind != MediaKind.none) ...[
+                    const SizedBox(height: 12),
+                    _buildMediaBody(colorScheme),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            _SectionCard(
+              icon: Icons.help_outline,
+              title: 'Treść pytania',
+              colorScheme: colorScheme,
+              child: TextField(
+                controller: _contentCtrl,
+                onChanged: (_) => _refreshTextPreview(),
+                decoration: InputDecoration(
+                  hintText: 'Wpisz treść pytania…',
+                  border: const OutlineInputBorder(),
+                  enabledBorder: enabledBorder(),
+                  focusedBorder: focusedBorder(),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.3,
+                  ),
+                ),
+                maxLines: 7,
+                minLines: 5,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            _SectionCard(
+              icon: Icons.checklist_rtl,
+              title: 'Odpowiedzi',
+              colorScheme: colorScheme,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Poprawna: ',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    value: _correct,
+                    isDense: true,
+                    underline: const SizedBox.shrink(),
+                    onChanged: (v) => setState(() => _correct = v ?? 'A'),
+                    items: const [
+                      DropdownMenuItem(value: 'A', child: Text('A')),
+                      DropdownMenuItem(value: 'B', child: Text('B')),
+                      DropdownMenuItem(value: 'C', child: Text('C')),
+                      DropdownMenuItem(value: 'D', child: Text('D')),
+                    ],
+                    dropdownColor: colorScheme.surface,
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  for (int i = 0; i < 4; i++) ...[
+                    _buildAnswerEditor(i, colorScheme),
+                    if (i < 3) const SizedBox(height: 10),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            _SectionCard(
+              icon: Icons.info_outline,
+              title: 'Wyjaśnienia (opcjonalne)',
+              colorScheme: colorScheme,
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _opisPoprawneCtrl,
+                    onChanged: (_) => _refreshTextPreview(),
+                    decoration: InputDecoration(
+                      labelText: 'Po poprawnej odpowiedzi',
+                      border: const OutlineInputBorder(),
+                      enabledBorder: enabledBorder(),
+                      focusedBorder: focusedBorder(),
+                      filled: true,
+                      fillColor: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.3,
+                      ),
+                    ),
+                    maxLines: 3,
+                    minLines: 2,
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _opisNiepoprawneCtrl,
+                    onChanged: (_) => _refreshTextPreview(),
+                    decoration: InputDecoration(
+                      labelText: 'Po niepoprawnej odpowiedzi',
+                      border: const OutlineInputBorder(),
+                      enabledBorder: enabledBorder(),
+                      focusedBorder: focusedBorder(),
+                      filled: true,
+                      fillColor: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.3,
+                      ),
+                    ),
+                    maxLines: 3,
+                    minLines: 2,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => setState(() => _showPreview = true),
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text('Podgląd'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(
+                        color: colorScheme.outline.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton.icon(
+                    onPressed: _saveQuestion,
+                    icon: const Icon(Icons.save_outlined),
+                    label: Text(isEditing ? 'Zaktualizuj' : 'Zapisz pytanie'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -1523,17 +1576,15 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       selected: selected,
       selectedColor: colorScheme.primaryContainer,
       labelStyle: TextStyle(
-        color:
-            selected
-                ? colorScheme.onPrimaryContainer
-                : colorScheme.onSurfaceVariant,
+        color: selected
+            ? colorScheme.onPrimaryContainer
+            : colorScheme.onSurfaceVariant,
         fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
       ),
       side: BorderSide(
-        color:
-            selected
-                ? colorScheme.primary
-                : colorScheme.outline.withValues(alpha: 0.4),
+        color: selected
+            ? colorScheme.primary
+            : colorScheme.outline.withValues(alpha: 0.4),
       ),
       onSelected: (_) => onSelected(),
     );
@@ -1556,10 +1607,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 '${_questionImageFilenames.length}/5',
                 style: TextStyle(
                   fontSize: 12,
-                  color:
-                      _questionImageFilenames.length >= 5
-                          ? colorScheme.error
-                          : colorScheme.onSurfaceVariant,
+                  color: _questionImageFilenames.length >= 5
+                      ? colorScheme.error
+                      : colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 8),
@@ -1737,10 +1787,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       decoration: BoxDecoration(
         border: Border(
           left: BorderSide(
-            color:
-                isCorrect
-                    ? colorScheme.primary
-                    : colorScheme.outline.withValues(alpha: 0.25),
+            color: isCorrect
+                ? colorScheme.primary
+                : colorScheme.outline.withValues(alpha: 0.25),
             width: 3,
           ),
         ),
@@ -1755,10 +1804,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 width: 26,
                 height: 26,
                 decoration: BoxDecoration(
-                  color:
-                      isCorrect
-                          ? colorScheme.primary
-                          : colorScheme.surfaceContainerHighest,
+                  color: isCorrect
+                      ? colorScheme.primary
+                      : colorScheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -1767,10 +1815,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color:
-                        isCorrect
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurfaceVariant,
+                    color: isCorrect
+                        ? colorScheme.onPrimary
+                        : colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -1884,28 +1931,19 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   // ─────────────────────────────────────────
-  //    Question card (right list) — NEW DESIGN
-  //
-  //  Matches egzamin_view: Border.left accent bar
-  //  (no rounded corners, no Stack/Positioned/ClipRRect),
-  //  structured answer tiles with letter circle,
-  //  outlined difficulty badge, admin action row.
+  //         Question card (right list)
   // ─────────────────────────────────────────
 
   Widget _buildQuestionCard(BuildContext context, Map<String, dynamic> q) {
     final cs = Theme.of(context).colorScheme;
-    final extras = Theme.of(context).extension<ExtraColors>()!;
 
     final id = int.tryParse(q['id']?.toString() ?? '');
     final poprawna = q['poprawna']?.toString().toUpperCase() ?? 'A';
-
     final isActiveEdit = id != null && id == editingId;
 
-    // Separate question images from answer images
-    final rawImages =
-        (q['images'] is List)
-            ? (q['images'] as List).cast<String>()
-            : <String>[];
+    final rawImages = (q['images'] is List)
+        ? (q['images'] as List).cast<String>()
+        : <String>[];
     final answerImageUrls = <String>{};
     for (int i = 1; i <= 4; i++) {
       final src = _extractFirstImageSrcSmart(
@@ -1913,30 +1951,44 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       );
       if (src != null) answerImageUrls.add(src);
     }
-    final questionImages =
-        rawImages.where((u) => !answerImageUrls.contains(u)).toList();
-    final questionVideos =
-        (q['videos'] is List)
-            ? (q['videos'] as List).cast<String>()
-            : <String>[];
+    final questionImages = rawImages
+        .where((u) => !answerImageUrls.contains(u))
+        .toList();
+    final questionVideos = (q['videos'] is List)
+        ? (q['videos'] as List).cast<String>()
+        : <String>[];
+
+    final answers = List.generate(4, (i) {
+      final letter = 'ABCD'[i];
+      final odpHtml = _unescapeLtGt(
+        (q['odp${i + 1}']?.toString() ?? '').replaceFirst(
+          RegExp(r'^[A-D]\.\s*'),
+          '',
+        ),
+      );
+      final imgUrl = _extractFirstImageSrcSmart(odpHtml);
+      final odpText = _stripAnswerPrefix(
+        imgUrl != null
+            ? odpHtml
+                  .replaceAll(RegExp('<img[^>]*>', caseSensitive: false), '')
+                  .trim()
+            : odpHtml.trim(),
+      );
+      return ExamAnswerState(
+        letter: letter,
+        text: odpText,
+        images: imgUrl != null ? [imgUrl] : [],
+        videos: [],
+        isCorrect: letter == poprawna,
+        isSelected: false,
+      );
+    });
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
-        color:
-            isActiveEdit
-                ? cs.primaryContainer.withValues(alpha: 0.10)
-                : cs.surface,
-        // Non-uniform border: left accent + subtle outline on remaining sides.
-        // Legal here because there is NO borderRadius.
-        borderRadius: BorderRadius.all(Radius.circular(12)),
-        border: Border(
-          //left: BorderSide(color: accent, width: _kAccentWidth),
-          //top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
-          //right: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
-          //bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
-        ),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: cs.shadow.withValues(alpha: isActiveEdit ? 0.05 : 0.2),
@@ -1945,221 +1997,82 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: ExamQuestionCard(
+        label: id != null ? 'ID $id' : 'ID —',
+        questionText: _clean(q['pytanie']?.toString() ?? ''),
+        questionImages: questionImages,
+        questionVideos: questionVideos,
+        answers: answers,
+        accentColor: isActiveEdit ? cs.primary : cs.outlineVariant,
+        showResult: true,
+        backgroundColor: isActiveEdit
+            ? cs.primaryContainer.withValues(alpha: 0.10)
+            : cs.surface,
+        shadowAlpha: 0, // shadow handled by AnimatedContainer above
+        headerTrailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Header row ───────────────────────────────────────────
-            Row(
-              children: [
-                if (isActiveEdit) ...[
-                  Icon(Icons.edit_rounded, size: 13, color: cs.primary),
-                  const SizedBox(width: 4),
-                ],
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (cs.primary).withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    id != null ? 'ID $id' : 'ID —',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.4,
-                      color: cs.primary,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                _buildDifficultyBadge(context, q),
-              ],
+            if (isActiveEdit) ...[
+              Icon(Icons.edit_rounded, size: 13, color: cs.primary),
+              const SizedBox(width: 4),
+            ],
+            DifficultyBadge(
+              trudnosc: q['trudnosc'] is num
+                  ? (q['trudnosc'] as num).toDouble()
+                  : double.tryParse(q['trudnosc']?.toString() ?? '') ?? 0.0,
+              ilosc: int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0,
             ),
-
-            const SizedBox(height: 8),
-
-            // ── Question text + media ─────────────────────────────────
-            _renderHtml(
-              q['pytanie']?.toString() ?? '',
-              images: questionImages,
-              videos: questionVideos,
+          ],
+        ),
+        bottomRow: Wrap(
+          spacing: 0,
+          children: [
+            _cardAction(
+              context,
+              icon: Icons.edit_outlined,
+              label: 'Edytuj',
+              onTap: () => _openForEdit(q),
+              color: cs.primary,
             ),
-
-            const SizedBox(height: 10),
-
-            // ── Answer tiles ──────────────────────────────────────────
-            ...List.generate(4, (i) {
-              final letter = 'ABCD'[i];
-              final isCorrect = letter == poprawna;
-              final odpHtml = _unescapeLtGt(
-                (q['odp${i + 1}']?.toString() ?? '').replaceFirst(
-                  RegExp(r'^[A-D]\.\s*'),
-                  '',
-                ),
-              );
-              final imgUrl = _extractFirstImageSrcSmart(odpHtml);
-              final odpText = _stripAnswerPrefix(
-                imgUrl != null
-                    ? odpHtml
-                        .replaceAll(
-                          RegExp('<img[^>]*>', caseSensitive: false),
-                          '',
-                        )
-                        .trim()
-                    : odpHtml.trim(),
-              );
-
-              final Color borderColor =
-                  isCorrect
-                      ? extras.correct.withValues(alpha: 0.55)
-                      : cs.outlineVariant.withValues(alpha: 0.28);
-              final Color bgColor =
-                  isCorrect
-                      ? extras.correct.withValues(alpha: 0.10)
-                      : cs.surfaceContainerHighest.withValues(alpha: 0.38);
-              final Color circleColor =
-                  isCorrect
-                      ? extras.correct
-                      : cs.outlineVariant.withValues(alpha: 0.35);
-              final Color circleText = isCorrect ? cs.surface : cs.onPrimary;
-
-              return Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 5),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(
-                    color: borderColor,
-                    width: isCorrect ? 1.5 : 1.0,
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: circleColor,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        letter,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: circleText,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            odpText,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.4,
-                              fontWeight:
-                                  isCorrect
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                              color: cs.onSurface,
+            _cardAction(
+              context,
+              icon: Icons.restart_alt,
+              label: 'Zresetuj trudność',
+              onTap: id == null ? null : () => _resetTrudnoscOne(id),
+              color: cs.secondary,
+            ),
+            _cardAction(
+              context,
+              icon: Icons.delete_outline,
+              label: 'Usuń',
+              onTap: id == null
+                  ? null
+                  : () async {
+                      final ok =
+                          await showDialog<bool>(
+                            context: context,
+                            builder: (dlgCtx) => AlertDialog(
+                              title: const Text('Usuń pytanie'),
+                              content: Text(
+                                'Na pewno chcesz usunąć pytanie ID $id?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(dlgCtx, false),
+                                  child: const Text('Anuluj'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(dlgCtx, true),
+                                  child: const Text('Usuń'),
+                                ),
+                              ],
                             ),
-                          ),
-                          if (imgUrl != null) ...[
-                            const SizedBox(height: 6),
-                            _buildAnswerImage(url: imgUrl),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (isCorrect)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6, top: 2),
-                        child: Icon(
-                          Icons.check_circle_rounded,
-                          size: 15,
-                          color: extras.correct,
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }),
-
-            const Divider(height: 16),
-            Row(
-              children: [
-                _cardAction(
-                  context,
-                  icon: Icons.edit_outlined,
-                  label: 'Edytuj',
-                  onTap: () => _openForEdit(q),
-                  color: cs.primary,
-                ),
-                _cardAction(
-                  context,
-                  icon: Icons.restart_alt,
-                  label: 'Trudność',
-                  onTap: id == null ? null : () => _resetTrudnoscOne(id),
-                  color: cs.secondary,
-                ),
-                _cardAction(
-                  context,
-                  icon: Icons.delete_outline,
-                  label: 'Usuń',
-                  onTap:
-                      id == null
-                          ? null
-                          : () async {
-                            final ok =
-                                await showDialog<bool>(
-                                  context: context,
-                                  builder:
-                                      (dlgCtx) => AlertDialog(
-                                        title: const Text('Usuń pytanie'),
-                                        content: Text(
-                                          'Na pewno chcesz usunąć pytanie ID $id?',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed:
-                                                () => Navigator.pop(
-                                                  dlgCtx,
-                                                  false,
-                                                ),
-                                            child: const Text('Anuluj'),
-                                          ),
-                                          FilledButton(
-                                            onPressed:
-                                                () =>
-                                                    Navigator.pop(dlgCtx, true),
-                                            child: const Text('Usuń'),
-                                          ),
-                                        ],
-                                      ),
-                                ) ??
-                                false;
-                            if (!context.mounted) return;
-                            if (ok) await _deleteQuestion(id);
-                          },
-                  color: cs.error,
-                ),
-              ],
+                          ) ??
+                          false;
+                      if (!context.mounted) return;
+                      if (ok) await _deleteQuestion(id);
+                    },
+              color: cs.error,
             ),
           ],
         ),
@@ -2188,54 +2101,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     );
   }
 
-  // ──────────────────
-  //  Difficulty badge
-  // ──────────────────
-
-  Widget _buildDifficultyBadge(BuildContext context, Map<String, dynamic> q) {
-    final extras = Theme.of(context).extension<ExtraColors>()!;
-
-    final ilosc = int.tryParse(q['ilosc_odpowiedzi']?.toString() ?? '') ?? 0;
-    final trudnosc =
-        q['trudnosc'] is num
-            ? (q['trudnosc'] as num).toDouble()
-            : double.tryParse(q['trudnosc']?.toString() ?? '') ?? 0.0;
-
-    if (ilosc < 5) return const SizedBox.shrink();
-
-    final isHard = trudnosc > _kHardThreshold;
-    final color = isHard ? extras.incorrect : extras.correct;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isHard ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-            size: 12,
-            color: color,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '${isHard ? "TRUDNE" : "ŁATWE"} ${trudnosc.toStringAsFixed(0)}%',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ────────
   //  Shimmer
   // ────────
@@ -2253,19 +2118,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           margin: const EdgeInsets.symmetric(vertical: 5),
           decoration: BoxDecoration(
             color: cs.surface,
-            border: Border(
-              left: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-                width: _kAccentWidth,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: cs.shadow.withValues(alpha: 0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
-              top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
-              right: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.15),
-              ),
-              bottom: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.15),
-              ),
-            ),
+            ],
           ),
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
           child: Column(
@@ -2306,38 +2166,28 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final extras = theme.extension<ExtraColors>()!;
-    final defaultTextColor =
-        theme.brightness == Brightness.light ? Colors.black : Colors.white;
+    final url = '$apiBaseUrl/$_kval/obrazy/';
+    final defaultTextColor = theme.brightness == Brightness.light
+        ? Colors.black
+        : Colors.white;
 
     Widget? mediaWidget;
     if (_mediaKind == MediaKind.image && _questionImageFilenames.isNotEmpty) {
       mediaWidget = Column(
-        children:
-            _questionImageFilenames
-                .map(
-                  (fname) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          minHeight: 100,
-                          maxHeight: 500,
-                        ),
-                        child: Image.network(
-                          '$apiBaseUrl/$_kval/obrazy/$fname',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
+        children: _questionImageFilenames
+            .map(
+              (fname) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Center(child: buildZoomableImage(context, "$url$fname")),
+              ),
+            )
+            .toList(),
       );
     } else if (_mediaKind == MediaKind.video) {
       if (_uploadedVideoUrl != null) {
         mediaWidget = Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
-          child: InlineVideoPlayer(url: _uploadedVideoUrl!, height: 400),
+          child: InlineVideoPlayer.network(_uploadedVideoUrl!, height: 400),
         );
       } else if (_videoBytes?.isNotEmpty ?? false) {
         return _previewShell(
@@ -2355,12 +2205,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               }
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                child: InlineVideoPlayer(
-                  url: kIsWeb ? null : null,
-                  filePath: kIsWeb ? null : snapshot.data,
-                  blobUrl: kIsWeb ? snapshot.data : null,
-                  height: 400,
-                ),
+                child: kIsWeb
+                    ? InlineVideoPlayer.blob(snapshot.data!, height: 400)
+                    : InlineVideoPlayer.file(snapshot.data!, height: 400),
               );
             },
           ),
@@ -2415,6 +2262,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           child: ElevatedButton(
             onPressed: () {},
             style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
               backgroundColor: isCorrect ? extras.correct : colorScheme.surface,
               foregroundColor: isCorrect ? Colors.black : defaultTextColor,
               alignment: Alignment.centerLeft,
@@ -2445,7 +2293,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _renderHtml(_contentCtrl.text.trim()),
-              if (mediaWidget != null) mediaWidget,
+              ?mediaWidget,
               ...answerWidgets,
               if (_opisPoprawneCtrl.text.trim().isNotEmpty)
                 Padding(
@@ -2485,7 +2333,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'PODGLĄD — zmiany nie są jeszcze zapisane',
+                      'PODGLĄD — zmiany nie są jeszcze zapisane!',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -2547,8 +2395,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     String text, {
     List<String>? images,
     List<String>? videos,
-    double minImageHeight = 100,
-    double maxImageHeight = 500,
   }) {
     const double videoHeight = 400;
     final plain = _clean(text);
@@ -2559,22 +2405,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         ...?images?.map(
           (url) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: minImageHeight,
-                  maxHeight: maxImageHeight,
-                ),
-                child: Image.network(url, fit: BoxFit.contain),
-              ),
-            ),
+            child: Center(child: buildZoomableImage(context, url)),
           ),
         ),
         ...?videos?.map(
           (url) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Center(
-              child: InlineVideoPlayer(url: url, height: videoHeight),
+              child: InlineVideoPlayer.network(url, height: videoHeight),
             ),
           ),
         ),
@@ -2588,13 +2426,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     }
     return Align(
       alignment: Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 50, maxHeight: 200),
-        child:
-            url != null && url.isNotEmpty
-                ? Image.network(url, fit: BoxFit.contain)
-                : Image.memory(bytes!, fit: BoxFit.contain),
-      ),
+      child: url != null && url.isNotEmpty
+          ? buildZoomableImage(context, url)
+          : Image.memory(bytes!, fit: BoxFit.contain),
     );
   }
 }

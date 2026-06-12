@@ -4,7 +4,11 @@ class QualificationGrid extends StatelessWidget {
   final String title;
   final List<Widget> items;
 
-  const QualificationGrid({super.key, required this.title, required this.items});
+  const QualificationGrid({
+    super.key,
+    required this.title,
+    required this.items,
+  });
 
   @override
   Widget build(BuildContext context) {

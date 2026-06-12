@@ -1,12 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/services/api_service.dart';
+import 'package:flutter_app/utils/async_state_view.dart';
+import 'package:flutter_app/utils/helpers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:html_unescape/html_unescape.dart';
+import 'package:html_unescape_xx/html_unescape.dart';
 import 'test_and_report_creation.dart';
 
 // ─── Fake data toggle ────────────────────────────────────────────────────────
-const bool _kUseFakeData = kDebugMode;
 
 List<Map<String, dynamic>> _buildFakeQuestions(int count) => List.generate(
   count,
@@ -54,10 +54,9 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
 
   String _userName = 'Nauczyciel';
 
-  List<Map<String, dynamic>> get selectedQuestions =>
-      allQuestions
-          .where((q) => _selectedIds.contains(q['id'] as String?))
-          .toList();
+  List<Map<String, dynamic>> get selectedQuestions => allQuestions
+      .where((q) => _selectedIds.contains(q['id'] as String?))
+      .toList();
 
   int get selectedCount => _selectedIds.length;
   bool get canSave =>
@@ -83,7 +82,7 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
       _errorMessage = null;
     });
 
-    if (_kUseFakeData) {
+    if (kUseFakeData) {
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
       final fake = _buildFakeQuestions(120);
@@ -104,9 +103,9 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
       if (!mounted) return;
 
       if (result.isSuccess && result.data != null) {
-        final unescape = HtmlUnescape();
-        final List<Map<String, dynamic>> data =
-            (result.data!).cast<Map<String, dynamic>>();
+        final unescape = HtmlUnescapeSmall();
+        final List<Map<String, dynamic>> data = (result.data!)
+            .cast<Map<String, dynamic>>();
 
         for (final q in data) {
           q['pytanie_text'] = unescape.convert(q['pytanie'] ?? '');
@@ -147,14 +146,12 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
 
   void _autoSelectRandom(List<Map<String, dynamic>> questions) {
     final shuffled = List.of(questions)..shuffle();
-    // FIX: if fewer than 40 questions exist, select all and warn user
     final take = shuffled.take(40).toList();
     _selectedIds
       ..clear()
       ..addAll(take.map((q) => q['id'] as String));
   }
 
-  // FIX: ID-based toggle
   void _toggleQuestion(Map<String, dynamic> question) {
     final id = question['id'] as String;
     setState(() {
@@ -166,13 +163,11 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
     });
   }
 
-  // Re-roll a single question in random mode
   void _rerollQuestion(int index) {
     final current = selectedQuestions[index];
-    final unselected =
-        allQuestions
-            .where((q) => !_selectedIds.contains(q['id'] as String))
-            .toList();
+    final unselected = allQuestions
+        .where((q) => !_selectedIds.contains(q['id'] as String))
+        .toList();
     if (unselected.isEmpty) return;
     unselected.shuffle();
     setState(() {
@@ -194,11 +189,10 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
 
     setState(() => isSaving = true);
 
-    final cleanQual =
-        widget.qualification
-            .replaceAll('.', '')
-            .replaceAll(' ', '')
-            .toLowerCase();
+    final cleanQual = widget.qualification
+        .replaceAll('.', '')
+        .replaceAll(' ', '')
+        .toLowerCase();
 
     final newTest = {
       'name': name,
@@ -232,7 +226,7 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
           SnackBar(
             content: Text(
               result.errorMessage ??
-                  'Test o tej nazwie już istnieje dla tej kwalifikacji i autora.',
+                  'Test o takiej samej nazwie w tej kwalifikacji już istnieje!',
             ),
             backgroundColor: cs.error,
           ),
@@ -264,8 +258,6 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
     super.dispose();
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -292,57 +284,65 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
             ),
         ],
       ),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage != null
-              ? _ErrorBody(
-                message: _errorMessage!,
-                onRetry: _fetchQuestions,
-                cs: cs,
-                tt: tt,
-              )
-              // FIX: warn user if bank has fewer than 40 questions
-              : allQuestions.length < 40
-              ? _TooFewQuestionsBody(count: allQuestions.length, cs: cs, tt: tt)
-              : Column(
-                children: [
-                  _HeaderPanel(
-                    nameController: _nameController,
-                    selectedCount: selectedCount,
-                    canSave: canSave,
-                    isSaving: isSaving,
-                    isRandom: isRandom,
-                    onSave: _saveTest,
-                    cs: cs,
-                    tt: tt,
-                  ),
-                  Expanded(
-                    child:
-                        isRandom
-                            ? _RandomList(
-                              questions: selectedQuestions,
-                              qualification: widget.qualification,
-                              onReroll: _rerollQuestion,
-                              cs: cs,
-                            )
-                            : _ManualList(
-                              questions: allQuestions,
-                              selectedIds: _selectedIds,
-                              selectedCount: selectedCount,
-                              onToggle: _toggleQuestion,
-                              cs: cs,
-                              tt: tt,
-                            ),
-                  ),
-                ],
+      body: isLoading
+          ? Center(
+              child: AsyncStateView.loading(subtitle: 'Pobieranie pytań...'),
+            )
+          : _errorMessage != null
+          ? Center(
+              child: AsyncStateView.error(
+                message: 'Błąd ładowania',
+                subtitle: _errorMessage,
+                icon: Icons.cloud_off_rounded,
               ),
+            )
+          // Warn user if bank has fewer than 40 questions
+          : allQuestions.length < 40
+          ? Center(
+              child: AsyncStateView.empty(
+                message: 'Za mało pytań',
+                subtitle:
+                    'Test zawiera tylko ${allQuestions.length} z 40 wymaganych pytań.',
+                icon: Icons.warning_amber_rounded,
+              ),
+            )
+          : Column(
+              children: [
+                _HeaderPanel(
+                  nameController: _nameController,
+                  selectedCount: selectedCount,
+                  canSave: canSave,
+                  isSaving: isSaving,
+                  isRandom: isRandom,
+                  onSave: _saveTest,
+                  cs: cs,
+                  tt: tt,
+                ),
+                Expanded(
+                  child: isRandom
+                      ? _RandomList(
+                          questions: selectedQuestions,
+                          qualification: widget.qualification,
+                          onReroll: _rerollQuestion,
+                          cs: cs,
+                        )
+                      : _ManualList(
+                          questions: allQuestions,
+                          selectedIds: _selectedIds,
+                          selectedCount: selectedCount,
+                          onToggle: _toggleQuestion,
+                          cs: cs,
+                          tt: tt,
+                        ),
+                ),
+              ],
+            ),
     );
   }
 }
 
 // ─────────────────────────────────────────────
-//  Header panel
+//                Header panel
 // ─────────────────────────────────────────────
 
 class _HeaderPanel extends StatelessWidget {
@@ -390,7 +390,7 @@ class _HeaderPanel extends StatelessWidget {
               labelText: 'Nazwa testu',
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.title_rounded),
-              // FIX: show hint when name is empty so user knows why save is disabled
+              // Show hint when name is empty so user knows why save is disabled
               helperText: nameEmpty ? 'Wymagane do zapisania testu' : null,
               helperStyle: TextStyle(color: cs.onSurfaceVariant),
             ),
@@ -436,23 +436,21 @@ class _HeaderPanel extends StatelessWidget {
               // Save button
               FilledButton.icon(
                 onPressed: canSave && !isSaving ? onSave : null,
-                icon:
-                    isSaving
-                        ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: cs.onPrimary,
-                          ),
-                        )
-                        : const Icon(Icons.save_rounded, size: 18),
+                icon: isSaving
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cs.onPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.save_rounded, size: 18),
                 label: const Text('Zapisz'),
               ),
             ],
           ),
 
-          // FIX: explain why save is disabled
           if (!canSave) ...[
             const SizedBox(height: 6),
             Text(
@@ -476,7 +474,7 @@ class _HeaderPanel extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Random mode list
+//              Random mode list
 // ─────────────────────────────────────────────
 
 class _RandomList extends StatelessWidget {
@@ -502,7 +500,6 @@ class _RandomList extends StatelessWidget {
         return Stack(
           children: [
             Padding(
-              // Give space for the re-roll button on the right
               padding: const EdgeInsets.only(right: 48),
               child: RichQuestionWidget(
                 question: q,
@@ -535,7 +532,7 @@ class _RandomList extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Manual mode list
+//             Manual mode list
 // ─────────────────────────────────────────────
 
 class _ManualList extends StatelessWidget {
@@ -564,26 +561,27 @@ class _ManualList extends StatelessWidget {
         final q = questions[i];
         final id = q['id'] as String;
         final isSelected = selectedIds.contains(id);
-        // FIX: visually disable unselected items at capacity
+        // Visually disable unselected items at capacity
         final isDisabled = !isSelected && selectedCount >= 40;
 
         return AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          color:
-              isSelected
-                  ? cs.primaryContainer.withValues(alpha: 0.35)
-                  : Colors.transparent,
+          color: isSelected
+              ? cs.primaryContainer.withValues(alpha: 0.35)
+              : Colors.transparent,
           child: CheckboxListTile(
             controlAffinity: ListTileControlAffinity.leading,
             secondary: CircleAvatar(
-              backgroundColor:
-                  isSelected ? cs.primaryContainer : cs.surfaceContainerHighest,
+              backgroundColor: isSelected
+                  ? cs.primaryContainer
+                  : cs.surfaceContainerHighest,
               child: Text(
                 '${i + 1}',
                 style: TextStyle(
                   fontSize: 12,
-                  color:
-                      isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  color: isSelected
+                      ? cs.onPrimaryContainer
+                      : cs.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -593,130 +591,29 @@ class _ManualList extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: tt.bodyMedium?.copyWith(
-                color:
-                    isDisabled
-                        ? cs.onSurfaceVariant.withValues(alpha: 0.4)
-                        : null,
+                color: isDisabled
+                    ? cs.onSurfaceVariant.withValues(alpha: 0.4)
+                    : null,
               ),
             ),
-            subtitle:
-                (q['pytanie_images'] as List).isNotEmpty
-                    ? Row(
-                      children: [
-                        Icon(Icons.image_rounded, size: 13, color: cs.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Z obrazkiem',
-                          style: tt.bodySmall?.copyWith(color: cs.primary),
-                        ),
-                      ],
-                    )
-                    : null,
+            subtitle: (q['pytanie_images'] as List).isNotEmpty
+                ? Row(
+                    children: [
+                      Icon(Icons.image_rounded, size: 13, color: cs.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Z obrazkiem',
+                        style: tt.bodySmall?.copyWith(color: cs.primary),
+                      ),
+                    ],
+                  )
+                : null,
             value: isSelected,
-            // FIX: disable checkbox (not just ignore tap) when at capacity
+            // Disable checkbox when at capacity
             onChanged: isDisabled ? null : (_) => onToggle(q),
           ),
         );
       },
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  Too few questions body
-// ─────────────────────────────────────────────
-
-class _TooFewQuestionsBody extends StatelessWidget {
-  const _TooFewQuestionsBody({
-    required this.count,
-    required this.cs,
-    required this.tt,
-  });
-  final int count;
-  final ColorScheme cs;
-  final TextTheme tt;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              size: 52,
-              color: cs.error.withValues(alpha: 0.7),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Za mało pytań w bazie',
-              style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Ta kwalifikacja ma tylko $count ${count == 1 ? "pytanie" : "pytań"}.\n'
-              'Do stworzenia testu potrzeba co najmniej 40.',
-              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  Error body
-// ─────────────────────────────────────────────
-
-class _ErrorBody extends StatelessWidget {
-  const _ErrorBody({
-    required this.message,
-    required this.onRetry,
-    required this.cs,
-    required this.tt,
-  });
-  final String message;
-  final VoidCallback onRetry;
-  final ColorScheme cs;
-  final TextTheme tt;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 52,
-              color: cs.onSurfaceVariant.withValues(alpha: 0.35),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Nie udało się pobrać pytań',
-              style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Spróbuj ponownie'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

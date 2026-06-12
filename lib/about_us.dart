@@ -84,8 +84,8 @@ class AboutPage extends StatelessWidget {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: authors.length,
-                        itemBuilder:
-                            (ctx, i) => _AuthorCard(author: authors[i], cs: cs),
+                        itemBuilder: (ctx, i) =>
+                            _AuthorCard(author: authors[i], cs: cs),
                       );
                     },
                   ),
@@ -102,7 +102,7 @@ class AboutPage extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Section header
+//               Section header
 // ─────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
@@ -159,7 +159,7 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  FAQ tile
+//                  FAQ tile
 // ─────────────────────────────────────────────
 
 class _FaqTile extends StatefulWidget {
@@ -207,32 +207,31 @@ class _FaqTileState extends State<_FaqTile>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color:
-              _open ? cs.primaryContainer.withValues(alpha: 0.18) : cs.surface,
+          color: _open
+              ? cs.primaryContainer.withValues(alpha: 0.18)
+              : cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                _open
-                    ? cs.primary.withValues(alpha: 0.35)
-                    : cs.outlineVariant.withValues(alpha: 0.4),
+            color: _open
+                ? cs.primary.withValues(alpha: 0.35)
+                : cs.outlineVariant.withValues(alpha: 0.4),
             width: _open ? 1.5 : 1.0,
           ),
-          boxShadow:
-              _open
-                  ? [
-                    BoxShadow(
-                      color: cs.shadow.withValues(alpha: 0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                  : [
-                    BoxShadow(
-                      color: cs.shadow.withValues(alpha: 0.6),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+          boxShadow: _open
+              ? [
+                  BoxShadow(
+                    color: cs.shadow.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: cs.shadow.withValues(alpha: 0.6),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,8 +295,9 @@ class _FaqTileState extends State<_FaqTile>
                   ],
                 ),
               ),
-              crossFadeState:
-                  _open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              crossFadeState: _open
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
             ),
           ],
         ),
@@ -307,7 +307,7 @@ class _FaqTileState extends State<_FaqTile>
 }
 
 // ─────────────────────────────────────────────
-//  Author card
+//                  Author card
 // ─────────────────────────────────────────────
 
 class _AuthorCard extends StatelessWidget {
@@ -317,13 +317,12 @@ class _AuthorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials =
-        author['name']!
-            .split(' ')
-            .where((p) => p.isNotEmpty)
-            .take(2)
-            .map((p) => p[0].toUpperCase())
-            .join();
+    final initials = author['name']!
+        .split(' ')
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0].toUpperCase())
+        .join();
 
     return Container(
       decoration: BoxDecoration(
@@ -340,7 +339,6 @@ class _AuthorCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Thin gradient top stripe ─────────────────────────────
           Container(
             height: 6,
             decoration: BoxDecoration(
@@ -426,9 +424,6 @@ class _AuthorCard extends StatelessWidget {
             endIndent: 20,
             color: cs.outlineVariant.withValues(alpha: 0.35),
           ),
-
-          // ── Description ──────────────────────────────────────────
-          // Uses cs.onSurface (not onSurfaceVariant) for full readability
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
             child: Text(

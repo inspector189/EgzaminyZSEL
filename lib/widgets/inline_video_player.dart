@@ -1,8 +1,8 @@
 import 'dart:io' show File;
 
-import 'package:chewie/chewie.dart' show ChewieController, Chewie;
-import 'package:flutter/material.dart' show StatefulWidget, State, AutomaticKeepAliveClientMixin, BuildContext, Widget, SizedBox, EdgeInsets, Theme, TextStyle, Text, CircularProgressIndicator, Center, BoxFit, FittedBox, AspectRatio, Padding, RepaintBoundary;
-import 'package:video_player/video_player.dart' show VideoPlayerController;
+import 'package:chewie/chewie.dart';
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 class InlineVideoPlayer extends StatefulWidget {
   const InlineVideoPlayer({
@@ -16,10 +16,27 @@ class InlineVideoPlayer extends StatefulWidget {
          'Podaj url, filePath albo blobUrl (co najmniej jedno)',
        );
 
+  /// Named constructors so call-sites stay clean and obvious
+  const InlineVideoPlayer.network(String this.url, {super.key, this.height})
+    : filePath = null,
+      blobUrl = null;
+
+  const InlineVideoPlayer.file(String path, {super.key, this.height})
+    : filePath = path,
+      url = null,
+      blobUrl = null;
+
+  const InlineVideoPlayer.blob(String blob, {super.key, this.height})
+    : blobUrl = blob,
+      url = null,
+      filePath = null;
+
   final String? url;
   final String? filePath;
   final String? blobUrl;
   final double? height;
+
+  String get _key => url ?? blobUrl ?? filePath!;
 
   @override
   State<InlineVideoPlayer> createState() => _InlineVideoPlayerState();
@@ -39,7 +56,7 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer>
   Future<void> _init() async {
     try {
       _chewie = await _VideoPool().getChewie(
-        widget.url ?? widget.blobUrl ?? widget.filePath!,
+        widget._key,
         filePath: widget.filePath,
         blobUrl: widget.blobUrl,
       );
@@ -51,7 +68,7 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer>
 
   @override
   void dispose() {
-    _VideoPool().release(widget.url ?? widget.blobUrl ?? widget.filePath!);
+    _VideoPool().release(widget._key);
     super.dispose();
   }
 
@@ -62,6 +79,7 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer>
   Widget build(BuildContext context) {
     super.build(context);
     final colorScheme = Theme.of(context).colorScheme;
+
     if (_initError) {
       return Text(
         'Nie udało się wczytać wideo',
@@ -76,10 +94,9 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer>
     }
 
     final vp = _chewie!.videoPlayerController;
-    final aspect =
-        vp.value.isInitialized && vp.value.aspectRatio != 0
-            ? vp.value.aspectRatio
-            : 16 / 9;
+    final aspect = vp.value.isInitialized && vp.value.aspectRatio != 0
+        ? vp.value.aspectRatio
+        : 16 / 9;
 
     Widget player = Chewie(controller: _chewie!);
     if (widget.height != null) {
@@ -119,10 +136,9 @@ class _VideoPool {
     String? blobUrl,
   }) async {
     if (!_vp.containsKey(key)) {
-      final v =
-          filePath != null
-              ? VideoPlayerController.file(File(filePath))
-              : VideoPlayerController.networkUrl(Uri.parse(blobUrl ?? key));
+      final v = filePath != null
+          ? VideoPlayerController.file(File(filePath))
+          : VideoPlayerController.networkUrl(Uri.parse(blobUrl ?? key));
       await v.initialize();
       _vp[key] = v;
     }

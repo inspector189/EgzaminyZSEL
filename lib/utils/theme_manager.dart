@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Keys
 const _kThemeMode = 'themeMode';
 const _kPrimaryColor = 'primaryColor';
 const _kSecondaryColor = 'secondaryColor';
@@ -42,8 +41,6 @@ class ThemeProvider extends ChangeNotifier {
     await prefs.setInt(_kSecondaryColor, _secondaryColor.toARGB32());
   }
 
-  // ── Public API ───────────────────────────────────────────────
-
   Future<void> toggleTheme() async {
     switch (_themeMode) {
       case ThemeMode.light:
@@ -57,7 +54,6 @@ class ThemeProvider extends ChangeNotifier {
     await _saveTheme();
   }
 
-  /// Set theme mode directly (used by PersonalisationPage picker).
   Future<void> setThemeMode(ThemeMode mode) async {
     if (_themeMode == mode) return;
     _themeMode = mode;
@@ -65,18 +61,14 @@ class ThemeProvider extends ChangeNotifier {
     await _saveTheme();
   }
 
-  /// Kept for backward compatibility.
   Future<void> setTheme(ThemeMode mode) => setThemeMode(mode);
 
-  /// Set accent colours and persist immediately.
   Future<void> setAccentColor(Color primary, Color secondary) async {
     _primaryColor = primary;
     _secondaryColor = secondary;
     notifyListeners();
     await _saveTheme();
   }
-
-  // ── Helpers ──────────────────────────────────────────────────
 
   ThemeMode _parseThemeMode(String mode) {
     switch (mode) {

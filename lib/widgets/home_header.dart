@@ -11,7 +11,6 @@ class HomeHeader extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           'Witamy w aplikacji Egzaminy! 👋',
@@ -23,7 +22,8 @@ class HomeHeader extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'Przygotuj się do egzaminu zawodowego z najlepszą bazą pytań! Poniżej znajdziesz kwalifikacje, które możesz przeglądać:',
+          'Przygotuj się do egzaminu zawodowego z najlepszą bazą pytań!'
+          ' Poniżej znajdziesz kwalifikacje, które możesz przeglądać:',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: colorScheme.onSurface,
           ),
@@ -32,12 +32,13 @@ class HomeHeader extends StatelessWidget {
         const SizedBox(height: 24),
         Text(
           '💬 $selectedQuote',
-          style: TextStyle(
+          style: theme.textTheme.bodyLarge?.copyWith(
             fontStyle: FontStyle.italic,
-            fontSize: 16,
             color: colorScheme.onSurfaceVariant,
           ),
           textAlign: TextAlign.center,
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

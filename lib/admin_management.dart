@@ -1,16 +1,33 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/services/api_service.dart';
+import 'package:flutter_app/utils/async_state_view.dart';
+import 'package:flutter_app/utils/helpers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// ─── Set to true to use fake data for UI preview ─────────────────────────────
-const bool _kUseFakeData = kDebugMode;
+// ─── Fake data for UI preview ────────────────────────────────────────────────
 
 final _fakeAdmins = [
-  AdminUser(id: 1, email: 'superadmin@zselektr.onmicrosoft.com', isSuperAdmin: true),
-  AdminUser(id: 2, email: 'jan.kowalski@zselektr.onmicrosoft.com', isSuperAdmin: false),
-  AdminUser(id: 3, email: 'anna.nowak@zselektr.onmicrosoft.com', isSuperAdmin: false),
-  AdminUser(id: 4, email: 'piotr.wisniewski@zselektr.onmicrosoft.com', isSuperAdmin: true),
+  AdminUser(
+    id: 1,
+    email: 'superadmin@zselektr.onmicrosoft.com',
+    isSuperAdmin: true,
+  ),
+  AdminUser(
+    id: 2,
+    email: 'jan.kowalski@zselektr.onmicrosoft.com',
+    isSuperAdmin: false,
+  ),
+  AdminUser(
+    id: 3,
+    email: 'anna.nowak@zselektr.onmicrosoft.com',
+    isSuperAdmin: false,
+  ),
+  AdminUser(
+    id: 4,
+    email: 'piotr.wisniewski@zselektr.onmicrosoft.com',
+    isSuperAdmin: true,
+  ),
 ];
 const String _fakeCurrentEmail = 'superadmin@zselektr.onmicrosoft.com';
 const bool _fakeIsSuperAdmin = true;
@@ -69,7 +86,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
   Future<void> _loadData() async {
     setState(() => isLoading = true);
 
-    if (_kUseFakeData) {
+    if (kUseFakeData) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
       setState(() {
@@ -131,17 +148,19 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     setState(() => isPerformingAction = true);
 
     try {
-      if (_kUseFakeData) {
+      if (kUseFakeData) {
         await Future.delayed(const Duration(milliseconds: 400));
         if (!mounted) return;
         setState(() {
-          admins.add(AdminUser(
-            id: admins.length + 10,
-            email: email,
-            isSuperAdmin: false,
-          ));
+          admins.add(
+            AdminUser(
+              id: admins.length + 10,
+              email: email,
+              isSuperAdmin: false,
+            ),
+          );
         });
-        _showSnackBar('Administrator dodany pomyślnie');
+        _showSnackBar('Status administratora nadany pomyślnie');
         _emailController.clear();
         return;
       }
@@ -154,7 +173,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         return;
       }
 
-      _showSnackBar('Administrator dodany pomyślnie');
+      _showSnackBar('Status administratora nadany pomyślnie');
       _emailController.clear();
       await _refresh();
     } catch (e) {
@@ -167,7 +186,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
   Future<void> _toggleSuperAdmin(AdminUser user) async {
     if (user.email == currentUserEmail && user.isSuperAdmin) {
       _showSnackBar(
-        'Nie możesz odebrać sobie statusu Admina Nadrzędnego!',
+        'Nie możesz odebrać sobie statusu Administratora Nadrzędnego!',
         isError: true,
       );
       return;
@@ -175,7 +194,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     setState(() => isPerformingAction = true);
 
     try {
-      if (_kUseFakeData) {
+      if (kUseFakeData) {
         await Future.delayed(const Duration(milliseconds: 300));
         if (!mounted) return;
         setState(() {
@@ -188,9 +207,11 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
             );
           }
         });
-        _showSnackBar(user.isSuperAdmin
-            ? 'Odebrano status Admina Nadrzędnego'
-            : 'Nadano status Admina Nadrzędnego');
+        _showSnackBar(
+          user.isSuperAdmin
+              ? 'Odebrano status Administratora Nadrzędnego'
+              : 'Nadano status Administratora Nadrzędnego',
+        );
         return;
       }
 
@@ -208,9 +229,11 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         return;
       }
 
-      _showSnackBar(user.isSuperAdmin
-          ? 'Odebrano status Admina Nadrzędnego'
-          : 'Nadano status Admina Nadrzędnego');
+      _showSnackBar(
+        user.isSuperAdmin
+            ? 'Odebrano status Administratora Nadrzędnego'
+            : 'Nadano status Administratora Nadrzędnego',
+      );
       await _refresh();
     } catch (e) {
       if (mounted) _showSnackBar('Brak połączenia z serwerem', isError: true);
@@ -221,7 +244,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
 
   Future<void> _deleteAdmin(AdminUser user) async {
     if (user.email == currentUserEmail) {
-      _showSnackBar('Nie możesz usunąć samego siebie!', isError: true);
+      _showSnackBar('Nie możesz usunąć swojego statusu!', isError: true);
       return;
     }
 
@@ -230,8 +253,10 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Usunąć administratora?'),
-        content: Text('Czy na pewno chcesz usunąć ${user.email}?'),
+        title: const Text('Usunąć status administratora?'),
+        content: Text(
+          'Czy na pewno chcesz usunąć ${user.email} z listy administratorów?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -250,11 +275,11 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     setState(() => isPerformingAction = true);
 
     try {
-      if (_kUseFakeData) {
+      if (kUseFakeData) {
         await Future.delayed(const Duration(milliseconds: 300));
         if (!mounted) return;
         setState(() => admins.removeWhere((a) => a.id == user.id));
-        _showSnackBar('Administrator usunięty');
+        _showSnackBar('Status administratora został pomyślnie usunięty');
         return;
       }
 
@@ -266,10 +291,15 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         return;
       }
 
-      _showSnackBar('Administrator usunięty');
+      _showSnackBar('Status administratora został pomyślnie usunięty');
       await _refresh();
     } catch (e) {
-      if (mounted) _showSnackBar('Błąd podczas usuwania', isError: true);
+      if (mounted) {
+        _showSnackBar(
+          'Błąd podczas usuwania statusu administratora',
+          isError: true,
+        );
+      }
     } finally {
       if (mounted) setState(() => isPerformingAction = false);
     }
@@ -294,8 +324,6 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     );
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -311,7 +339,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         iconTheme: IconThemeData(color: cs.onPrimary),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: AsyncStateView.loading())
           : RefreshIndicator(
               onRefresh: _refresh,
               child: ListView(
@@ -362,19 +390,21 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
                   if (admins.isEmpty)
                     _EmptyState(cs: cs, tt: tt)
                   else
-                    ...admins.map((user) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _AdminRow(
-                            user: user,
-                            isCurrent: user.email == currentUserEmail,
-                            isSuperAdmin: isSuperAdmin,
-                            isPerformingAction: isPerformingAction,
-                            onToggleSuperAdmin: () => _toggleSuperAdmin(user),
-                            onDelete: () => _deleteAdmin(user),
-                            cs: cs,
-                            tt: tt,
-                          ),
-                        )),
+                    ...admins.map(
+                      (user) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _AdminRow(
+                          user: user,
+                          isCurrent: user.email == currentUserEmail,
+                          isSuperAdmin: isSuperAdmin,
+                          isPerformingAction: isPerformingAction,
+                          onToggleSuperAdmin: () => _toggleSuperAdmin(user),
+                          onDelete: () => _deleteAdmin(user),
+                          cs: cs,
+                          tt: tt,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -383,7 +413,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
 }
 
 // ─────────────────────────────────────────────
-//  Add admin card
+//               Add admin card
 // ─────────────────────────────────────────────
 
 class _AddAdminCard extends StatelessWidget {
@@ -431,12 +461,15 @@ class _AddAdminCard extends StatelessWidget {
                     color: cs.primaryContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.person_add_rounded,
-                      size: 18, color: cs.onPrimaryContainer),
+                  child: Icon(
+                    Icons.person_add_rounded,
+                    size: 18,
+                    color: cs.onPrimaryContainer,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  'Dodaj administratora',
+                  'Nadaj status administratora',
                   style: tt.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: cs.onSurface,
@@ -452,21 +485,25 @@ class _AddAdminCard extends StatelessWidget {
                   child: TextFormField(
                     controller: controller,
                     decoration: InputDecoration(
-                      hintText: 'Email nowego administratora',
+                      hintText: 'Adres email nowego administratora',
                       prefixIcon: const Icon(Icons.email_outlined, size: 20),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 14),
+                        vertical: 12,
+                        horizontal: 14,
+                      ),
                       isDense: true,
                     ),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Pole wymagane';
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Pole jest wymagane!';
+                      }
                       if (!v.contains('@') || !v.contains('.')) {
-                        return 'Nieprawidłowy email';
+                        return 'Nieprawidłowy adres email!';
                       }
                       return null;
                     },
@@ -492,7 +529,7 @@ class _AddAdminCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Read-only banner
+//                Read-only banner
 // ─────────────────────────────────────────────
 
 class _ReadOnlyBanner extends StatelessWidget {
@@ -511,11 +548,15 @@ class _ReadOnlyBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.lock_outline_rounded, color: cs.onErrorContainer, size: 20),
+          Icon(
+            Icons.lock_outline_rounded,
+            color: cs.onErrorContainer,
+            size: 20,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Tryb tylko do odczytu — brak uprawnień administratora nadrzędnego.',
+              'Tryb tylko do odczytu — brak uprawnień Administratora Nadrzędnego.',
               style: tt.bodySmall?.copyWith(
                 color: cs.onErrorContainer,
                 fontWeight: FontWeight.w500,
@@ -529,7 +570,7 @@ class _ReadOnlyBanner extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Admin row card
+//               Admin row card
 // ─────────────────────────────────────────────
 
 class _AdminRow extends StatelessWidget {
@@ -554,7 +595,6 @@ class _AdminRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return Container(
       decoration: BoxDecoration(
         color: cs.surface,
@@ -580,7 +620,9 @@ class _AdminRow extends StatelessWidget {
             width: 4,
             height: 64,
             decoration: BoxDecoration(
-              color: isCurrent ? cs.primary : cs.outlineVariant.withValues(alpha: 0.4),
+              color: isCurrent
+                  ? cs.primary
+                  : cs.outlineVariant.withValues(alpha: 0.4),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 bottomLeft: Radius.circular(12),
@@ -595,7 +637,9 @@ class _AdminRow extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: isCurrent ? cs.primaryContainer : cs.surfaceContainerHighest,
+              color: isCurrent
+                  ? cs.primaryContainer
+                  : cs.surfaceContainerHighest,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -628,11 +672,10 @@ class _AdminRow extends StatelessWidget {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      Icon(Icons.star_rounded,
-                          size: 12, color: cs.tertiary),
+                      Icon(Icons.star_rounded, size: 12, color: cs.tertiary),
                       const SizedBox(width: 4),
                       Text(
-                        'Admin Nadrzędny',
+                        'Administrator Nadrzędny',
                         style: tt.labelSmall?.copyWith(
                           color: cs.tertiary,
                           fontWeight: FontWeight.w600,
@@ -653,18 +696,20 @@ class _AdminRow extends StatelessWidget {
                 // Super admin toggle
                 Tooltip(
                   message: user.isSuperAdmin
-                      ? 'Odbierz status Admina Nadrzędnego'
-                      : 'Nadaj status Admina Nadrzędnego',
+                      ? 'Odbierz status Administratora Nadrzędnego'
+                      : 'Nadaj status Administratora Nadrzędnego',
                   child: IconButton(
                     icon: Icon(
                       user.isSuperAdmin
                           ? Icons.star_rounded
                           : Icons.star_outline_rounded,
-                      color: user.isSuperAdmin ? cs.tertiary : cs.onSurfaceVariant,
+                      color: user.isSuperAdmin
+                          ? cs.tertiary
+                          : cs.onSurfaceVariant,
                       size: 22,
                     ),
-                    onPressed: isPerformingAction ||
-                            (user.isSuperAdmin && isCurrent)
+                    onPressed:
+                        isPerformingAction || (user.isSuperAdmin && isCurrent)
                         ? null
                         : onToggleSuperAdmin,
                   ),
@@ -674,8 +719,11 @@ class _AdminRow extends StatelessWidget {
                   Tooltip(
                     message: 'Usuń administratora',
                     child: IconButton(
-                      icon: Icon(Icons.delete_outline_rounded,
-                          color: cs.error, size: 22),
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        color: cs.error,
+                        size: 22,
+                      ),
                       onPressed: isPerformingAction ? null : onDelete,
                     ),
                   )
@@ -683,9 +731,13 @@ class _AdminRow extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Tooltip(
-                      message: 'Nie możesz usunąć własnego konta',
-                      child: Icon(Icons.shield_rounded,
-                          color: cs.primary.withValues(alpha: 0.4), size: 22),
+                      message:
+                          'Nie możesz usunąć statusu administratora z własnego konta',
+                      child: Icon(
+                        Icons.shield_rounded,
+                        color: cs.primary.withValues(alpha: 0.4),
+                        size: 22,
+                      ),
                     ),
                   ),
                 const SizedBox(width: 4),
@@ -694,8 +746,11 @@ class _AdminRow extends StatelessWidget {
           else
             Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Icon(Icons.visibility_outlined,
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.5), size: 20),
+              child: Icon(
+                Icons.visibility_outlined,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                size: 20,
+              ),
             ),
         ],
       ),
@@ -704,7 +759,7 @@ class _AdminRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Empty state
+//                 Empty state
 // ─────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
@@ -718,11 +773,14 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 48),
       child: Column(
         children: [
-          Icon(Icons.people_outline_rounded,
-              size: 52, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+          Icon(
+            Icons.people_outline_rounded,
+            size: 52,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 16),
           Text(
-            'Brak administratorów',
+            'Brak administratorów!',
             style: tt.titleSmall?.copyWith(
               color: cs.onSurfaceVariant,
               fontWeight: FontWeight.w600,

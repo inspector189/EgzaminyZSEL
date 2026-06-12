@@ -27,10 +27,9 @@ class EgzaminWynikView extends StatelessWidget {
     final bool zdane = percentage >= 50;
 
     final resultText = "$correctAnswers / $totalQuestions";
-    final message =
-        zdane
-            ? "Gratulacje! Zdałeś egzamin!"
-            : "Niestety, nie udało się zdać egzaminu";
+    final message = zdane
+        ? "Gratulacje! Zdałeś egzamin!"
+        : "Niestety, nie udało się zdać egzaminu";
 
     final color = zdane ? extras.correct : extras.incorrect;
 
@@ -143,11 +142,10 @@ class EgzaminWynikView extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder:
-                                    (_) => EgzaminPodgladView(
-                                      questions: questions,
-                                      selectedAnswers: selectedAnswers,
-                                    ),
+                                builder: (_) => EgzaminPodgladView(
+                                  questions: questions,
+                                  selectedAnswers: selectedAnswers,
+                                ),
                               ),
                             );
                           },
@@ -160,10 +158,9 @@ class EgzaminWynikView extends StatelessWidget {
                         ),
                       const SizedBox(height: 8),
                       TextButton(
-                        onPressed:
-                            () => Navigator.of(
-                              context,
-                            ).popUntil((route) => route.isFirst),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst),
                         child: const Text("Wróć do strony głównej"),
                       ),
                     ],

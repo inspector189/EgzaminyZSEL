@@ -90,7 +90,7 @@ class PersonalisationPage extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Section label
+//                 Section label
 // ─────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
@@ -130,7 +130,7 @@ class _SectionLabel extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Colour swatch tile
+//            Colour swatch tile
 // ─────────────────────────────────────────────
 
 class _SwatchTile extends StatelessWidget {
@@ -222,7 +222,7 @@ class _SwatchTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Theme mode picker
+//            Theme mode picker
 // ─────────────────────────────────────────────
 
 class _ThemeModePicker extends StatelessWidget {

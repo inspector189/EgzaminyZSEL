@@ -19,7 +19,7 @@ class SearchBar extends StatelessWidget {
       onTap: onTap,
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.search),
-        hintText: 'Wyszukaj użytkownika..',
+        hintText: 'Wyszukaj użytkownika...',
         filled: true,
         fillColor: fill,
         border: OutlineInputBorder(

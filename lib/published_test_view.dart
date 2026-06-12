@@ -1,9 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/services/api_service.dart';
+import 'package:flutter_app/utils/async_state_view.dart';
+import 'package:flutter_app/utils/helpers.dart';
 import 'exam_solving.dart';
-
-const bool _kUseFakeData = kDebugMode;
 
 final _fakeTests = [
   {
@@ -91,20 +90,18 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
       publishedTests = [];
     });
 
-    if (_kUseFakeData) {
+    if (kUseFakeData) {
       await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
       setState(() {
-        publishedTests =
-            _fakeTests
-                .where(
-                  (t) =>
-                      _normalize(t['qualification'] as String) ==
-                          _normalizedQual &&
-                      ((t['questions'] as List?)?.isNotEmpty ?? false),
-                )
-                .map((t) => Map<String, dynamic>.from(t))
-                .toList();
+        publishedTests = _fakeTests
+            .where(
+              (t) =>
+                  _normalize(t['qualification'] as String) == _normalizedQual &&
+                  ((t['questions'] as List?)?.isNotEmpty ?? false),
+            )
+            .map((t) => Map<String, dynamic>.from(t))
+            .toList();
         isLoading = false;
       });
       return;
@@ -158,14 +155,13 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (_) => EgzaminView(
-              tryb: TrybEgzaminu.zTestu,
-              kwalifikacja: test['qualification'] as String,
-              returnToHome: false,
-              userName: null,
-              testData: shuffledTest,
-            ),
+        builder: (_) => EgzaminView(
+          tryb: TrybEgzaminu.zTestu,
+          kwalifikacja: test['qualification'] as String,
+          returnToHome: false,
+          userName: null,
+          testData: shuffledTest,
+        ),
       ),
     );
   }
@@ -179,11 +175,8 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
     final qual = widget.qualification.toUpperCase();
 
     return Scaffold(
-      backgroundColor: cs.surfaceContainerLowest,
       appBar: AppBar(
         title: Text('Testy — $qual'),
-        backgroundColor: cs.primary,
-        foregroundColor: cs.onPrimary,
         iconTheme: IconThemeData(color: cs.onPrimary),
         actions: [
           IconButton(
@@ -199,24 +192,26 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
 
   Widget _buildBody(ColorScheme cs, TextTheme tt) {
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: AsyncStateView.loading());
     }
 
     if (errorMessage != null) {
-      return _ErrorState(
-        message: errorMessage!,
-        onRetry: _loadPublishedTests,
-        cs: cs,
-        tt: tt,
+      return Center(
+        child: AsyncStateView.error(
+          message: 'Błąd ładowania',
+          subtitle: errorMessage,
+          icon: Icons.cloud_off_rounded,
+        ),
       );
     }
 
     if (publishedTests.isEmpty) {
-      return _EmptyState(
-        qualification: widget.qualification.toUpperCase(),
-        onRetry: _loadPublishedTests,
-        cs: cs,
-        tt: tt,
+      return Center(
+        child: AsyncStateView.empty(
+          message: 'Brak opublikowanych testów',
+          subtitle: 'Brak testów od nauczycieli dla kwalifikacji ${widget.qualification.toUpperCase()}.',
+          icon: Icons.assignment_outlined,
+        ),
       );
     }
 
@@ -225,13 +220,12 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         itemCount: publishedTests.length,
-        itemBuilder:
-            (context, i) => _TestCard(
-              test: publishedTests[i],
-              cs: cs,
-              tt: tt,
-              onTap: () => _startTest(publishedTests[i]),
-            ),
+        itemBuilder: (context, i) => _TestCard(
+          test: publishedTests[i],
+          cs: cs,
+          tt: tt,
+          onTap: () => _startTest(publishedTests[i]),
+        ),
       ),
     );
   }
@@ -273,27 +267,24 @@ class _TestCard extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
-            color:
-                isEmpty
-                    ? cs.surfaceContainerHighest.withValues(alpha: 0.5)
-                    : cs.surface,
+            color: isEmpty
+                ? cs.surfaceContainerHighest.withValues(alpha: 0.5)
+                : cs.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color:
-                  isEmpty
-                      ? cs.outlineVariant.withValues(alpha: 0.2)
-                      : cs.outlineVariant.withValues(alpha: 0.4),
+              color: isEmpty
+                  ? cs.outlineVariant.withValues(alpha: 0.2)
+                  : cs.outlineVariant.withValues(alpha: 0.4),
             ),
-            boxShadow:
-                isEmpty
-                    ? null
-                    : [
-                      BoxShadow(
-                        color: cs.shadow.withValues(alpha: 0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+            boxShadow: isEmpty
+                ? null
+                : [
+                    BoxShadow(
+                      color: cs.shadow.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -304,28 +295,26 @@ class _TestCard extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color:
-                        isEmpty
-                            ? cs.surfaceContainerHighest
-                            : cs.primaryContainer,
+                    color: isEmpty
+                        ? cs.surfaceContainerHighest
+                        : cs.primaryContainer,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
-                  child:
-                      isEmpty
-                          ? Icon(
-                            Icons.warning_amber_rounded,
-                            size: 20,
-                            color: cs.error,
-                          )
-                          : Text(
-                            initial,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                              color: cs.onPrimaryContainer,
-                            ),
+                  child: isEmpty
+                      ? Icon(
+                          Icons.warning_amber_rounded,
+                          size: 20,
+                          color: cs.error,
+                        )
+                      : Text(
+                          initial,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            color: cs.onPrimaryContainer,
                           ),
+                        ),
                 ),
                 const SizedBox(width: 14),
 
@@ -367,8 +356,9 @@ class _TestCard extends StatelessWidget {
                             isEmpty ? 'Brak pytań' : '$questionCount pytań',
                             style: tt.bodySmall?.copyWith(
                               color: isEmpty ? cs.error : cs.onSurfaceVariant,
-                              fontWeight:
-                                  isEmpty ? FontWeight.w600 : FontWeight.normal,
+                              fontWeight: isEmpty
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -383,121 +373,6 @@ class _TestCard extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  Empty state
-// ─────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.qualification,
-    required this.onRetry,
-    required this.cs,
-    required this.tt,
-  });
-  final String qualification;
-  final VoidCallback onRetry;
-  final ColorScheme cs;
-  final TextTheme tt;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.folder_open_rounded,
-              size: 52,
-              color: cs.onSurfaceVariant.withValues(alpha: 0.35),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Brak testów dla $qualification',
-              style: tt.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Żaden test nie został jeszcze opublikowany\ndla tej kwalifikacji.',
-              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Sprawdź ponownie'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  Error state
-// ─────────────────────────────────────────────
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({
-    required this.message,
-    required this.onRetry,
-    required this.cs,
-    required this.tt,
-  });
-  final String message;
-  final VoidCallback onRetry;
-  final ColorScheme cs;
-  final TextTheme tt;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 52,
-              color: cs.onSurfaceVariant.withValues(alpha: 0.35),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Nie udało się pobrać testów',
-              style: tt.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: tt.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Spróbuj ponownie'),
-            ),
-          ],
         ),
       ),
     );

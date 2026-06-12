@@ -37,20 +37,29 @@ class ApiService {
 
   Map<String, String> get _apiKeyFormHeaders => {
     'Content-Type': 'application/x-www-form-urlencoded',
-    'Authorization': 'Bearer $apiKey',
+    'Authorization': 'Bearer $apiToken',
   };
 
   Map<String, String> get _apiKeyJsonHeaders => {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer $apiKey',
+    'Authorization': 'Bearer $apiToken',
   };
 
   // ─── Questions ────────────────────────────────────────────────────────────
 
   /// Fetches the raw question list for [qualification] (e.g. "inf03").
-  Future<ApiResult<List<dynamic>>> fetchQuestions(String qualification) async {
+  Future<ApiResult<List<dynamic>>> fetchQuestions(
+    String qualification, {
+    int? limit,
+  }) async {
     try {
-      final res = await http.get(Uri.parse('$apiBaseUrl/$qualification.php'));
+      final uri = Uri.parse('$apiBaseUrl/getQuestions.php').replace(
+        queryParameters: {
+          'egzamin': qualification,
+          if (limit != null) 'limit': limit.toString(),
+        },
+      );
+      final res = await http.get(uri);
       if (res.statusCode == 200 && res.body.isNotEmpty) {
         return ApiResult(
           statusCode: res.statusCode,
@@ -91,7 +100,7 @@ class ApiService {
         Uri.parse('$apiBaseUrl/add_question.php'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $apiKey',
+          'Authorization': 'Bearer $apiToken',
           'Accept': 'application/json',
         },
         body: jsonEncode(payload),
@@ -116,8 +125,8 @@ class ApiService {
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-          'X-API-Key': apiKey,
+          'Authorization': 'Bearer $apiToken',
+          'X-API-Key': apiToken,
         },
         body: jsonEncode({'egzamin': qualification, 'id': id}),
       );
@@ -141,7 +150,7 @@ class ApiService {
         Uri.parse('$apiBaseUrl/reset_trudnosc.php'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-          'Authorization': 'Bearer $apiKey',
+          'Authorization': 'Bearer $apiToken',
         },
         body: body,
       );
@@ -189,8 +198,8 @@ class ApiService {
               'POST',
               Uri.parse('$apiBaseUrl/upload_image_next.php'),
             )
-            ..headers['Authorization'] = 'Bearer $apiKey'
-            ..headers['X-API-Key'] = apiKey
+            ..headers['Authorization'] = 'Bearer $apiToken'
+            ..headers['X-API-Key'] = apiToken
             ..headers['Accept'] = 'application/json'
             ..fields['kwalifikacja'] = qualification
             ..fields['egzamin'] = qualification
@@ -247,8 +256,8 @@ class ApiService {
               'POST',
               Uri.parse('$apiBaseUrl/upload_video.php'),
             )
-            ..headers['Authorization'] = 'Bearer $apiKey'
-            ..headers['X-API-Key'] = apiKey
+            ..headers['Authorization'] = 'Bearer $apiToken'
+            ..headers['X-API-Key'] = apiToken
             ..headers['Accept'] = 'application/json'
             ..fields['kwalifikacja'] = qualification
             ..fields['egzamin'] = qualification
@@ -330,7 +339,7 @@ class ApiService {
   }
 
   /// Saves a quick exam score (used in single/40-question modes via zapisz_wynik.php).
-  Future<ApiResult<void>> saveExamScore({
+  /*Future<ApiResult<void>> saveExamScore({
     required String qualification,
     required double score,
     required String dateTime,
@@ -353,7 +362,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(statusCode: -1, errorMessage: e.toString());
     }
-  }
+  }*/
 
   // ─── Published Tests ──────────────────────────────────────────────────────
 
@@ -361,7 +370,7 @@ class ApiService {
   Future<ApiResult<List<Map<String, dynamic>>>> fetchPublishedTests() async {
     try {
       final res = await http.get(
-        Uri.parse(publishedTestsUrl),
+        Uri.parse('$apiBaseUrl/publishedTests.php'),
         headers: _authHeaders,
       );
       if (res.statusCode == 200) {
@@ -379,7 +388,10 @@ class ApiService {
   /// Fetches all tests (teacher-facing, includes unpublished).
   Future<ApiResult<List<Map<String, dynamic>>>> fetchAllTests() async {
     try {
-      final res = await http.get(Uri.parse(allTestsUrl), headers: _authHeaders);
+      final res = await http.get(
+        Uri.parse('$apiBaseUrl/publishedTests_admin.php'),
+        headers: _authHeaders,
+      );
       if (res.statusCode == 200) {
         return ApiResult(
           statusCode: res.statusCode,
@@ -396,7 +408,7 @@ class ApiService {
   Future<ApiResult<void>> createTest(Map<String, dynamic> test) async {
     try {
       final res = await http.post(
-        Uri.parse(publishedTestsUrl),
+        Uri.parse('$apiBaseUrl/publishedTests.php'),
         headers: _authJsonHeaders,
         body: json.encode({'action': 'create', 'test': test}),
       );
@@ -416,7 +428,7 @@ class ApiService {
   ) async {
     try {
       final res = await http.post(
-        Uri.parse(publishedTestsUrl),
+        Uri.parse('$apiBaseUrl/publishedTests.php'),
         headers: _authJsonHeaders,
         body: json.encode({
           'action': publish ? 'publish' : 'unpublish',
@@ -433,7 +445,7 @@ class ApiService {
   Future<ApiResult<void>> deleteTest(Map<String, dynamic> test) async {
     try {
       final res = await http.post(
-        Uri.parse(publishedTestsUrl),
+        Uri.parse('$apiBaseUrl/publishedTests.php'),
         headers: _authJsonHeaders,
         body: json.encode({'action': 'delete', 'test': test}),
       );
@@ -513,7 +525,7 @@ class ApiService {
       final res = await http.post(
         Uri.parse('$apiBaseUrl/stats_all.php'),
         headers: _apiKeyFormHeaders,
-        body: {'api_token': apiKey},
+        body: {'api_token': apiToken},
       );
       if (res.statusCode == 200) {
         return ApiResult(
@@ -538,7 +550,7 @@ class ApiService {
       final res = await http.post(
         Uri.parse('$apiBaseUrl/podgladEgzaminu.php'),
         body: {
-          'api_token': apiKey,
+          'api_token': apiToken,
           'exam_id': examId.toString(),
           'userName': userName,
           'exam_date': examDateTime,
@@ -567,7 +579,7 @@ class ApiService {
       final res = await http.post(
         Uri.parse('$apiBaseUrl/podgladEgzaminu_user.php'),
         body: {
-          'api_token': apiKey,
+          'api_token': apiToken,
           'exam_id': examId.toString(),
           'exam_date': examDateTime,
           'duration_sec': durationSec.toString(),

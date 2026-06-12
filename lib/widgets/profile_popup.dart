@@ -131,7 +131,7 @@ class ProfilePopup extends StatelessWidget {
                       cs: cs,
                       tt: tt,
                     ),
-                  if (!isAdmin)
+                  //if (!isAdmin)
                     _MenuItem(
                       icon: Icons.bar_chart_rounded,
                       label: 'Statystyki',
@@ -172,7 +172,7 @@ class ProfilePopup extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Menu item row
+//                Menu item row
 // ─────────────────────────────────────────────
 
 class _MenuItem extends StatelessWidget {

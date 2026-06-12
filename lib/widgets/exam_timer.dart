@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 class ExamTimer extends StatelessWidget {
   final DateTime endTime;
   const ExamTimer({super.key, required this.endTime});
@@ -20,8 +21,9 @@ class ExamTimer extends StatelessWidget {
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color:
-                total.inMinutes < 5 ? colorScheme.error : colorScheme.onPrimary,
+            color: total.inMinutes < 5
+                ? colorScheme.error
+                : colorScheme.onPrimary,
           ),
         );
       },

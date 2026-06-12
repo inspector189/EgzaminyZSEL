@@ -62,7 +62,7 @@ class ModernAdminRow extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Usuń administratora',
+              tooltip: 'Usuń status administratora',
               onPressed: onDelete,
               style: IconButton.styleFrom(
                 backgroundColor: colorScheme.errorContainer,

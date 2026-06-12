@@ -8,6 +8,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/helpers.dart';
 
 class OAuth2Service {
+  static const List<String> _scopes = [
+    'openid',
+    'profile',
+    'email',
+    'User.Read',
+    'offline_access',
+  ];
+
+  static const String _microsoftUrl = "https://login.microsoftonline.com/";
+  static const String _tokenUrl = '$_microsoftUrl/$tenantId/oauth2/v2.0/token';
+  static const String _authorizeUrl =
+      '$_microsoftUrl/$tenantId/oauth2/v2.0/authorize';
+
+  static const String _redirectUri = '$baseUrl/redirect.html';
 
   static String _generateCodeVerifier() {
     final random = Random.secure();
@@ -33,12 +47,12 @@ class OAuth2Service {
     web.window.localStorage.setItem('code_verifier', codeVerifier);
     web.window.localStorage.setItem('oauth_state', state);
 
-    final authUrl = Uri.parse(authorizeUrl).replace(
+    final authUrl = Uri.parse(_authorizeUrl).replace(
       queryParameters: {
         'client_id': clientId,
         'response_type': 'code',
-        'redirect_uri': redirectUri,
-        'scope': scopes.join(' '),
+        'redirect_uri': _redirectUri,
+        'scope': _scopes.join(' '),
         'state': state,
         'response_mode': 'query',
         'code_challenge': codeChallenge,
@@ -65,13 +79,13 @@ class OAuth2Service {
 
     try {
       final response = await http.post(
-        Uri.parse(tokenUrl),
+        Uri.parse(_tokenUrl),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {
           'client_id': clientId,
           'grant_type': 'authorization_code',
           'code': code,
-          'redirect_uri': redirectUri,
+          'redirect_uri': _redirectUri,
           'code_verifier': codeVerifier,
         },
       );

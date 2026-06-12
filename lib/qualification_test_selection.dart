@@ -32,10 +32,9 @@ class QualificationPage extends StatelessWidget {
 
     final screenWidth = MediaQuery.of(context).size.width;
     const double kMaxContent = 880.0;
-    final double contentWidth =
-        screenWidth < 600
-            ? screenWidth - 32
-            : (screenWidth * 0.85).clamp(0.0, kMaxContent);
+    final double contentWidth = screenWidth < 600
+        ? screenWidth - 32
+        : (screenWidth * 0.85).clamp(0.0, kMaxContent);
     final double hPad = ((screenWidth - contentWidth) / 2).clamp(
       16.0,
       double.infinity,
@@ -52,18 +51,16 @@ class QualificationPage extends StatelessWidget {
           code: 'Losuj 1 pytanie',
           label: 'Sprawdź swoją wiedzę',
           showCount: false,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (_) => EgzaminView(
-                        tryb: TrybEgzaminu.jednoPytanie,
-                        kwalifikacja: _sanitized,
-                        returnToHome: false,
-                      ),
-                ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EgzaminView(
+                tryb: TrybEgzaminu.jednoPytanie,
+                kwalifikacja: _sanitized,
+                returnToHome: false,
               ),
+            ),
+          ),
         ),
       ),
       (w) => SizedBox(
@@ -73,18 +70,16 @@ class QualificationPage extends StatelessWidget {
           code: 'Test 40 pytań',
           label: 'Pełny egzamin próbny',
           showCount: false,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (_) => EgzaminView(
-                        tryb: TrybEgzaminu.czterdziesciPytan,
-                        kwalifikacja: _sanitized,
-                        returnToHome: false,
-                      ),
-                ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EgzaminView(
+                tryb: TrybEgzaminu.czterdziesciPytan,
+                kwalifikacja: _sanitized,
+                returnToHome: false,
               ),
+            ),
+          ),
         ),
       ),
       (w) => SizedBox(
@@ -94,18 +89,16 @@ class QualificationPage extends StatelessWidget {
           code: 'Baza pytań',
           label: 'Przeglądaj wszystkie pytania',
           showCount: false,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (_) => EgzaminView(
-                        tryb: TrybEgzaminu.wszystkie,
-                        kwalifikacja: _sanitized,
-                        returnToHome: false,
-                      ),
-                ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EgzaminView(
+                tryb: TrybEgzaminu.wszystkie,
+                kwalifikacja: _sanitized,
+                returnToHome: false,
               ),
+            ),
+          ),
         ),
       ),
       (w) => SizedBox(
@@ -115,18 +108,16 @@ class QualificationPage extends StatelessWidget {
           code: 'Testy nauczyciela',
           label: 'Opublikowane zestawy pytań',
           showCount: false,
-          onTap:
-              () =>
-                  isLoggedIn
-                      ? Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (_) =>
-                                  PublishedTestsPage(qualification: _sanitized),
-                        ),
-                      )
-                      : _showLoginGate(context, cs, tt),
+          isLocked: !isLoggedIn,
+          onTap: () => isLoggedIn
+              ? Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        PublishedTestsPage(qualification: _sanitized),
+                  ),
+                )
+              : LoginGateBottomSheet.show(context),
         ),
       ),
     ];
@@ -145,45 +136,40 @@ class QualificationPage extends StatelessWidget {
           return Wrap(
             spacing: spacing,
             runSpacing: spacing,
-            children:
-                practiceTileBuilders
-                    .map((builder) => builder(tileWidth))
-                    .toList(),
+            children: practiceTileBuilders
+                .map((builder) => builder(tileWidth))
+                .toList(),
           );
         },
       ),
     );
 
-    final adminSection =
-        isAdmin
-            ? _Section(
-              label: 'Zarządzanie',
-              cs: cs,
-              tt: tt,
-              accent: cs.tertiary,
-              child: Center(
-                child: SizedBox(
-                  width: itemWidth,
-                  child: QuestionTile(
-                    icon: Icons.edit_note_rounded,
-                    code: 'Edytuj pytania',
-                    label: 'Zarządzaj bazą egzaminów',
-                    showCount: false,
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (_) => EditQuestionsPage(
-                                  qualification: _sanitized,
-                                ),
-                          ),
-                        ),
+    final adminSection = isAdmin
+        ? _Section(
+            label: 'Zarządzanie',
+            cs: cs,
+            tt: tt,
+            accent: cs.tertiary,
+            child: Center(
+              child: SizedBox(
+                width: itemWidth,
+                child: QuestionTile(
+                  icon: Icons.edit_note_rounded,
+                  code: 'Edytuj pytania',
+                  label: 'Zarządzaj bazą egzaminów',
+                  showCount: false,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          EditQuestionsPage(qualification: _sanitized),
+                    ),
                   ),
                 ),
               ),
-            )
-            : null;
+            ),
+          )
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -191,110 +177,123 @@ class QualificationPage extends StatelessWidget {
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
         iconTheme: IconThemeData(color: cs.onPrimary),
-        leading:
-            returnToHome
-                ? IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  onPressed:
-                      () => Navigator.of(context).popUntil((r) => r.isFirst),
-                )
-                : null,
+        leading: returnToHome
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () =>
+                    Navigator.of(context).popUntil((r) => r.isFirst),
+              )
+            : null,
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(hPad, 28, hPad, 32),
-        child:
-            isWide
-                ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: practiceSection),
-                    Container(
-                      width: 1,
-                      height: 600,
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      color: cs.outlineVariant.withValues(alpha: 0.4),
-                    ),
-                    SizedBox(width: itemWidth + 40, child: adminSection!),
+        child: isWide
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: practiceSection),
+                  Container(
+                    width: 1,
+                    height: 600,
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
+                  ),
+                  SizedBox(width: itemWidth + 40, child: adminSection!),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  practiceSection,
+                  if (adminSection != null) ...[
+                    const SizedBox(height: 32),
+                    Divider(color: cs.outlineVariant.withValues(alpha: 0.4)),
+                    const SizedBox(height: 20),
+                    adminSection,
                   ],
-                )
-                : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    practiceSection,
-                    if (adminSection != null) ...[
-                      const SizedBox(height: 32),
-                      Divider(color: cs.outlineVariant.withValues(alpha: 0.4)),
-                      const SizedBox(height: 20),
-                      adminSection,
-                    ],
-                  ],
-                ),
+                ],
+              ),
       ),
-    );
-  }
-
-  void _showLoginGate(BuildContext context, ColorScheme cs, TextTheme tt) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder:
-          (ctx) => Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.lock_outline_rounded,
-                    size: 28,
-                    color: cs.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Wymagane logowanie',
-                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Aby rozwiązać testy od nauczycieli,\nmusisz być zalogowany.',
-                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.login_rounded),
-                    label: const Text('Rozumiem'),
-                  ),
-                ),
-              ],
-            ),
-          ),
     );
   }
 }
 
 // ─────────────────────────────────────────────
-//  Section wrapper with label
+//          Login Gate Bottom Sheet
+// ─────────────────────────────────────────────
+
+class LoginGateBottomSheet extends StatelessWidget {
+  const LoginGateBottomSheet({super.key});
+
+  static void show(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const LoginGateBottomSheet(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: cs.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.lock_outline_rounded,
+              size: 28,
+              color: cs.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Wymagane logowanie',
+            style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Aby rozwiązać testy od nauczycieli,\nmusisz być zalogowany.',
+            style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.login_rounded),
+              label: const Text('Rozumiem (Przejdź do logowania)'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//          Section wrapper with label
 // ─────────────────────────────────────────────
 
 class _Section extends StatelessWidget {

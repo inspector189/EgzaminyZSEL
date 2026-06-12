@@ -16,6 +16,7 @@ class QuestionTile extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
   final bool showCount;
+  final bool isLocked;
 
   const QuestionTile({
     super.key,
@@ -24,6 +25,7 @@ class QuestionTile extends StatefulWidget {
     required this.label,
     required this.onTap,
     this.showCount = true,
+    this.isLocked = false,
   });
 
   @override
@@ -121,7 +123,7 @@ class _QuestionTileState extends State<QuestionTile> {
 
       if (parsedCount == null) {
         throw const FormatException(
-          'Zwrócona wartość count nie jest prawidłowa!',
+          'Zwrócona wartość ilości pytań jest nieprawidłowa!',
         );
       }
 
@@ -143,7 +145,7 @@ class _QuestionTileState extends State<QuestionTile> {
         debugPrint('Widżet ($_cacheKey) napotkał błąd: $e\n$stack');
       }
 
-      String userMessage = 'Nie udało się pobrać liczby pytań';
+      String userMessage = 'Nie udało się pobrać liczby pytań!';
       if (e is TimeoutException) {
         userMessage = 'Przekroczono czas oczekiwania';
       } else if (e is FormatException) {
@@ -174,7 +176,7 @@ class _QuestionTileState extends State<QuestionTile> {
 
     if (_hasError) {
       return _ErrorState(
-        message: _errorMessage ?? 'Wystąpił błąd',
+        message: _errorMessage ?? 'Wystąpił nieznany błąd',
         onRetry: _tryLoadFromCacheOrNetwork,
         scheme: scheme,
       );
@@ -211,18 +213,17 @@ class _QuestionTileState extends State<QuestionTile> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final itemWidth = screenWidth < 600 ? screenWidth - 40 : 300.0;
 
-    final scale =
-        _isPressed
-            ? 0.97
-            : _isHovering
-            ? 1.025
-            : 1.0;
+    final scale = _isPressed
+        ? 0.97
+        : (_isHovering && !widget.isLocked)
+        ? 1.025
+        : 1.0;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
       child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapDown: (_) => setState(() => _isPressed = !widget.isLocked),
         onTapUp: (_) {
           setState(() => _isPressed = false);
           widget.onTap();
@@ -249,14 +250,44 @@ class _QuestionTileState extends State<QuestionTile> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(widget.icon, size: 44, color: scheme.primary),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          widget.icon,
+                          size: 44,
+                          color: widget.isLocked
+                              ? scheme.onSurface.withValues(alpha: 0.3)
+                              : scheme.primary,
+                        ),
+                        if (widget.isLocked)
+                          Positioned(
+                            right: -6,
+                            bottom: -4,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainerHighest,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.lock_outline_rounded,
+                                size: 13,
+                                color: scheme.outline,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       widget.code,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: scheme.onSurface,
+                        color: widget.isLocked
+                            ? scheme.onSurface.withValues(alpha: 0.4)
+                            : scheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
