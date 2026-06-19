@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'question_panel.dart';
@@ -57,14 +58,15 @@ class AdminPanelPage extends StatelessWidget {
           MaterialPageRoute(builder: (_) => QuestionStatsPage()),
         ),
       ),
-      AdminTileData(
-        icon: Icons.school_rounded,
-        label: 'Kwalifikacje i zawody',
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ManageQualificationsPage()),
+      if (kDebugMode)
+        AdminTileData(
+          icon: Icons.school_rounded,
+          label: 'Kwalifikacje i zawody',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ManageQualificationsPage()),
+          ),
         ),
-      ),
       AdminTileData(
         icon: Icons.play_circle_fill,
         label: 'Przeprowadź test',

@@ -24,8 +24,9 @@ class ProfilePopup extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final initial =
-        userName.trim().isNotEmpty ? userName.trim()[0].toUpperCase() : '?';
+    final initial = userName.trim().isNotEmpty
+        ? userName.trim()[0].toUpperCase()
+        : '?';
 
     return Material(
       elevation: 8,
@@ -131,7 +132,7 @@ class ProfilePopup extends StatelessWidget {
                       cs: cs,
                       tt: tt,
                     ),
-                  //if (!isAdmin)
+                  if (!isAdmin)
                     _MenuItem(
                       icon: Icons.bar_chart_rounded,
                       label: 'Statystyki',
