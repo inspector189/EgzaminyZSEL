@@ -283,7 +283,7 @@ class LoginGateBottomSheet extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.login_rounded),
-              label: const Text('Rozumiem (Przejdź do logowania)'),
+              label: const Text('Rozumiem'),
             ),
           ),
         ],

@@ -257,7 +257,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       widget.kwalifikacja,
       correct,
     );
-    if (!result.isSuccess && mounted) {
+    if (!result.isSuccess && mounted && kDebugMode) {
       debugPrint('Zapis trudności nie powiódł się: ${result.errorMessage}');
     }
   }

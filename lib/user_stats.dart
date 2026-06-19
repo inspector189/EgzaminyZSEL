@@ -1,12 +1,27 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/services/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'exam_preview.dart';
 import 'utils/async_state_view.dart';
 
-class StatisticsPage extends StatelessWidget {
+class StatisticsPage extends StatefulWidget {
   const StatisticsPage({super.key});
+
+  @override
+  State<StatisticsPage> createState() => _StatisticsPageState();
+}
+
+class _StatisticsPageState extends State<StatisticsPage> {
+  late final Future<Map<String, dynamic>> _statsFuture = ApiService.instance
+      .fetchUserStats()
+      .then((result) {
+        if (result.isSuccess) return result.data!;
+        if (result.isNotFound) {
+          throw Exception('⚠️ Nie zrobiłeś(aś) jeszcze żadnego egzaminu!');
+        } else {
+          throw Exception('Wystąpił wewnętrzny błąd: ${result.errorMessage}');
+        }
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -16,103 +31,87 @@ class StatisticsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('📊 Statystyki'), elevation: 2),
       body: FutureBuilder<Map<String, dynamic>>(
-        future: fetchStatistics(),
+        future: _statsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return AsyncStateView.loading(subtitle: 'Pobieranie statystyk...');
-          } else if (snapshot.hasError) {
+          }
+          if (snapshot.hasError) {
             return AsyncStateView.error(
               message: 'Błąd ładowania',
               subtitle: snapshot.error.toString(),
             );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          }
+
+          final data = snapshot.data!;
+          final stats = data['stats'] as Map<String, dynamic>? ?? {};
+          final exams = data['exams'] as List<dynamic>? ?? [];
+
+          if (stats.isEmpty && exams.isEmpty) {
             return AsyncStateView.empty(
               message: 'Brak danych statystycznych',
               icon: Icons.bar_chart_outlined,
             );
           }
 
-          final stats = snapshot.data!;
+          // Group exams by qualification
+          final Map<String, List<dynamic>> examsByQual = {};
+          for (final exam in exams) {
+            final qual = (exam['kwalifikacja'] ?? 'Nieznana') as String;
+            examsByQual.putIfAbsent(qual, () => []).add(exam);
+          }
+
           final entries = stats.entries.toList();
 
           return LayoutBuilder(
             builder: (context, constraints) {
               const maxCardWidth = 350;
-              final crossAxisCount = (constraints.maxWidth / maxCardWidth)
-                  .floor()
-                  .clamp(1, entries.length);
+              final crossAxisCount = entries.isEmpty
+                  ? 1
+                  : (constraints.maxWidth / maxCardWidth).floor().clamp(
+                      1,
+                      entries.length,
+                    );
+              final rowCount = entries.isEmpty
+                  ? 0
+                  : (entries.length / crossAxisCount).ceil();
 
-              final rowCount = (entries.length / crossAxisCount).ceil();
-
-              List<Widget> mainStatsWidgets = [];
-              for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-                final startIndex = rowIndex * crossAxisCount;
-                final endIndex = (startIndex + crossAxisCount).clamp(
-                  0,
-                  entries.length,
-                );
-                final rowEntries = entries.sublist(startIndex, endIndex);
-
-                mainStatsWidgets.add(
+              final mainStatsWidgets = <Widget>[
+                for (int rowIndex = 0; rowIndex < rowCount; rowIndex++)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (int i = 0; i < rowEntries.length; i++) ...[
-                          Expanded(
-                            child: StatCard(
-                              entry: rowEntries[i],
-                              colorScheme: colorScheme,
-                              theme: theme,
-                            ),
-                          ),
-                          if (i != rowEntries.length - 1)
-                            const SizedBox(width: 16),
-                        ],
-                      ],
+                    child: Builder(
+                      builder: (context) {
+                        final startIndex = rowIndex * crossAxisCount;
+                        final endIndex = (startIndex + crossAxisCount).clamp(
+                          0,
+                          entries.length,
+                        );
+                        final rowEntries = entries.sublist(
+                          startIndex,
+                          endIndex,
+                        );
+
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (int i = 0; i < rowEntries.length; i++) ...[
+                              Expanded(
+                                child: StatCard(
+                                  entry: rowEntries[i],
+                                  colorScheme: colorScheme,
+                                  theme: theme,
+                                ),
+                              ),
+                              if (i != rowEntries.length - 1)
+                                const SizedBox(width: 16),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                   ),
-                );
-              }
-
-              Widget lastExamsWidget = FutureBuilder<List<dynamic>>(
-                future: fetchUserExams(),
-                builder: (context, snapshot2) {
-                  if (snapshot2.connectionState == ConnectionState.waiting) {
-                    return AsyncStateView.loading(
-                      subtitle: 'Pobieranie egzaminów...',
-                    );
-                  }
-
-                  if (!snapshot2.hasData || snapshot2.data!.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: AsyncStateView.empty(
-                        message: 'Brak zapisanych egzaminów',
-                        subtitle: 'Nie zrobiłeś(aś) jeszcze żadnego egzaminu.',
-                        icon: Icons.assignment_outlined,
-                      ),
-                    );
-                  }
-
-                  final exams = snapshot2.data!;
-                  final Map<String, List<dynamic>> examsByQual = {};
-                  for (final exam in exams) {
-                    final qual = exam['kwalifikacja'] ?? 'Nieznana';
-                    examsByQual.putIfAbsent(qual, () => []).add(exam);
-                  }
-
-                  return Column(
-                    children: examsByQual.entries.map((entry) {
-                      return LastExamCard(
-                        title: entry.key,
-                        exams: entry.value.cast(),
-                      );
-                    }).toList(),
-                  );
-                },
-              );
+              ];
 
               return ListView(
                 padding: const EdgeInsets.all(16),
@@ -124,7 +123,19 @@ class StatisticsPage extends StatelessWidget {
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  lastExamsWidget,
+                  if (exams.isEmpty)
+                    AsyncStateView.empty(
+                      message: 'Brak zapisanych egzaminów',
+                      subtitle: 'Nie zrobiłeś(aś) jeszcze żadnego egzaminu.',
+                      icon: Icons.assignment_outlined,
+                    )
+                  else
+                    ...examsByQual.entries.map(
+                      (entry) => LastExamCard(
+                        title: entry.key,
+                        exams: entry.value.cast(),
+                      ),
+                    ),
                 ],
               );
             },
@@ -132,59 +143,6 @@ class StatisticsPage extends StatelessWidget {
         },
       ),
     );
-  }
-
-  Future<List<dynamic>> fetchUserExams() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString('userName') ?? 'anonymous';
-    if (userName == 'anonymous') return [];
-
-    final result = await ApiService.instance.fetchAllStats();
-
-    if (!result.isSuccess) return [];
-
-    final jsonData = result.data!;
-
-    final exams = jsonData
-        .where((e) => (e['userID'] ?? '') == userName)
-        .toList();
-
-    exams.sort((a, b) {
-      final da = DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
-      final db = DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
-      return db.compareTo(da);
-    });
-
-    return exams;
-  }
-
-  Future<Map<String, dynamic>> fetchStatistics() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString('userName') ?? 'anonymous';
-
-    if (userName == 'anonymous') {
-      throw Exception('ℹ️ Funkcja statystyk wymaga zalogowania.');
-    }
-
-    final result = await ApiService.instance.fetchUserStats(userName);
-
-    if (kDebugMode) {
-      debugPrint('📥 Otrzymano odpowiedź od serwera.');
-    }
-
-    try {
-      final data = result.data!;
-      if (result.isSuccess) {
-        if (data.containsKey('error')) throw Exception(data['error']);
-        return data;
-      } else if (result.isNotFound) {
-        throw Exception('⚠️ Nie zrobiłeś(aś) jeszcze żadnego egzaminu!');
-      } else {
-        throw Exception('❌ ${result.statusCode} - ${result.data!}');
-      }
-    } on Exception catch (e) {
-      throw Exception("$e");
-    }
   }
 }
 
@@ -527,11 +485,13 @@ class LastExamRow extends StatelessWidget {
         };
       }
       if (kDebugMode) {
-        debugPrint('Błąd PHP: ${result.statusCode}');
+        debugPrint(
+          'Wystąpił błąd podczas pobierania danych egzaminu: ${result.statusCode}',
+        );
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Błąd podczas pobierania danych egzaminu: $e');
+        debugPrint('Wystąpił wewnętrzny błąd: $e');
       }
     }
     return null;

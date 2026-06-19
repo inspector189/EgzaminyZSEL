@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 
 import 'question_panel.dart';
+import 'utils/helpers.dart';
 import 'widgets/admin_tiles.dart';
 import 'admin_stats.dart';
 import 'admin_management.dart';
 import 'test_and_report_creation.dart';
+import 'admin_qualifications.dart';
 
 class AdminPanelPage extends StatelessWidget {
-  const AdminPanelPage({super.key});
+  final bool isSuperAdmin;
+  final String currentUserEmail;
+
+  const AdminPanelPage({
+    super.key,
+    required this.isSuperAdmin,
+    required this.currentUserEmail,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +31,14 @@ class AdminPanelPage extends StatelessWidget {
         label: 'Administratorzy',
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const ManageAdminsPage()),
+          MaterialPageRoute(
+            builder: (_) => ManageAdminsPage(
+              isSuperAdmin: kUseFakeData ? true : isSuperAdmin,
+              currentUserEmail: kUseFakeData
+                  ? 'superadmin@zselektr.onmicrosoft.com'
+                  : currentUserEmail,
+            ),
+          ),
         ),
       ),
       AdminTileData(
@@ -42,12 +58,25 @@ class AdminPanelPage extends StatelessWidget {
         ),
       ),
       AdminTileData(
+        icon: Icons.school_rounded,
+        label: 'Kwalifikacje i zawody',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ManageQualificationsPage()),
+        ),
+      ),
+      AdminTileData(
         icon: Icons.play_circle_fill,
         label: 'Przeprowadź test',
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => const CreatingTestsAndReportsPage(),
+            builder: (_) => CreatingTestsAndReportsPage(
+              isSuperAdmin: kUseFakeData ? true : isSuperAdmin,
+              currentUserEmail: kUseFakeData
+                  ? 'superadmin@zselektr.onmicrosoft.com'
+                  : currentUserEmail,
+            ),
           ),
         ),
       ),

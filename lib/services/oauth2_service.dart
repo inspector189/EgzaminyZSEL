@@ -21,7 +21,7 @@ class OAuth2Service {
   static const String _authorizeUrl =
       '$_microsoftUrl/$tenantId/oauth2/v2.0/authorize';
 
-  static const String _redirectUri = '$baseUrl/redirect.html';
+  static const String _redirectUri = '${baseUrl}redirect.html';
 
   static String _generateCodeVerifier() {
     final random = Random.secure();
@@ -110,7 +110,9 @@ class OAuth2Service {
             isAdmin = msJson['isAdmin'] == true;
           } else {
             if (kDebugMode) {
-              print('ms-login error: ${msRes.statusCode} ${msRes.body}');
+              debugPrint(
+                'Wystąpił błąd podczas logowania: ${msRes.statusCode} ${msRes.body}',
+              );
             }
           }
         }
@@ -121,11 +123,13 @@ class OAuth2Service {
         return true;
       } else {
         if (kDebugMode) {
-          print('Token error: ${response.statusCode} - ${response.body}');
+          debugPrint(
+            'Wystąpił błąd podczas pobierania tokena: ${response.statusCode} - ${response.body}',
+          );
         }
       }
     } catch (e) {
-      if (kDebugMode) print('Błąd tokena: $e');
+      if (kDebugMode) debugPrint('Wystąpił wewnętrzny błąd: $e');
     }
     return false;
   }
@@ -152,7 +156,7 @@ class OAuth2Service {
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Failed to parse id_token: $e');
+        debugPrint('Wystąpił błąd podczas przetwarzania ID: $e');
       }
     }
   }

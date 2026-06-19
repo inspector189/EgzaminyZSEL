@@ -51,7 +51,7 @@ void main() async {
       );
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Błąd ładownaia certyfikatu: $e');
+        debugPrint('Błąd ładowania certyfikatu: $e');
       }
     }
   }
@@ -118,6 +118,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   String? _userName;
   String? _userEmail;
   bool _isAdmin = false;
+  bool _isSuperAdmin = false;
 
   @override
   void initState() {
@@ -158,7 +159,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
           }
         } else {
           if (mounted) {
-            setState(() => _isAdmin = result.data?['isAdmin'] == true);
+            setState(() {
+              _isAdmin = result.data?['isAdmin'] == true;
+              _isSuperAdmin = result.data?['isSuperAdmin'] == true;
+            });
           }
         }
       }
@@ -269,6 +273,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       _userName = null;
       _userEmail = null;
       _isAdmin = false;
+      _isSuperAdmin = false;
     });
 
     if (mounted && showSnack) {
@@ -348,7 +353,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const AdminPanelPage(),
+                            builder: (_) => AdminPanelPage(
+                              isSuperAdmin: _isSuperAdmin,
+                              currentUserEmail: _userEmail ?? '',
+                            ),
                           ),
                         );
                       },
@@ -436,7 +444,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     }
     final profession = professions.firstWhere(
       (p) => p.name == title,
-      orElse: () => Profession(name: '', emoji: '', qualifications: []),
+      orElse: () => Profession(name: '', qualifications: []),
     );
 
     return Padding(
@@ -640,7 +648,9 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                   },
                 ),
                 IconButton(
-                  icon: Icon(_isLoggedIn ? Icons.person_rounded : Icons.login_rounded),
+                  icon: Icon(
+                    _isLoggedIn ? Icons.person_rounded : Icons.login_rounded,
+                  ),
                   tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
                   color: colorScheme.onPrimary,
                   onPressed: () async {
@@ -747,7 +757,6 @@ class HomeContent extends StatelessWidget {
           }).toList();
 
           return _ProfessionSection(
-            emoji: profession.emoji,
             name: profession.name,
             tiles: tiles,
             cs: cs,
@@ -761,14 +770,12 @@ class HomeContent extends StatelessWidget {
 
 class _ProfessionSection extends StatelessWidget {
   const _ProfessionSection({
-    required this.emoji,
     required this.name,
     required this.tiles,
     required this.cs,
     required this.tt,
   });
 
-  final String emoji;
   final String name;
   final List<Widget> tiles;
   final ColorScheme cs;
@@ -796,9 +803,7 @@ class _ProfessionSection extends StatelessWidget {
               ),
               Row(
                 children: [
-                  const SizedBox(width: 12),
-                  Text(emoji, style: const TextStyle(fontSize: 20)),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 10),
                   Text(
                     'Technik $name',
                     style: tt.titleMedium?.copyWith(

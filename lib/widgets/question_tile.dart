@@ -1,13 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
 
-import '/utils/helpers.dart';
+import '/services/api_service.dart';
 import '/utils/app_themes.dart';
 
 class QuestionTile extends StatefulWidget {
@@ -33,152 +28,89 @@ class QuestionTile extends StatefulWidget {
 }
 
 class _QuestionTileState extends State<QuestionTile> {
-  static final Map<String, _CacheEntry> _cache = {};
-
-  static void _evictExpired() {
-    final now = DateTime.now();
-    _cache.removeWhere((_, entry) => entry.expiresAt.isBefore(now));
-  }
-
-  static const _cacheTtl = Duration(minutes: 15);
-  static const _baseUrl = '$apiBaseUrl/count/countQuestions.php';
-
   int? _count;
   bool _isLoading = false;
   bool _hasError = false;
-  String? _errorMessage;
-
   bool _isHovering = false;
   bool _isPressed = false;
-
-  late final String _cacheKey;
-  Future<void>? _currentLoadFuture;
 
   @override
   void initState() {
     super.initState();
-    _cacheKey = widget.code.replaceAll('.', '').toLowerCase();
-
-    if (widget.showCount) {
-      _tryLoadFromCacheOrNetwork();
-    }
+    if (widget.showCount) _load();
   }
 
-  void _tryLoadFromCacheOrNetwork() {
-    _evictExpired();
-    final cached = _cache[_cacheKey];
-    final now = DateTime.now();
+  String get _cacheKey => widget.code.replaceAll('.', '').toLowerCase();
 
-    if (cached != null && cached.expiresAt.isAfter(now)) {
+  Future<void> _load() async {
+    if (_isLoading) return;
+    if (mounted) {
       setState(() {
-        _count = cached.value;
-        _isLoading = false;
+        _isLoading = true;
         _hasError = false;
       });
-      return;
     }
 
-    if (_currentLoadFuture != null) return;
-
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-      _errorMessage = null;
-    });
-
-    _currentLoadFuture = _fetchCount();
-  }
-
-  Future<void> _fetchCount() async {
     try {
-      final uri = Uri.parse('$_baseUrl?egzamin=$_cacheKey');
-
-      final response = await http
-          .get(uri)
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw TimeoutException('Żądanie wygasło po 10 sekundach');
-            },
-          );
-
+      final result = await ApiService.instance.fetchQuestionCount(_cacheKey);
       if (!mounted) return;
-
-      if (response.statusCode != 200) {
-        throw _HttpException('Serwer zwrócił kod ${response.statusCode}');
+      if (result.isSuccess) {
+        setState(() {
+          _count = result.data;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
       }
-
-      final decoded = jsonDecode(response.body);
-
-      if (decoded is! Map<String, dynamic> || !decoded.containsKey('count')) {
-        throw const FormatException('Nieprawidłowy format odpowiedzi!');
-      }
-
-      final rawCount = decoded['count'];
-      final parsedCount = switch (rawCount) {
-        int count => count,
-        String str => int.tryParse(str),
-        _ => null,
-      };
-
-      if (parsedCount == null) {
-        throw const FormatException(
-          'Zwrócona wartość ilości pytań jest nieprawidłowa!',
-        );
-      }
-
-      _cache[_cacheKey] = _CacheEntry(
-        value: parsedCount,
-        expiresAt: DateTime.now().add(_cacheTtl),
-      );
-
+    } catch (e) {
       if (!mounted) return;
-
-      setState(() {
-        _count = parsedCount;
-        _isLoading = false;
-        _hasError = false;
-        _errorMessage = null;
-      });
-    } catch (e, stack) {
-      if (kDebugMode) {
-        debugPrint('Widżet ($_cacheKey) napotkał błąd: $e\n$stack');
-      }
-
-      String userMessage = 'Nie udało się pobrać liczby pytań!';
-      if (e is TimeoutException) {
-        userMessage = 'Przekroczono czas oczekiwania';
-      } else if (e is FormatException) {
-        userMessage = 'Błędna odpowiedź serwera';
-      }
-
-      if (!mounted) return;
-
       setState(() {
         _isLoading = false;
         _hasError = true;
-        _errorMessage = userMessage;
       });
-    } finally {
-      _currentLoadFuture = null;
     }
   }
 
-  Widget _buildCountArea(ColorScheme scheme, ExtraColors extras) {
+  Widget _buildCountArea(ColorScheme cs, ExtraColors extras) {
     if (_isLoading) {
       return Shimmer.fromColors(
         baseColor: extras.shimmerBase,
-        highlightColor: scheme.primary.withValues(alpha: 0.4),
+        highlightColor: cs.primary.withValues(alpha: 0.4),
         period: const Duration(milliseconds: 1400),
-        child: const _LoadingPlaceholder(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            SizedBox.square(
+              dimension: 14,
+              child: CircularProgressIndicator(strokeWidth: 2.2),
+            ),
+            SizedBox(width: 8),
+            Text('Ładowanie...', style: TextStyle(fontSize: 12)),
+          ],
+        ),
       );
     }
 
     if (_hasError) {
-      return _ErrorState(
-        message: _errorMessage ?? 'Wystąpił nieznany błąd',
-        onRetry: _tryLoadFromCacheOrNetwork,
-        scheme: scheme,
+      return GestureDetector(
+        onTap: _load,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, color: cs.error, size: 15),
+            const SizedBox(width: 5),
+            Padding(
+              padding: EdgeInsetsGeometry.all(2),
+              child: Text(
+                'Błąd — dotknij, aby ponowić',
+                style: TextStyle(fontSize: 11, color: cs.error),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -190,7 +122,7 @@ class _QuestionTileState extends State<QuestionTile> {
           const SizedBox(width: 6),
           Text(
             'Brak pytań',
-            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
           ),
         ],
       );
@@ -200,7 +132,7 @@ class _QuestionTileState extends State<QuestionTile> {
       '$_count ${_count == 1 ? "pytanie" : "pytań"}',
       style: TextStyle(
         fontSize: 12.5,
-        color: scheme.onSurface.withValues(alpha: 0.75),
+        color: cs.onSurface.withValues(alpha: 0.75),
         fontWeight: FontWeight.w500,
       ),
     );
@@ -208,7 +140,7 @@ class _QuestionTileState extends State<QuestionTile> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final extras = Theme.of(context).extension<ExtraColors>()!;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final itemWidth = screenWidth < 600 ? screenWidth - 40 : 300.0;
@@ -223,10 +155,12 @@ class _QuestionTileState extends State<QuestionTile> {
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
       child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = !widget.isLocked),
+        onTapDown: (_) {
+          if (!widget.isLocked) setState(() => _isPressed = true);
+        },
         onTapUp: (_) {
           setState(() => _isPressed = false);
-          widget.onTap();
+          if (!widget.isLocked) widget.onTap();
         },
         onTapCancel: () => setState(() => _isPressed = false),
         child: AnimatedScale(
@@ -234,11 +168,9 @@ class _QuestionTileState extends State<QuestionTile> {
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
           child: Card(
-            elevation: _isHovering ? 6 : 3,
-            color: scheme.surfaceContainerHighest,
-            shadowColor: scheme.shadow.withValues(
-              alpha: _isHovering ? 0.25 : 0.18,
-            ),
+            elevation: _isHovering && !widget.isLocked ? 6 : 3,
+            color: cs.surfaceContainerHighest,
+            shadowColor: cs.shadow.withValues(alpha: _isHovering ? 0.25 : 0.18),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -257,8 +189,8 @@ class _QuestionTileState extends State<QuestionTile> {
                           widget.icon,
                           size: 44,
                           color: widget.isLocked
-                              ? scheme.onSurface.withValues(alpha: 0.3)
-                              : scheme.primary,
+                              ? cs.onSurface.withValues(alpha: 0.3)
+                              : cs.primary,
                         ),
                         if (widget.isLocked)
                           Positioned(
@@ -267,13 +199,13 @@ class _QuestionTileState extends State<QuestionTile> {
                             child: Container(
                               padding: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
-                                color: scheme.surfaceContainerHighest,
+                                color: cs.surfaceContainerHighest,
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 Icons.lock_outline_rounded,
                                 size: 13,
-                                color: scheme.outline,
+                                color: cs.outline,
                               ),
                             ),
                           ),
@@ -286,8 +218,8 @@ class _QuestionTileState extends State<QuestionTile> {
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: widget.isLocked
-                            ? scheme.onSurface.withValues(alpha: 0.4)
-                            : scheme.onSurface,
+                            ? cs.onSurface.withValues(alpha: 0.4)
+                            : cs.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -297,12 +229,12 @@ class _QuestionTileState extends State<QuestionTile> {
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.3,
-                        color: scheme.onSurfaceVariant,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                     if (widget.showCount) ...[
                       const Spacer(),
-                      _buildCountArea(scheme, extras),
+                      _buildCountArea(cs, extras),
                     ],
                   ],
                 ),
@@ -313,78 +245,4 @@ class _QuestionTileState extends State<QuestionTile> {
       ),
     );
   }
-}
-
-class _LoadingPlaceholder extends StatelessWidget {
-  const _LoadingPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: const [
-        SizedBox.square(
-          dimension: 14,
-          child: CircularProgressIndicator(strokeWidth: 2.2),
-        ),
-        SizedBox(width: 8),
-        Text('Ładowanie...', style: TextStyle(fontSize: 12)),
-      ],
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-  final ColorScheme scheme;
-
-  const _ErrorState({
-    required this.message,
-    required this.onRetry,
-    required this.scheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.error_outline_rounded, color: scheme.error, size: 18),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            message,
-            style: TextStyle(fontSize: 12, color: scheme.error),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(width: 8),
-        TextButton(
-          onPressed: onRetry,
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(0, 0),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: const Text('Spróbuj ponownie', style: TextStyle(fontSize: 12)),
-        ),
-      ],
-    );
-  }
-}
-
-class _CacheEntry {
-  final int value;
-  final DateTime expiresAt;
-
-  _CacheEntry({required this.value, required this.expiresAt});
-}
-
-class _HttpException implements Exception {
-  final String message;
-  _HttpException(this.message);
-  @override
-  String toString() => message;
 }

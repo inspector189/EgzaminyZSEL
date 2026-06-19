@@ -106,9 +106,6 @@ final _fakeTests = [
   },
 ];
 
-const String _fakeCurrentUser = 'jan.kowalski@szkola.pl';
-const bool _fakeIsSuperAdmin = true;
-
 bool isValidQualification(String? qual) {
   if (qual == null) return false;
   final trimmed = qual.trim().toLowerCase();
@@ -216,7 +213,14 @@ class RichQuestionWidget extends StatelessWidget {
 // ─────────────────────────────────────────────
 
 class CreatingTestsAndReportsPage extends StatefulWidget {
-  const CreatingTestsAndReportsPage({super.key});
+  final bool isSuperAdmin;
+  final String currentUserEmail;
+
+  const CreatingTestsAndReportsPage({
+    super.key,
+    required this.isSuperAdmin,
+    required this.currentUserEmail,
+  });
 
   @override
   State<CreatingTestsAndReportsPage> createState() =>
@@ -283,7 +287,13 @@ class _CreatingTestsAndReportsPageState
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [CreatedTestsTab(), CreateNewTestTab()],
+              children: [
+                CreatedTestsTab(
+                  isSuperAdmin: widget.isSuperAdmin,
+                  currentUserEmail: widget.currentUserEmail,
+                ),
+                const CreateNewTestTab(),
+              ],
             ),
           ),
         ],
@@ -351,7 +361,14 @@ class TestPreviewPage extends StatelessWidget {
 // ─────────────────────────────────────────────
 
 class CreatedTestsTab extends StatefulWidget {
-  const CreatedTestsTab({super.key});
+  final bool isSuperAdmin;
+  final String currentUserEmail;
+
+  const CreatedTestsTab({
+    super.key,
+    required this.isSuperAdmin,
+    required this.currentUserEmail,
+  });
   @override
   State<CreatedTestsTab> createState() => _CreatedTestsTabState();
 }
@@ -370,8 +387,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
   void initState() {
     super.initState();
     _innerTab = TabController(length: 2, vsync: this);
-    _loadCurrentUser();
-    _loadUserRole();
     _loadTests();
   }
 
@@ -382,39 +397,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
   }
 
   // ── Data loading ──────────────────────────────────────────────
-
-  Future<void> _loadCurrentUser() async {
-    if (kUseFakeData) {
-      if (mounted) setState(() => currentUser = _fakeCurrentUser);
-      return;
-    }
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() => currentUser = prefs.getString('userName') ?? '');
-    }
-  }
-
-  Future<void> _loadUserRole() async {
-    if (kUseFakeData) {
-      if (mounted) setState(() => isSuperAdmin = _fakeIsSuperAdmin);
-      return;
-    }
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('userEmail');
-    if (email == null || email.isEmpty) {
-      return; // silent — not a SnackBar concern
-    }
-
-    try {
-      final result = await ApiService.instance.checkSuperAdmin(email);
-      if (result.isSuccess && mounted) {
-        setState(() => isSuperAdmin = result.data ?? false);
-        prefs.setBool('isSuperAdmin', isSuperAdmin);
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('Błąd sprawdzania uprawnień: $e');
-    }
-  }
 
   Future<void> _loadTests() async {
     if (kUseFakeData) {

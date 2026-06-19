@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/services/api_service.dart';
 import 'package:flutter_app/utils/async_state_view.dart';
 import 'package:flutter_app/utils/helpers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Fake data for UI preview ────────────────────────────────────────────────
 
@@ -29,8 +28,6 @@ final _fakeAdmins = [
     isSuperAdmin: true,
   ),
 ];
-const String _fakeCurrentEmail = 'superadmin@zselektr.onmicrosoft.com';
-const bool _fakeIsSuperAdmin = true;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -55,7 +52,14 @@ class AdminUser {
 }
 
 class ManageAdminsPage extends StatefulWidget {
-  const ManageAdminsPage({super.key});
+  final bool isSuperAdmin;
+  final String currentUserEmail;
+
+  const ManageAdminsPage({
+    super.key,
+    required this.isSuperAdmin,
+    required this.currentUserEmail,
+  });
 
   @override
   State<ManageAdminsPage> createState() => _ManageAdminsPageState();
@@ -64,8 +68,6 @@ class ManageAdminsPage extends StatefulWidget {
 class _ManageAdminsPageState extends State<ManageAdminsPage> {
   List<AdminUser> admins = [];
   bool isLoading = true;
-  bool isSuperAdmin = false;
-  String? currentUserEmail;
   bool isPerformingAction = false;
 
   final _emailController = TextEditingController();
@@ -90,38 +92,14 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
       await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
       setState(() {
-        currentUserEmail = _fakeCurrentEmail;
-        isSuperAdmin = _fakeIsSuperAdmin;
         admins = List.from(_fakeAdmins);
         isLoading = false;
       });
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('userEmail')?.trim();
-
-    if (email == null || email.isEmpty) {
-      if (mounted) _showSnackBar('Brak danych logowania', isError: true);
-      setState(() => isLoading = false);
-      return;
-    }
-
-    currentUserEmail = email;
-    await Future.wait([_checkSuperAdminStatus(email), _fetchAdmins()]);
+    await _fetchAdmins();
     if (mounted) setState(() => isLoading = false);
-  }
-
-  Future<void> _checkSuperAdminStatus(String email) async {
-    try {
-      final result = await ApiService.instance.checkSuperAdmin(email);
-      if (result.isSuccess && mounted) {
-        setState(() => isSuperAdmin = result.data ?? false);
-      }
-    } catch (e, st) {
-      debugPrint('checkSuperAdmin error: $e\n$st');
-      if (mounted) setState(() => isSuperAdmin = false);
-    }
   }
 
   Future<void> _fetchAdmins() async {
@@ -137,7 +115,9 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         });
       }
     } catch (e, st) {
-      if (kDebugMode) debugPrint('fetchAdmins error: $e\n$st');
+      if (kDebugMode) {
+        debugPrint('Błąd podczas ładowania administratorów: $e\n$st');
+      }
       if (mounted) _showSnackBar('Nie udało się pobrać listy', isError: true);
     }
   }
@@ -184,7 +164,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
   }
 
   Future<void> _toggleSuperAdmin(AdminUser user) async {
-    if (user.email == currentUserEmail && user.isSuperAdmin) {
+    if (user.email == widget.currentUserEmail && user.isSuperAdmin) {
       _showSnackBar(
         'Nie możesz odebrać sobie statusu Administratora Nadrzędnego!',
         isError: true,
@@ -243,7 +223,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
   }
 
   Future<void> _deleteAdmin(AdminUser user) async {
-    if (user.email == currentUserEmail) {
+    if (user.email == widget.currentUserEmail) {
       _showSnackBar('Nie możesz usunąć swojego statusu!', isError: true);
       return;
     }
@@ -307,9 +287,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
 
   Future<void> _refresh() async {
     if (!mounted) return;
-    final email = currentUserEmail;
-    if (email == null) return;
-    await Future.wait([_checkSuperAdminStatus(email), _fetchAdmins()]);
+    await _fetchAdmins();
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -347,7 +325,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   // ── Permission banner ──────────────────────────
-                  if (isSuperAdmin)
+                  if (widget.isSuperAdmin)
                     _AddAdminCard(
                       formKey: _formKey,
                       controller: _emailController,
@@ -395,8 +373,8 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _AdminRow(
                           user: user,
-                          isCurrent: user.email == currentUserEmail,
-                          isSuperAdmin: isSuperAdmin,
+                          isCurrent: user.email == widget.currentUserEmail,
+                          isSuperAdmin: widget.isSuperAdmin,
                           isPerformingAction: isPerformingAction,
                           onToggleSuperAdmin: () => _toggleSuperAdmin(user),
                           onDelete: () => _deleteAdmin(user),

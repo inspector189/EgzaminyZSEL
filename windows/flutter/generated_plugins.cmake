@@ -3,12 +3,11 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  desktop_webview_window
+  emoji_picker_flutter
   file_selector_windows
   flutter_secure_storage_windows
   printing
   url_launcher_windows
-  window_to_front
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

@@ -14,12 +14,10 @@ class Qualification {
 
 class Profession {
   final String name;
-  final String emoji;
   final List<Qualification> qualifications;
 
   const Profession({
     required this.name,
-    required this.emoji,
     required this.qualifications,
   });
 }
@@ -27,7 +25,6 @@ class Profession {
 const List<Profession> professions = [
   Profession(
     name: 'Programista',
-    emoji: '👨‍💻',
     qualifications: [
       Qualification(
         code: 'INF.03',
@@ -44,7 +41,6 @@ const List<Profession> professions = [
   ),
   Profession(
     name: 'Informatyk',
-    emoji: '💻',
     qualifications: [
       Qualification(
         code: 'INF.02',
@@ -62,7 +58,6 @@ const List<Profession> professions = [
   ),
   Profession(
     name: 'Teleinformatyk',
-    emoji: '🌐',
     qualifications: [
       Qualification(
         code: 'INF.07',
@@ -80,7 +75,6 @@ const List<Profession> professions = [
   ),
   Profession(
     name: 'Elektronik',
-    emoji: '📟',
     qualifications: [
       Qualification(
         code: 'ELM.02',
@@ -97,7 +91,6 @@ const List<Profession> professions = [
   ),
   Profession(
     name: 'Elektryk',
-    emoji: '💡',
     qualifications: [
       Qualification(
         code: 'ELE.02',
@@ -114,7 +107,6 @@ const List<Profession> professions = [
   ),
   Profession(
     name: 'Automatyk',
-    emoji: '🤖',
     qualifications: [
       Qualification(
         code: 'ELM.01',

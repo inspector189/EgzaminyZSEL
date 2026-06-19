@@ -497,15 +497,46 @@ class ApiService {
 
   // ─── Statistics ───────────────────────────────────────────────────────────
 
-  /// Fetches per-user statistics for [userName].
-  Future<ApiResult<Map<String, dynamic>>> fetchUserStats(
-    String userName,
-  ) async {
+  // Static cache — survives widget rebuilds, respects server's 15min TTL
+  static final Map<String, _CountCacheEntry> _countCache = {};
+
+  Future<ApiResult<int>> fetchQuestionCount(String cacheKey) async {
+    final cached = _countCache[cacheKey];
+    if (cached != null && cached.expiresAt.isAfter(DateTime.now())) {
+      return ApiResult(statusCode: 200, data: cached.count);
+    }
+
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$apiBaseUrl/count/countQuestions.php?egzamin=$cacheKey'),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body) as Map<String, dynamic>;
+        final count = data['count'];
+        final parsed = count is int ? count : int.tryParse('$count');
+        if (parsed != null) {
+          _countCache[cacheKey] = _CountCacheEntry(
+            count: parsed,
+            expiresAt: DateTime.now().add(const Duration(minutes: 15)),
+          );
+          return ApiResult(statusCode: 200, data: parsed);
+        }
+      }
+      return ApiResult(statusCode: res.statusCode);
+    } catch (e) {
+      return ApiResult(statusCode: -1, errorMessage: e.toString());
+    }
+  }
+
+  /// Fetches per-user statistics.
+  Future<ApiResult<Map<String, dynamic>>> fetchUserStats() async {
     try {
       final res = await http.post(
         Uri.parse('$apiBaseUrl/stats.php'),
         headers: _apiKeyFormHeaders,
-        body: {'userName': userName},
       );
       if (res.statusCode == 200) {
         return ApiResult(
@@ -621,7 +652,7 @@ class ApiService {
   // ─── Admin Management ─────────────────────────────────────────────────────
 
   /// Checks whether [email] has super admin privileges.
-  Future<ApiResult<bool>> checkSuperAdmin(String email) async {
+  /*Future<ApiResult<bool>> checkSuperAdmin(String email) async {
     try {
       final res = await http.post(
         Uri.parse('$apiBaseUrl/is_super_admin.php'),
@@ -639,7 +670,7 @@ class ApiService {
     } catch (e) {
       return ApiResult(statusCode: -1, errorMessage: e.toString(), data: false);
     }
-  }
+  }*/
 
   /// Fetches the list of all admin accounts.
   Future<ApiResult<List<dynamic>>> fetchAdmins() async {
@@ -772,4 +803,10 @@ class ApiService {
       return ApiResult(statusCode: -1, errorMessage: e.toString());
     }
   }
+}
+
+class _CountCacheEntry {
+  final int count;
+  final DateTime expiresAt;
+  _CountCacheEntry({required this.count, required this.expiresAt});
 }

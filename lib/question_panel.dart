@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/services/api_service.dart';
 import 'package:flutter_app/utils/app_themes.dart';
@@ -210,7 +211,9 @@ class QuestionStatsPageState extends State<QuestionStatsPage>
         });
       }
     } catch (e) {
-      debugPrint('Error loading $kwal: $e');
+      if (kDebugMode) {
+        debugPrint('Błąd podczas ładowania kwalifikacji $kwal: $e');
+      }
       if (mounted) setState(() => s.isLoading = false);
     }
   }

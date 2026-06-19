@@ -9,11 +9,11 @@ class AsyncStateView extends StatelessWidget {
   final IconData icon;
 
   const AsyncStateView._({
-    required _AsyncStateType type,
+    required this._type,
     required this.message,
     required this.icon,
     this.subtitle,
-  }) : _type = type;
+  });
 
   factory AsyncStateView.loading({
     String message = 'Ładowanie...',
