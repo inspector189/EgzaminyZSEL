@@ -156,11 +156,11 @@ class _QuestionTileState extends State<QuestionTile> {
       onExit: (_) => setState(() => _isHovering = false),
       child: GestureDetector(
         onTapDown: (_) {
-          if (!widget.isLocked) setState(() => _isPressed = true);
+          setState(() => _isPressed = true);
         },
         onTapUp: (_) {
           setState(() => _isPressed = false);
-          if (!widget.isLocked) widget.onTap();
+          widget.onTap();
         },
         onTapCancel: () => setState(() => _isPressed = false),
         child: AnimatedScale(

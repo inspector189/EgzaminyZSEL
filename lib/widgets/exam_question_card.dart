@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/utils/app_themes.dart';
 import 'package:flutter_app/widgets/inline_video_player.dart';
@@ -13,6 +14,7 @@ class ExamAnswerState {
   final List<String> videos;
   final bool isCorrect;
   final bool isSelected;
+  final Uint8List? localImageBytes;
 
   const ExamAnswerState({
     required this.letter,
@@ -21,6 +23,7 @@ class ExamAnswerState {
     required this.videos,
     required this.isCorrect,
     required this.isSelected,
+    this.localImageBytes,
   });
 }
 
@@ -41,6 +44,7 @@ class ExamQuestionCard extends StatelessWidget {
     this.bottomRow,
     this.backgroundColor,
     this.shadowAlpha = 0.06,
+    this.questionLocalImageBytes,
   });
 
   final String label;
@@ -57,6 +61,7 @@ class ExamQuestionCard extends StatelessWidget {
   final Widget? bottomRow;
   final Color? backgroundColor;
   final double shadowAlpha;
+  final List<Uint8List>? questionLocalImageBytes;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +146,15 @@ class ExamQuestionCard extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: buildZoomableImage(context, url),
+                    ),
+                  ),
+                ),
+                ...?questionLocalImageBytes?.map(
+                  (bytes) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(bytes, fit: BoxFit.contain),
                     ),
                   ),
                 ),
@@ -283,6 +297,17 @@ class ExamQuestionCard extends StatelessWidget {
                       child: buildZoomableImage(context, url),
                     ),
                   ),
+                  if (a.localImageBytes != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.memory(
+                          a.localImageBytes!,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
                   ...a.videos.map(
                     (url) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),

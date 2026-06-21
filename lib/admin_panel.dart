@@ -12,11 +12,13 @@ import 'admin_qualifications.dart';
 class AdminPanelPage extends StatelessWidget {
   final bool isSuperAdmin;
   final String currentUserEmail;
+  final String currentUserName;
 
   const AdminPanelPage({
     super.key,
     required this.isSuperAdmin,
     required this.currentUserEmail,
+    required this.currentUserName,
   });
 
   @override
@@ -78,6 +80,7 @@ class AdminPanelPage extends StatelessWidget {
               currentUserEmail: kUseFakeData
                   ? 'superadmin@zselektr.onmicrosoft.com'
                   : currentUserEmail,
+              currentUserName: kUseFakeData ? 'Super Admin' : currentUserName,
             ),
           ),
         ),

@@ -265,7 +265,6 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
     final isRandom = widget.mode == TestCreationMode.random;
 
     return Scaffold(
-      backgroundColor: cs.surfaceContainerLowest,
       appBar: AppBar(
         title: Text(
           isRandom
@@ -333,6 +332,7 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
                           onToggle: _toggleQuestion,
                           cs: cs,
                           tt: tt,
+                          qualification: widget.qualification,
                         ),
                 ),
               ],
@@ -375,7 +375,7 @@ class _HeaderPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: cs.surfaceContainerLowest,
         border: Border(
           bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
         ),
@@ -500,7 +500,7 @@ class _RandomList extends StatelessWidget {
         return Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.only(right: 48),
+              padding: const EdgeInsets.only(right: 44),
               child: RichQuestionWidget(
                 question: q,
                 number: i + 1,
@@ -508,18 +508,31 @@ class _RandomList extends StatelessWidget {
               ),
             ),
             Positioned(
-              right: 8,
+              right: 6,
               top: 0,
               bottom: 0,
               child: Center(
                 child: Tooltip(
                   message: 'Zamień to pytanie',
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.refresh_rounded,
-                      color: cs.onSurfaceVariant,
+                  child: Material(
+                    color: cs.surface,
+                    shape: const CircleBorder(),
+                    elevation: 1.5,
+                    shadowColor: cs.shadow.withValues(alpha: 0.2),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => onReroll(i),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.refresh_rounded,
+                          size: 18,
+                          color: cs.primary,
+                        ),
+                      ),
                     ),
-                    onPressed: () => onReroll(i),
                   ),
                 ),
               ),
@@ -535,7 +548,7 @@ class _RandomList extends StatelessWidget {
 //             Manual mode list
 // ─────────────────────────────────────────────
 
-class _ManualList extends StatelessWidget {
+class _ManualList extends StatefulWidget {
   const _ManualList({
     required this.questions,
     required this.selectedIds,
@@ -543,6 +556,7 @@ class _ManualList extends StatelessWidget {
     required this.onToggle,
     required this.cs,
     required this.tt,
+    required this.qualification,
   });
 
   final List<Map<String, dynamic>> questions;
@@ -551,69 +565,180 @@ class _ManualList extends StatelessWidget {
   final void Function(Map<String, dynamic>) onToggle;
   final ColorScheme cs;
   final TextTheme tt;
+  final String qualification;
+
+  @override
+  State<_ManualList> createState() => _ManualListState();
+}
+
+class _ManualListState extends State<_ManualList> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchText = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_searchText.trim().isEmpty) return widget.questions;
+    final q = _searchText.trim().toLowerCase();
+    return widget.questions.where((question) {
+      final text = (question['pytanie_text'] as String? ?? '').toLowerCase();
+      final id = (question['id']?.toString() ?? '').toLowerCase();
+      return text.contains(q) || id.contains(q);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 16),
-      itemCount: questions.length,
-      itemBuilder: (context, i) {
-        final q = questions[i];
-        final id = q['id'] as String;
-        final isSelected = selectedIds.contains(id);
-        // Visually disable unselected items at capacity
-        final isDisabled = !isSelected && selectedCount >= 40;
+    final cs = widget.cs;
+    final tt = widget.tt;
+    final filtered = _filtered;
 
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          color: isSelected
-              ? cs.primaryContainer.withValues(alpha: 0.35)
-              : Colors.transparent,
-          child: CheckboxListTile(
-            controlAffinity: ListTileControlAffinity.leading,
-            secondary: CircleAvatar(
-              backgroundColor: isSelected
-                  ? cs.primaryContainer
-                  : cs.surfaceContainerHighest,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: TextField(
+            controller: _searchCtrl,
+            decoration: InputDecoration(
+              hintText: 'Szukaj pytania...',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: _searchText.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _searchText = '');
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              isDense: true,
+            ),
+            onChanged: (v) => setState(() => _searchText = v),
+          ),
+        ),
+        if (_searchText.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Align(
+              alignment: Alignment.centerLeft,
               child: Text(
-                '${i + 1}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isSelected
-                      ? cs.onPrimaryContainer
-                      : cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
+                'Znalezione: ${filtered.length} / ${widget.questions.length}',
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               ),
             ),
-            title: Text(
-              q['pytanie_text'] as String? ?? '',
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: tt.bodyMedium?.copyWith(
-                color: isDisabled
-                    ? cs.onSurfaceVariant.withValues(alpha: 0.4)
+          ),
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(
+                  child: Text(
+                    'Brak wyników',
+                    style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, i) {
+                    final q = filtered[i];
+                    final id = q['id'] as String;
+                    final isSelected = widget.selectedIds.contains(id);
+                    final isDisabled =
+                        !isSelected && widget.selectedCount >= 40;
+
+                    return _SelectableQuestionCard(
+                      question: q,
+                      number: widget.questions.indexOf(q) + 1,
+                      qualification: widget.qualification,
+                      isSelected: isSelected,
+                      isDisabled: isDisabled,
+                      cs: cs,
+                      onTap: isDisabled ? null : () => widget.onToggle(q),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Selectable wrapper around ExamQuestionCard
+// ─────────────────────────────────────────────
+
+class _SelectableQuestionCard extends StatelessWidget {
+  const _SelectableQuestionCard({
+    required this.question,
+    required this.number,
+    required this.qualification,
+    required this.isSelected,
+    required this.isDisabled,
+    required this.cs,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> question;
+  final int number;
+  final String qualification;
+  final bool isSelected;
+  final bool isDisabled;
+  final ColorScheme cs;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: isDisabled ? 0.45 : 1.0,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Stack(
+          children: [
+            IgnorePointer(
+              child: RichQuestionWidget(
+                question: question,
+                number: number,
+                qualification: qualification,
+                accentColorOverride: isSelected ? cs.primary : null,
+              ),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: isSelected ? cs.primary : cs.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected
+                        ? cs.primary
+                        : cs.outlineVariant.withValues(alpha: 0.6),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: cs.shadow.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: isSelected
+                    ? Icon(Icons.check_rounded, size: 16, color: cs.onPrimary)
                     : null,
               ),
             ),
-            subtitle: (q['pytanie_images'] as List).isNotEmpty
-                ? Row(
-                    children: [
-                      Icon(Icons.image_rounded, size: 13, color: cs.primary),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Z obrazkiem',
-                        style: tt.bodySmall?.copyWith(color: cs.primary),
-                      ),
-                    ],
-                  )
-                : null,
-            value: isSelected,
-            // Disable checkbox when at capacity
-            onChanged: isDisabled ? null : (_) => onToggle(q),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

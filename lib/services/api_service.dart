@@ -366,11 +366,12 @@ class ApiService {
 
   // ─── Published Tests ──────────────────────────────────────────────────────
 
-  /// Fetches all published tests (student-facing, no auth needed).
-  Future<ApiResult<List<Map<String, dynamic>>>> fetchPublishedTests() async {
+  /// Fetches all tests metadata for the admin "Created Tests" view (no questions).
+  Future<ApiResult<List<Map<String, dynamic>>>>
+  fetchAdminTestsMetadata() async {
     try {
       final res = await http.get(
-        Uri.parse('$apiBaseUrl/publishedTests.php'),
+        Uri.parse('$apiBaseUrl/publishedTests_adminMetadata.php'),
         headers: _authHeaders,
       );
       if (res.statusCode == 200) {
@@ -385,11 +386,15 @@ class ApiService {
     }
   }
 
-  /// Fetches all tests (teacher-facing, includes unpublished).
-  Future<ApiResult<List<Map<String, dynamic>>>> fetchAllTests() async {
+  /// Fetches published tests metadata for a given qualification (student-facing).
+  Future<ApiResult<List<Map<String, dynamic>>>> fetchUserTestsMetadata(
+    String qualification,
+  ) async {
     try {
       final res = await http.get(
-        Uri.parse('$apiBaseUrl/publishedTests_admin.php'),
+        Uri.parse(
+          '$apiBaseUrl/publishedTests_userMetadata.php?qualification=$qualification',
+        ),
         headers: _authHeaders,
       );
       if (res.statusCode == 200) {
@@ -399,40 +404,82 @@ class ApiService {
         );
       }
       return ApiResult(statusCode: res.statusCode);
+    } catch (e) {
+      return ApiResult(statusCode: -1, errorMessage: e.toString());
+    }
+  }
+
+  /// Fetches a test's full content by id, regardless of published status (admin only).
+  Future<ApiResult<Map<String, dynamic>>> fetchAdminTestQuestions(
+    int id,
+  ) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$apiBaseUrl/publishedTests_adminQuestions.php?id=$id'),
+        headers: _authHeaders,
+      );
+      if (res.statusCode == 200) {
+        return ApiResult(
+          statusCode: res.statusCode,
+          data: json.decode(res.body) as Map<String, dynamic>,
+        );
+      }
+      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+    } catch (e) {
+      return ApiResult(statusCode: -1, errorMessage: e.toString());
+    }
+  }
+
+  /// Fetches a test's full content by id, only if published (student-facing).
+  Future<ApiResult<Map<String, dynamic>>> fetchUserTestQuestions(int id) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$apiBaseUrl/publishedTests_userQuestions.php?id=$id'),
+        headers: _authHeaders,
+      );
+      if (res.statusCode == 200) {
+        return ApiResult(
+          statusCode: res.statusCode,
+          data: json.decode(res.body) as Map<String, dynamic>,
+        );
+      }
+      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
     } catch (e) {
       return ApiResult(statusCode: -1, errorMessage: e.toString());
     }
   }
 
   /// Creates a new test on the server. Returns 409 on name conflict.
-  Future<ApiResult<void>> createTest(Map<String, dynamic> test) async {
+  Future<ApiResult<Map<String, dynamic>>> createTest(
+    Map<String, dynamic> test,
+  ) async {
     try {
       final res = await http.post(
-        Uri.parse('$apiBaseUrl/publishedTests.php'),
+        Uri.parse('$apiBaseUrl/publishedTests_adminManage.php'),
         headers: _authJsonHeaders,
         body: json.encode({'action': 'create', 'test': test}),
       );
-      return ApiResult(
-        statusCode: res.statusCode,
-        errorMessage: res.statusCode != 200 ? res.body : null,
-      );
+      if (res.statusCode == 200) {
+        return ApiResult(
+          statusCode: res.statusCode,
+          data: json.decode(res.body) as Map<String, dynamic>,
+        );
+      }
+      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
     } catch (e) {
       return ApiResult(statusCode: -1, errorMessage: e.toString());
     }
   }
 
   /// Publishes or unpublishes a test.
-  Future<ApiResult<void>> setTestPublished(
-    Map<String, dynamic> test,
-    bool publish,
-  ) async {
+  Future<ApiResult<void>> setTestPublished(int id, bool publish) async {
     try {
       final res = await http.post(
-        Uri.parse('$apiBaseUrl/publishedTests.php'),
+        Uri.parse('$apiBaseUrl/publishedTests_adminManage.php'),
         headers: _authJsonHeaders,
         body: json.encode({
           'action': publish ? 'publish' : 'unpublish',
-          'test': test,
+          'test': {'id': id},
         }),
       );
       return ApiResult(statusCode: res.statusCode);
@@ -442,12 +489,15 @@ class ApiService {
   }
 
   /// Deletes a test from the server.
-  Future<ApiResult<void>> deleteTest(Map<String, dynamic> test) async {
+  Future<ApiResult<void>> deleteTest(int id) async {
     try {
       final res = await http.post(
-        Uri.parse('$apiBaseUrl/publishedTests.php'),
+        Uri.parse('$apiBaseUrl/publishedTests_adminManage.php'),
         headers: _authJsonHeaders,
-        body: json.encode({'action': 'delete', 'test': test}),
+        body: json.encode({
+          'action': 'delete',
+          'test': {'id': id},
+        }),
       );
       return ApiResult(statusCode: res.statusCode);
     } catch (e) {

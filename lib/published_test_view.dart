@@ -82,7 +82,6 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
     _loadPublishedTests();
   }
 
-  // FIX: returns Future<void> so errors propagate; wrapped in try/catch
   Future<void> _loadPublishedTests() async {
     setState(() {
       isLoading = true;
@@ -97,8 +96,7 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
         publishedTests = _fakeTests
             .where(
               (t) =>
-                  _normalize(t['qualification'] as String) == _normalizedQual &&
-                  ((t['questions'] as List?)?.isNotEmpty ?? false),
+                  _normalize(t['qualification'] as String) == _normalizedQual,
             )
             .map((t) => Map<String, dynamic>.from(t))
             .toList();
@@ -108,26 +106,14 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
     }
 
     try {
-      final result = await ApiService.instance.fetchPublishedTests();
+      final result = await ApiService.instance.fetchUserTestsMetadata(
+        _normalizedQual,
+      );
       if (!mounted) return;
 
       if (result.isSuccess) {
-        final Map<String, Map<String, dynamic>> merged = {};
-        for (final t in result.data! as List<dynamic>) {
-          final tMap = t as Map<String, dynamic>;
-          final questions = tMap['questions'] as List?;
-          if (questions == null || questions.isEmpty) continue;
-          if (_normalize(tMap['qualification'] as String? ?? '') !=
-              _normalizedQual) {
-            continue;
-          }
-
-          final key = '${tMap['name']}||${tMap['qualification']}';
-          merged[key] = tMap;
-        }
-
         setState(() {
-          publishedTests = merged.values.toList();
+          publishedTests = result.data!;
           isLoading = false;
         });
       } else {
@@ -145,11 +131,34 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
     }
   }
 
-  void _startTest(Map<String, dynamic> test) {
-    final questions = List<Map<String, dynamic>>.from(test['questions'] as List)
-      ..shuffle();
+  Future<void> _startTest(Map<String, dynamic> testMeta) async {
+    final id = testMeta['id'] as int;
 
-    final shuffledTest = Map<String, dynamic>.from(test);
+    Map<String, dynamic>? full;
+    if (kUseFakeData) {
+      full = _fakeTests.firstWhere(
+        (t) => t['name'] == testMeta['name'],
+        orElse: () => {},
+      );
+    } else {
+      setState(() => isLoading = true);
+      final result = await ApiService.instance.fetchUserTestQuestions(id);
+      if (mounted) setState(() => isLoading = false);
+      if (result.isSuccess) full = result.data;
+    }
+
+    if (!mounted) return;
+
+    if (full == null || full.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nie udało się wczytać testu')),
+      );
+      return;
+    }
+
+    final questions = List<Map<String, dynamic>>.from(full['questions'] as List)
+      ..shuffle();
+    final shuffledTest = Map<String, dynamic>.from(full);
     shuffledTest['questions'] = questions;
 
     Navigator.push(
@@ -157,7 +166,7 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
       MaterialPageRoute(
         builder: (_) => EgzaminView(
           tryb: TrybEgzaminu.zTestu,
-          kwalifikacja: test['qualification'] as String,
+          kwalifikacja: widget.qualification,
           returnToHome: false,
           userName: null,
           testData: shuffledTest,
@@ -209,7 +218,8 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
       return Center(
         child: AsyncStateView.empty(
           message: 'Brak opublikowanych testów',
-          subtitle: 'Brak testów od nauczycieli dla kwalifikacji ${widget.qualification.toUpperCase()}.',
+          subtitle:
+              'Brak testów od nauczycieli dla kwalifikacji ${widget.qualification.toUpperCase()}.',
           icon: Icons.assignment_outlined,
         ),
       );
@@ -254,8 +264,8 @@ class _TestCard extends StatelessWidget {
     final author = (test['author'] as String? ?? '').replaceAll(
       RegExp(r'@.*'),
       '',
-    ); // strip domain for display
-    final questionCount = (test['questions'] as List?)?.length ?? 0;
+    );
+    final questionCount = test['question_count'] as int? ?? 0;
     final isEmpty = questionCount == 0;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 

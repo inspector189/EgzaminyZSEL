@@ -1056,7 +1056,6 @@ class _UserCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
         boxShadow: [
@@ -1067,76 +1066,83 @@ class _UserCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-          leading: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: isAnonymous
-                  ? cs.surfaceContainerHighest
-                  : cs.primaryContainer,
-              shape: BoxShape.circle,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: cs.surface,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 6,
             ),
-            alignment: Alignment.center,
-            child: isAnonymous
-                ? Icon(
-                    Icons.person_off_rounded,
-                    size: 18,
-                    color: cs.onSurfaceVariant,
-                  )
-                : Text(
-                    initial,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onPrimaryContainer,
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+            leading: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isAnonymous
+                    ? cs.surfaceContainerHighest
+                    : cs.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: isAnonymous
+                  ? Icon(
+                      Icons.person_off_rounded,
+                      size: 18,
+                      color: cs.onSurfaceVariant,
+                    )
+                  : Text(
+                      initial,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onPrimaryContainer,
+                      ),
                     ),
-                  ),
+            ),
+            title: isAnonymous
+                ? Text(
+                    name,
+                    style: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                : _UserTileTitle(name: name, uid: uid, cs: cs, tt: tt),
+            subtitle: Text(
+              'Egz.: ${userStats['count']}  •  Śr.: ${(userStats['avg'] as double).toStringAsFixed(1)}%  •  Najl.: ${(userStats['best'] as double).toStringAsFixed(1)}%',
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            children: examsByQual.entries.where((e) => e.value.isNotEmpty).map((
+              qualEntry,
+            ) {
+              final qualExams = List<dynamic>.from(qualEntry.value)
+                ..sort((a, b) {
+                  final da =
+                      DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
+                  final db =
+                      DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
+                  return db.compareTo(da);
+                });
+
+              final recent = (startDate == null && endDate == null)
+                  ? qualExams.take(5).toList()
+                  : qualExams;
+
+              final qualStats = calculateStats(qualEntry.value);
+
+              return _QualificationTile(
+                qualification: qualEntry.key,
+                recentExams: recent,
+                qualStats: qualStats,
+                fmtDuration: fmtDuration,
+                cs: cs,
+                tt: tt,
+              );
+            }).toList(),
           ),
-          title: isAnonymous
-              ? Text(
-                  name,
-                  style: tt.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
-                  ),
-                )
-              : _UserTileTitle(name: name, uid: uid, cs: cs, tt: tt),
-          subtitle: Text(
-            'Egz.: ${userStats['count']}  •  Śr.: ${(userStats['avg'] as double).toStringAsFixed(1)}%  •  Najl.: ${(userStats['best'] as double).toStringAsFixed(1)}%',
-            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          children: examsByQual.entries.where((e) => e.value.isNotEmpty).map((
-            qualEntry,
-          ) {
-            final qualExams = List<dynamic>.from(qualEntry.value)
-              ..sort((a, b) {
-                final da =
-                    DateTime.tryParse(a['data_czas'] ?? '') ?? DateTime(2000);
-                final db =
-                    DateTime.tryParse(b['data_czas'] ?? '') ?? DateTime(2000);
-                return db.compareTo(da);
-              });
-
-            final recent = (startDate == null && endDate == null)
-                ? qualExams.take(5).toList()
-                : qualExams;
-
-            final qualStats = calculateStats(qualEntry.value);
-
-            return _QualificationTile(
-              qualification: qualEntry.key,
-              recentExams: recent,
-              qualStats: qualStats,
-              fmtDuration: fmtDuration,
-              cs: cs,
-              tt: tt,
-            );
-          }).toList(),
         ),
       ),
     );
@@ -1238,89 +1244,99 @@ class _QualificationTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          leading: Icon(Icons.book_rounded, color: cs.primary, size: 20),
-          title: Text(
-            qualification.toUpperCase(),
-            style: tt.labelMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface,
-              letterSpacing: 0.5,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: cs.surfaceContainerLowest,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 2,
             ),
-          ),
-          subtitle: Text(
-            'Egz.: ${qualStats['count']}  •  Śr.: ${(qualStats['avg'] as double).toStringAsFixed(1)}%',
-            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          children: recentExams.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      'Brak egzaminów.',
-                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            leading: Icon(Icons.book_rounded, color: cs.primary, size: 20),
+            title: Text(
+              qualification.toUpperCase(),
+              style: tt.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+                letterSpacing: 0.5,
+              ),
+            ),
+            subtitle: Text(
+              'Egz.: ${qualStats['count']}  •  Śr.: ${(qualStats['avg'] as double).toStringAsFixed(1)}%',
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            children: recentExams.isEmpty
+                ? [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Brak egzaminów.',
+                        style: tt.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                     ),
-                  ),
-                ]
-              : recentExams.map((exam) {
-                  final dateTimeStr = (exam['data_czas'] ?? '-') as String;
-                  final wynik = _scoreStr(exam['wynik']);
-                  final durationSec = (exam['czas_trwania_sec'] is int)
-                      ? exam['czas_trwania_sec'] as int
-                      : int.tryParse('${exam['czas_trwania_sec'] ?? '0'}') ?? 0;
-                  final czas = fmtDuration(durationSec);
-                  final tryb = (exam['tryb'] ?? exam['mode'] ?? '') as String;
-                  final examId = int.tryParse('${exam['id'] ?? '0'}') ?? 0;
-                  final userName = (exam['userID'] ?? '').toString();
+                  ]
+                : recentExams.map((exam) {
+                    final dateTimeStr = (exam['data_czas'] ?? '-') as String;
+                    final wynik = _scoreStr(exam['wynik']);
+                    final durationSec = (exam['czas_trwania_sec'] is int)
+                        ? exam['czas_trwania_sec'] as int
+                        : int.tryParse('${exam['czas_trwania_sec'] ?? '0'}') ??
+                              0;
+                    final czas = fmtDuration(durationSec);
+                    final tryb = (exam['tryb'] ?? exam['mode'] ?? '') as String;
+                    final examId = int.tryParse('${exam['id'] ?? '0'}') ?? 0;
+                    final userName = (exam['userID'] ?? '').toString();
 
-                  return _ExamRow(
-                    date: dateTimeStr.split(' ').first,
-                    wynik: wynik,
-                    czas: czas,
-                    tryb: tryb,
-                    onPreview: examId <= 0
-                        ? null
-                        : () async {
-                            final details = await _fetchExamDetails(
-                              examId,
-                              userName,
-                              dateTimeStr,
-                              durationSec,
-                            );
-                            if (!context.mounted) return;
-                            if (details != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => EgzaminPodgladView(
-                                    questions: details['questions'],
-                                    selectedAnswers: details['selectedAnswers'],
-                                  ),
-                                ),
+                    return _ExamRow(
+                      date: dateTimeStr.split(' ').first,
+                      wynik: wynik,
+                      czas: czas,
+                      tryb: tryb,
+                      onPreview: examId <= 0
+                          ? null
+                          : () async {
+                              final details = await _fetchExamDetails(
+                                examId,
+                                userName,
+                                dateTimeStr,
+                                durationSec,
                               );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'Nie udało się wczytać podglądu',
+                              if (!context.mounted) return;
+                              if (details != null) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => EgzaminPodgladView(
+                                      questions: details['questions'],
+                                      selectedAnswers:
+                                          details['selectedAnswers'],
+                                    ),
                                   ),
-                                  backgroundColor: cs.error,
-                                ),
-                              );
-                            }
-                          },
-                    cs: cs,
-                    tt: tt,
-                  );
-                }).toList(),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                      'Nie udało się wczytać podglądu',
+                                    ),
+                                    backgroundColor: cs.error,
+                                  ),
+                                );
+                              }
+                            },
+                      cs: cs,
+                      tt: tt,
+                    );
+                  }).toList(),
+          ),
         ),
       ),
     );

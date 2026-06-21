@@ -3,6 +3,7 @@ import 'exam_solving.dart';
 import 'question_editing.dart';
 import 'widgets/question_tile.dart';
 import 'published_test_view.dart';
+import "services/oauth2_service.dart";
 
 class QualificationPage extends StatelessWidget {
   const QualificationPage({
@@ -235,6 +236,19 @@ class LoginGateBottomSheet extends StatelessWidget {
     );
   }
 
+  Future<void> _startLogin(BuildContext context) async {
+    Navigator.pop(context);
+    try {
+      OAuth2Service.startLogin();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Błąd logowania: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -273,7 +287,8 @@ class LoginGateBottomSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Aby rozwiązać testy od nauczycieli,\nmusisz być zalogowany.',
+            'Aby rozwiązywać testy od nauczycieli,\nmusisz być zalogowany przy pomocy maila '
+            'z domeną @zselektr.onmicrosoft.com.',
             style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
@@ -281,9 +296,17 @@ class LoginGateBottomSheet extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => _startLogin(context),
               icon: const Icon(Icons.login_rounded),
-              label: const Text('Rozumiem'),
+              label: const Text('Zaloguj się'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Anuluj'),
             ),
           ),
         ],

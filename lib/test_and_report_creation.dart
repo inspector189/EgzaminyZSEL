@@ -5,7 +5,7 @@ import 'package:flutter_app/services/api_service.dart';
 import 'package:flutter_app/utils/app_themes.dart';
 import 'package:flutter_app/utils/async_state_view.dart';
 import 'package:flutter_app/utils/helpers.dart';
-import 'package:flutter_app/widgets/zoomable_image.dart';
+import 'package:flutter_app/widgets/exam_question_card.dart';
 
 import 'exam_preview.dart';
 import 'package:flutter/foundation.dart';
@@ -18,10 +18,10 @@ import 'package:printing/printing.dart';
 import 'package:web/web.dart' as web;
 import 'package:html_unescape_xx/html_unescape.dart';
 import 'test_creator.dart';
-import 'widgets/inline_video_player.dart';
 
 final _fakeTests = [
   {
+    'id': 1,
     'name': 'Test próbny EE.08',
     'qualification': 'ee08',
     'author': 'jan.kowalski@szkola.pl',
@@ -80,6 +80,7 @@ final _fakeTests = [
     ],
   },
   {
+    'id': 2,
     'name': 'Sprawdzian EE.09 – moduł 2',
     'qualification': 'ee09',
     'author': 'anna.nowak@szkola.pl',
@@ -121,6 +122,7 @@ class RichQuestionWidget extends StatelessWidget {
   final int number;
   final bool showAnswers;
   final String qualification;
+  final Color? accentColorOverride;
 
   const RichQuestionWidget({
     super.key,
@@ -128,82 +130,42 @@ class RichQuestionWidget extends StatelessWidget {
     required this.number,
     this.showAnswers = true,
     required this.qualification,
+    this.accentColorOverride,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    Theme.of(context).extension<ExtraColors>()!;
-    final tt = Theme.of(context).textTheme;
     final unescape = HtmlUnescapeSmall();
-    final pytanieText = unescape.convert(question['pytanie_text'] ?? '');
-    final pytanieImages =
-        (question['pytanie_images'] as List?)?.cast<String>() ?? [];
-    final pytanieVideos =
-        (question['pytanie_videos'] as List?)?.cast<String>() ?? [];
+    final poprawna = question['poprawna']?.toString() ?? '';
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    final answers = List.generate(4, (i) {
+      final letter = 'ABCD'[i];
+      final key = 'odp${i + 1}';
+      return ExamAnswerState(
+        letter: letter,
+        text: unescape
+            .convert(question['${key}_text']?.toString() ?? '')
+            .trim(),
+        images: (question['${key}_images'] as List?)?.cast<String>() ?? [],
+        videos: (question['${key}_videos'] as List?)?.cast<String>() ?? [],
+        isCorrect: letter == poprawna,
+        isSelected: false,
+      );
+    });
+
+    return ExamQuestionCard(
+      label: 'Pytanie $number',
+      questionText: unescape.convert(
+        question['pytanie_text']?.toString() ?? '',
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$number. $pytanieText',
-              style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ...pytanieImages.map(
-              (url) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Center(child: buildZoomableImage(context, url)),
-              ),
-            ),
-            ...pytanieVideos.map(
-              (url) => InlineVideoPlayer.network(url, height: 240),
-            ),
-            if (showAnswers) ...[
-              const SizedBox(height: 12),
-              ...[1, 2, 3, 4].map((idx) {
-                final text = unescape
-                    .convert(question['odp${idx}_text'] ?? '')
-                    .trim();
-                final images =
-                    (question['odp${idx}_images'] as List?)?.cast<String>() ??
-                    [];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(text, style: tt.bodyMedium),
-                      ...images.map(
-                        (url) => Padding(
-                          padding: const EdgeInsets.only(top: 8, left: 20),
-                          child: buildZoomableImage(context, url),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ],
-        ),
-      ),
+      questionImages:
+          (question['pytanie_images'] as List?)?.cast<String>() ?? [],
+      questionVideos:
+          (question['pytanie_videos'] as List?)?.cast<String>() ?? [],
+      answers: showAnswers ? answers : const [],
+      accentColor: accentColorOverride ?? cs.primary,
+      showResult: showAnswers,
     );
   }
 }
@@ -215,10 +177,12 @@ class RichQuestionWidget extends StatelessWidget {
 class CreatingTestsAndReportsPage extends StatefulWidget {
   final bool isSuperAdmin;
   final String currentUserEmail;
+  final String currentUserName;
 
   const CreatingTestsAndReportsPage({
     super.key,
     required this.isSuperAdmin,
+    required this.currentUserName,
     required this.currentUserEmail,
   });
 
@@ -290,7 +254,8 @@ class _CreatingTestsAndReportsPageState
               children: [
                 CreatedTestsTab(
                   isSuperAdmin: widget.isSuperAdmin,
-                  currentUserEmail: widget.currentUserEmail,
+                  //currentUserEmail: widget.currentUserEmail,
+                  currentUserName: widget.currentUserName,
                 ),
                 const CreateNewTestTab(),
               ],
@@ -362,12 +327,14 @@ class TestPreviewPage extends StatelessWidget {
 
 class CreatedTestsTab extends StatefulWidget {
   final bool isSuperAdmin;
-  final String currentUserEmail;
+  //final String currentUserEmail;
+  final String currentUserName;
 
   const CreatedTestsTab({
     super.key,
     required this.isSuperAdmin,
-    required this.currentUserEmail,
+    //required this.currentUserEmail,
+    required this.currentUserName,
   });
   @override
   State<CreatedTestsTab> createState() => _CreatedTestsTabState();
@@ -378,10 +345,9 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
   late final TabController _innerTab;
 
   List<Map<String, dynamic>> savedTests = [];
-  bool isLoadingResults = false;
   bool isLoadingTests = true;
-  bool isSuperAdmin = false;
-  String currentUser = '';
+  final Set<int> _loadedResultsForIds = {};
+  final Set<int> _loadingResultsForIds = {};
 
   @override
   void initState() {
@@ -415,28 +381,17 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     setState(() => isLoadingTests = true);
 
     try {
-      final result = await ApiService.instance.fetchAllTests();
+      final result = await ApiService.instance.fetchAdminTestsMetadata();
 
       if (result.isSuccess) {
-        final serverMaps = (result.data! as List<dynamic>)
-            .cast<Map<String, dynamic>>();
-
+        final serverMaps = result.data!;
         for (final t in serverMaps) {
-          // Normalise 'published' to bool regardless of server type
-          final publishedVal = t['published'];
-          t['published'] =
-              publishedVal == true ||
-              publishedVal == 1 ||
-              publishedVal.toString() == '1' ||
-              publishedVal.toString().toLowerCase() == 'true';
           t['results'] ??= <dynamic>[];
         }
-
         if (mounted) setState(() => savedTests = serverMaps);
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('saved_tests', json.encode(savedTests));
-        _loadAllResults();
       } else {
         await _loadTestsFromCache();
       }
@@ -445,6 +400,21 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     } finally {
       if (mounted) setState(() => isLoadingTests = false);
     }
+  }
+
+  Future<Map<String, dynamic>?> _fetchFullTest(int id) async {
+    if (kUseFakeData) {
+      return savedTests.firstWhere((t) => t['id'] == id, orElse: () => {});
+    }
+    try {
+      final result = await ApiService.instance.fetchAdminTestQuestions(id);
+      if (result.isSuccess) return result.data;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Wystąpił błąd podczas pobierania pytań z testu: $e');
+      }
+    }
+    return null;
   }
 
   Future<void> _loadTestsFromCache() async {
@@ -456,26 +426,37 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     }
   }
 
-  Future<void> _loadAllResults() async {
-    if (isLoadingResults) return;
-    if (mounted) setState(() => isLoadingResults = true);
+  Future<void> _loadResultsForTest(int index) async {
+    final test = savedTests[index];
+    final id = test['id'] as int;
 
-    final futures = List.generate(savedTests.length, (i) async {
-      final test = savedTests[i];
-      final testKey =
-          '${test['name']}||${test['author']}||${test['qualification']}';
-      try {
-        final result = await ApiService.instance.fetchTestResults(testKey);
-        if (result.isSuccess && mounted) {
-          setState(() => savedTests[i]['results'] = result.data!);
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('Błąd pobierania wyników [$i]: $e');
+    if (_loadedResultsForIds.contains(id) ||
+        _loadingResultsForIds.contains(id)) {
+      return;
+    }
+
+    if (kUseFakeData) {
+      setState(() => _loadedResultsForIds.add(id));
+      return;
+    }
+
+    setState(() => _loadingResultsForIds.add(id));
+
+    final testKey =
+        '${test['name']}||${test['author']}||${test['qualification']}';
+    try {
+      final result = await ApiService.instance.fetchTestResults(testKey);
+      if (result.isSuccess && mounted) {
+        setState(() {
+          savedTests[index]['results'] = result.data!;
+          _loadedResultsForIds.add(id);
+        });
       }
-    });
-
-    await Future.wait(futures);
-    if (mounted) setState(() => isLoadingResults = false);
+    } catch (e) {
+      if (kDebugMode) debugPrint('Błąd pobierania wyników [$id]: $e');
+    } finally {
+      if (mounted) setState(() => _loadingResultsForIds.remove(id));
+    }
   }
 
   // ── Actions ───────────────────────────────────────────────────
@@ -521,7 +502,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     }
 
     try {
-      await ApiService.instance.deleteTest(test);
+      await ApiService.instance.deleteTest(test['id'] as int);
     } catch (e) {
       if (kDebugMode) debugPrint('Błąd usuwania z serwera: $e');
     }
@@ -566,7 +547,10 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     await prefs.setString('saved_tests', json.encode(savedTests));
 
     try {
-      await ApiService.instance.setTestPublished(test, willPublish);
+      await ApiService.instance.setTestPublished(
+        test['id'] as int,
+        willPublish,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -866,7 +850,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
   Future<Map<String, dynamic>?> _fetchExamDetailsFull(int examId) async {
     if (kUseFakeData) {
       await Future.delayed(const Duration(milliseconds: 300));
-      return null; // Preview not available in fake mode
+      return null;
     }
     try {
       final result = await ApiService.instance.fetchExamPreviewForTest(examId);
@@ -878,7 +862,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
         };
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('fetchExamDetails error: $e');
+      if (kDebugMode) debugPrint('Błąd podczas pobierania listy: $e');
     }
     return null;
   }
@@ -905,7 +889,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     }
 
     final myTests = savedTests
-        .where((t) => t['author'] == currentUser)
+        .where((t) => t['author'] == widget.currentUserName)
         .toList();
 
     return Column(
@@ -925,12 +909,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
             ],
           ),
         ),
-        if (isLoadingResults)
-          LinearProgressIndicator(
-            minHeight: 2,
-            color: cs.primary,
-            backgroundColor: cs.primaryContainer.withValues(alpha: 0.3),
-          ),
         Expanded(
           child: TabBarView(
             controller: _innerTab,
@@ -972,7 +950,8 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
                 (a, b) => (b['date'] as String).compareTo(a['date'] as String),
               );
           final isPublished = t['published'] == true;
-          final canEdit = isSuperAdmin || t['author'] == currentUser;
+          final canEdit =
+              widget.isSuperAdmin || t['author'] == widget.currentUserName;
 
           return _TestCard(
             test: t,
@@ -982,16 +961,47 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
             cs: cs,
             extras: extras,
             tt: tt,
-            onPreview: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TestPreviewPage(
-                  test: t,
-                  onPublish: () => _togglePublish(realIndex),
+            isLoadingResults: _loadingResultsForIds.contains(t['id'] as int),
+            onExpand: () => _loadResultsForTest(realIndex),
+            onPreview: () async {
+              final id = t['id'] as int;
+              final full = await _fetchFullTest(id);
+              if (!context.mounted) return;
+              if (full == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Nie udało się wczytać testu'),
+                    backgroundColor: cs.error,
+                  ),
+                );
+                return;
+              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TestPreviewPage(
+                    test: full,
+                    onPublish: () => _togglePublish(realIndex),
+                  ),
                 ),
-              ),
-            ),
-            onPrint: () => _printTest(t),
+              );
+            },
+            onPrint: () async {
+              final id = t['id'] as int;
+              final full = await _fetchFullTest(id);
+              if (full == null) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Nie udało się wczytać testu'),
+                      backgroundColor: cs.error,
+                    ),
+                  );
+                }
+                return;
+              }
+              await _printTest(full);
+            },
             onDelete: canEdit ? () => _deleteTest(realIndex) : null,
             onTogglePublish: canEdit ? () => _togglePublish(realIndex) : null,
             onReport: () => _generateReportPdf(t),
@@ -1024,12 +1034,12 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     );
   }
 
-  String _fmtDuration(int? seconds) {
+  /*String _fmtDuration(int? seconds) {
     if (seconds == null || seconds <= 0) return '-';
     final m = seconds ~/ 60;
     final s = seconds % 60;
     return '${m}m ${s}s';
-  }
+  }*/
 
   String _formatDate(String isoDate) {
     try {
@@ -1044,7 +1054,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     }
   }
 
-  List<Widget> buildGroupedResults(
+  /*List<Widget> buildGroupedResults(
     BuildContext context,
     List<dynamic> results,
     ColorScheme cs,
@@ -1160,7 +1170,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
         ),
       );
     }).toList();
-  }
+  } */
 
   // ── PDF generation ────────────────────────────────────────────
 
@@ -1417,6 +1427,8 @@ class _TestCard extends StatelessWidget {
     required this.cs,
     required this.extras,
     required this.tt,
+    required this.isLoadingResults,
+    required this.onExpand,
     required this.onPreview,
     required this.onPrint,
     required this.onDelete,
@@ -1433,6 +1445,8 @@ class _TestCard extends StatelessWidget {
   final ColorScheme cs;
   final ExtraColors extras;
   final TextTheme tt;
+  final bool isLoadingResults;
+  final VoidCallback onExpand;
   final VoidCallback onPreview;
   final VoidCallback onPrint;
   final VoidCallback? onDelete;
@@ -1464,132 +1478,155 @@ class _TestCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-
-          leading: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: isPublished
-                  ? Colors.green.withValues(alpha: 0.15)
-                  : cs.surfaceContainerHighest,
-              shape: BoxShape.circle,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: cs.surface,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            onExpansionChanged: (expanded) {
+              if (expanded) onExpand();
+            },
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
             ),
-            child: Tooltip(
-              padding: EdgeInsets.all(8),
-              message: isPublished
-                  ? "Ten test jest dostępny do rozwiązywania przez uczniów."
-                  : "Test został zamknięty i nie można go już rozwiązywać.",
-              child: Icon(
-                isPublished ? Icons.public_rounded : Icons.lock_outline_rounded,
-                size: 20,
-                color: isPublished ? Colors.green : cs.onSurfaceVariant,
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+
+            leading: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: isPublished
+                    ? Colors.green.withValues(alpha: 0.15)
+                    : cs.surfaceContainerHighest,
+                shape: BoxShape.circle,
+              ),
+              child: Tooltip(
+                padding: EdgeInsets.all(8),
+                message: isPublished
+                    ? "Ten test jest dostępny do rozwiązywania przez uczniów."
+                    : "Test został zamknięty i nie można go już rozwiązywać.",
+                child: Icon(
+                  isPublished
+                      ? Icons.public_rounded
+                      : Icons.lock_outline_rounded,
+                  size: 20,
+                  color: isPublished ? Colors.green : cs.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
 
-          // ── Title ─────────────────────────────────────────────
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  test['name'] as String,
-                  style: tt.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  (test['qualification'] as String).toUpperCase(),
-                  style: tt.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: cs.onPrimaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // ── Subtitle ──────────────────────────────────────────
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
+            // ── Title ─────────────────────────────────────────────
+            title: Row(
               children: [
-                _SubtitleChip(
-                  icon: Icons.person_outline_rounded,
-                  label: test['author'] as String,
-                  cs: cs,
-                  tt: tt,
-                ),
-                _SubtitleChip(
-                  icon: Icons.quiz_rounded,
-                  label: '${(test['questions'] as List).length} pytań',
-                  cs: cs,
-                  tt: tt,
-                ),
-                if (avg != null)
-                  _SubtitleChip(
-                    icon: Icons.bar_chart_rounded,
-                    label: 'Śr. ${avg.toStringAsFixed(1)}% (${results.length})',
-                    cs: cs,
-                    tt: tt,
-                    highlight: true,
-                  ),
-              ],
-            ),
-          ),
-
-          // ── Action buttons
-          trailing: _ActionMenu(
-            canEdit: canEdit,
-            isPublished: isPublished,
-            cs: cs,
-            onPreview: onPreview,
-            onPrint: onPrint,
-            onDelete: onDelete,
-            onTogglePublish: onTogglePublish,
-            onReport: onReport,
-            onAnswerKey: onAnswerKey,
-          ),
-
-          children: results.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inbox_rounded,
-                          size: 20,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.4),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Brak wyników',
-                          style: tt.bodyMedium?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
+                Expanded(
+                  child: Text(
+                    test['name'] as String,
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
                     ),
                   ),
-                ]
-              : _buildGroupedResultsInline(context, results),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    (test['qualification'] as String).toUpperCase(),
+                    style: tt.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: cs.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // ── Subtitle ──────────────────────────────────────────
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  _SubtitleChip(
+                    icon: Icons.person_outline_rounded,
+                    label: test['author'] as String,
+                    cs: cs,
+                    tt: tt,
+                  ),
+                  _SubtitleChip(
+                    icon: Icons.quiz_rounded,
+                    label: '${test['question_count'] ?? 0} pytań',
+                    cs: cs,
+                    tt: tt,
+                  ),
+                  if (avg != null)
+                    _SubtitleChip(
+                      icon: Icons.bar_chart_rounded,
+                      label:
+                          'Śr. ${avg.toStringAsFixed(1)}% (${results.length})',
+                      cs: cs,
+                      tt: tt,
+                      highlight: true,
+                    ),
+                ],
+              ),
+            ),
+
+            // ── Action buttons
+            trailing: _ActionMenu(
+              canEdit: canEdit,
+              isPublished: isPublished,
+              cs: cs,
+              onPreview: onPreview,
+              onPrint: onPrint,
+              onDelete: onDelete,
+              onTogglePublish: onTogglePublish,
+              onReport: onReport,
+              onAnswerKey: onAnswerKey,
+            ),
+
+            children: isLoadingResults
+                ? [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ]
+                : results.isEmpty
+                ? [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.inbox_rounded,
+                            size: 20,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Brak wyników',
+                            style: tt.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ]
+                : _buildGroupedResultsInline(context, results),
+          ),
         ),
       ),
     );
@@ -1618,82 +1655,90 @@ class _TestCard extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: cs.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
           ),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 4,
-            ),
-            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            leading: _ScoreBadge(score: latestScore, extras: extras),
-            title: Text(
-              entry.key,
-              style: tt.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface,
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: cs.surfaceContainerLowest,
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 4,
               ),
-            ),
-            subtitle: Text(
-              'Ostatni: ${latestScore.toStringAsFixed(0)}%  •  $latestDate',
-              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            children: userResults.map((r) {
-              final score = (r['score'] as num?)?.toDouble() ?? 0.0;
-              final date = _fmtDate((r['date'] as String?) ?? '');
-              final durSec = r['duration_sec'] is int
-                  ? r['duration_sec'] as int
-                  : int.tryParse('${r['duration_sec'] ?? ''}');
-              final czas = _fmtDur(durSec);
-              final examId =
-                  int.tryParse((r['exam_id'] ?? r['id'] ?? '').toString()) ?? 0;
+              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              leading: _ScoreBadge(score: latestScore, extras: extras),
+              title: Text(
+                entry.key,
+                style: tt.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+              subtitle: Text(
+                'Ostatni: ${latestScore.toStringAsFixed(0)}%  •  $latestDate',
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                child: Row(
-                  children: [
-                    _ScoreBadge(score: score, extras: extras, small: true),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            date,
-                            style: tt.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: cs.onSurface,
+              children: userResults.map((r) {
+                final score = (r['score'] as num?)?.toDouble() ?? 0.0;
+                final date = _fmtDate((r['date'] as String?) ?? '');
+                final durSec = r['duration_sec'] is int
+                    ? r['duration_sec'] as int
+                    : int.tryParse('${r['duration_sec'] ?? ''}');
+                final czas = _fmtDur(durSec);
+                final examId =
+                    int.tryParse((r['exam_id'] ?? r['id'] ?? '').toString()) ??
+                    0;
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                  child: Row(
+                    children: [
+                      _ScoreBadge(score: score, extras: extras, small: true),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              date,
+                              style: tt.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Czas: $czas',
-                            style: tt.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
+                            Text(
+                              'Czas: $czas',
+                              style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (examId > 0)
-                      OutlinedButton.icon(
-                        onPressed: () => onExamPreview(examId),
-                        icon: const Icon(Icons.visibility_rounded, size: 14),
-                        label: const Text('Podgląd'),
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          textStyle: const TextStyle(fontSize: 12),
+                          ],
                         ),
                       ),
-                  ],
-                ),
-              );
-            }).toList(),
+                      if (examId > 0)
+                        OutlinedButton.icon(
+                          onPressed: () => onExamPreview(examId),
+                          icon: const Icon(Icons.visibility_rounded, size: 14),
+                          label: const Text('Podgląd'),
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
           ),
         ),
       );

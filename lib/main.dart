@@ -1,13 +1,12 @@
 import 'package:flutter_app/services/api_service.dart';
+import 'package:flutter_app/utils/helpers.dart';
 
 import 'widgets/question_tile.dart';
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 import 'package:web/web.dart' as web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'widgets/home_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,7 +29,7 @@ const String userEmail = "";
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kDebugMode) {
+  if (kUseFakeData) {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userName', userName);
     await prefs.setString('userEmail', userEmail);
@@ -41,18 +40,6 @@ void main() async {
     final success = await OAuth2Service.handleRedirect();
     if (success) {
       cleanUrl();
-    }
-  }
-  if (!kIsWeb) {
-    try {
-      final ByteData data = await rootBundle.load('assets/cert/interpage.cer');
-      SecurityContext.defaultContext.setTrustedCertificatesBytes(
-        data.buffer.asUint8List(),
-      );
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Błąd ładowania certyfikatu: $e');
-      }
     }
   }
   runApp(
@@ -137,7 +124,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   }
 
   Future<void> _syncWithServerSession() async {
-    if (kDebugMode) return;
+    if (kUseFakeData) return;
     if (!_isLoggedIn || _userEmail == null) return;
     if (!kIsWeb) return;
 
@@ -356,6 +343,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                             builder: (_) => AdminPanelPage(
                               isSuperAdmin: _isSuperAdmin,
                               currentUserEmail: _userEmail ?? '',
+                              currentUserName: _userName ?? '',
                             ),
                           ),
                         );

@@ -6,7 +6,6 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_app/utils/async_state_view.dart';
-import 'package:flutter_app/widgets/zoomable_image.dart';
 import 'package:html_unescape_xx/html_unescape.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shimmer/shimmer.dart';
@@ -16,7 +15,6 @@ import 'package:flutter_app/services/api_service.dart';
 import 'package:flutter_app/utils/app_themes.dart';
 import 'widgets/difficulty_badge.dart';
 import 'widgets/exam_question_card.dart';
-import 'widgets/inline_video_player.dart';
 import 'widgets/shim_box.dart';
 import 'utils/helpers.dart';
 
@@ -1800,24 +1798,35 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         children: [
           Row(
             children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: isCorrect
-                      ? colorScheme.primary
-                      : colorScheme.surfaceContainerHighest,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  letter,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isCorrect
-                        ? colorScheme.onPrimary
-                        : colorScheme.onSurfaceVariant,
+              GestureDetector(
+                onTap: () => setState(() => _correct = letter),
+                child: Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => setState(() => _correct = letter),
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: isCorrect
+                            ? colorScheme.primary
+                            : colorScheme.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        letter,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isCorrect
+                              ? colorScheme.onPrimary
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -2163,272 +2172,177 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   // ─────────────────────────────────────────
 
   Widget _buildLivePreview(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final extras = theme.extension<ExtraColors>()!;
+    final colorScheme = Theme.of(context).colorScheme;
     final url = '$apiBaseUrl/$_kval/obrazy/';
-    final defaultTextColor = theme.brightness == Brightness.light
-        ? Colors.black
-        : Colors.white;
 
-    Widget? mediaWidget;
-    if (_mediaKind == MediaKind.image && _questionImageFilenames.isNotEmpty) {
-      mediaWidget = Column(
-        children: _questionImageFilenames
-            .map(
-              (fname) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Center(child: buildZoomableImage(context, "$url$fname")),
-              ),
-            )
-            .toList(),
-      );
-    } else if (_mediaKind == MediaKind.video) {
-      if (_uploadedVideoUrl != null) {
-        mediaWidget = Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: InlineVideoPlayer.network(_uploadedVideoUrl!, height: 400),
-        );
-      } else if (_videoBytes?.isNotEmpty ?? false) {
-        return _previewShell(
-          context,
-          child: FutureBuilder<String?>(
-            future: _ensureLocalTempVideo(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: kIsWeb
-                    ? InlineVideoPlayer.blob(snapshot.data!, height: 400)
-                    : InlineVideoPlayer.file(snapshot.data!, height: 400),
-              );
-            },
-          ),
-        );
-      }
-    }
+    final questionImageUrls = _mediaKind == MediaKind.image
+        ? _questionImageFilenames.map((f) => "$url$f").toList()
+        : <String>[];
 
-    final answerWidgets = List.generate(4, (i) {
+    final questionVideoUrls =
+        (_mediaKind == MediaKind.video && _uploadedVideoUrl != null)
+        ? [_uploadedVideoUrl!]
+        : <String>[];
+
+    final answers = List.generate(4, (i) {
       final letter = 'ABCD'[i];
-      final isCorrect = letter == _correct;
       final a = _answers[i];
+      final hasUploadedImage =
+          a.kind == AnswerKind.image && a.uploadedImageUrl != null;
+      final hasLocalImage =
+          a.kind == AnswerKind.image &&
+          !hasUploadedImage &&
+          a.imageBytes != null;
 
-      Widget child;
-      if (a.kind == AnswerKind.text) {
-        child = Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('$letter. '),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                a.ctrl.text.trim(),
-                style: const TextStyle(fontSize: 16),
-              ),
-            ),
-          ],
-        );
-      } else {
-        child = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('$letter.'),
-            if (a.ctrl.text.trim().isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                a.ctrl.text.trim(),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            _buildAnswerImage(url: a.uploadedImageUrl, bytes: a.imageBytes),
-          ],
-        );
-      }
-
-      return Container(
-        margin: const EdgeInsets.only(top: 6),
-        child: IgnorePointer(
-          child: ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 48),
-              backgroundColor: isCorrect ? extras.correct : colorScheme.surface,
-              foregroundColor: isCorrect ? Colors.black : defaultTextColor,
-              alignment: Alignment.centerLeft,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 2,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            ),
-            child: child,
-          ),
-        ),
+      return ExamAnswerState(
+        letter: letter,
+        text: a.ctrl.text.trim(),
+        images: hasUploadedImage ? [a.uploadedImageUrl!] : const [],
+        videos: const [],
+        isCorrect: letter == _correct,
+        isSelected: false,
+        localImageBytes: hasLocalImage ? a.imageBytes : null,
       );
     });
 
+    final label = editingId != null ? 'Pytanie ID $editingId' : 'Nowe pytanie';
+    final questionText = _clean(_contentCtrl.text.trim());
+
+    // Local video not yet uploaded needs async temp-file resolution first.
+    if (_mediaKind == MediaKind.video &&
+        _uploadedVideoUrl == null &&
+        (_videoBytes?.isNotEmpty ?? false)) {
+      return _previewShell(
+        context,
+        child: FutureBuilder<String?>(
+          future: _ensureLocalTempVideo(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: ExamQuestionCard(
+                label: label,
+                questionText: questionText,
+                questionImages: questionImageUrls,
+                questionVideos: [snapshot.data!],
+                answers: answers,
+                accentColor: colorScheme.primary,
+                showResult: true,
+                resultBanner: _buildExplanationBanner(colorScheme),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     return _previewShell(
       context,
-      child: Card(
-        margin: const EdgeInsets.all(16),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _renderHtml(_contentCtrl.text.trim()),
-              ?mediaWidget,
-              ...answerWidgets,
-              if (_opisPoprawneCtrl.text.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: _renderHtml(_opisPoprawneCtrl.text.trim()),
-                ),
-              if (_opisNiepoprawneCtrl.text.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: _renderHtml(_opisNiepoprawneCtrl.text.trim()),
-                ),
-            ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ExamQuestionCard(
+          label: label,
+          questionText: questionText,
+          questionImages: questionImageUrls,
+          questionVideos: questionVideoUrls,
+          answers: answers,
+          accentColor: colorScheme.primary,
+          showResult: true,
+          resultBanner: _buildExplanationBanner(colorScheme),
         ),
       ),
+    );
+  }
+
+  Widget? _buildExplanationBanner(ColorScheme colorScheme) {
+    final correct = _opisPoprawneCtrl.text.trim();
+    final incorrect = _opisNiepoprawneCtrl.text.trim();
+    if (correct.isEmpty && incorrect.isEmpty) return null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (correct.isNotEmpty)
+          Text(
+            'Po poprawnej: ${_clean(correct)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        if (correct.isNotEmpty && incorrect.isNotEmpty)
+          const SizedBox(height: 6),
+        if (incorrect.isNotEmpty)
+          Text(
+            'Po niepoprawnej: ${_clean(incorrect)}',
+            style: TextStyle(
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+      ],
     );
   }
 
   Widget _previewShell(BuildContext context, {required Widget child}) {
     final colorScheme = Theme.of(context).colorScheme;
-    return ColoredBox(
-      color: colorScheme.surfaceContainerLow,
-      child: Column(
-        children: [
-          Material(
-            color: colorScheme.tertiaryContainer,
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.preview_outlined,
-                    size: 18,
-                    color: colorScheme.onTertiaryContainer,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'PODGLĄD — zmiany nie są jeszcze zapisane!',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onTertiaryContainer,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () => setState(() => _showPreview = false),
-                    icon: const Icon(Icons.close, size: 16),
-                    label: const Text('Zamknij'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      backgroundColor: colorScheme.onTertiaryContainer
-                          .withValues(alpha: 0.15),
-                      foregroundColor: colorScheme.onTertiaryContainer,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Row(
-                      children: [
-                        Text(
-                          editingId != null
-                              ? 'Pytanie ID $editingId'
-                              : 'Nowe pytanie',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  child,
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _renderHtml(
-    String text, {
-    List<String>? images,
-    List<String>? videos,
-  }) {
-    const double videoHeight = 400;
-    final plain = _clean(text);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (plain.isNotEmpty) Text(plain, style: const TextStyle(fontSize: 15)),
-        ...?images?.map(
-          (url) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Center(child: buildZoomableImage(context, url)),
-          ),
-        ),
-        ...?videos?.map(
-          (url) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: InlineVideoPlayer.network(url, height: videoHeight),
+        Material(
+          color: colorScheme.tertiaryContainer,
+          elevation: 0,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.preview_outlined,
+                  size: 18,
+                  color: colorScheme.onTertiaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'PODGLĄD — zmiany nie są jeszcze zapisane!',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onTertiaryContainer,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: () => setState(() => _showPreview = false),
+                  icon: const Icon(Icons.close, size: 16),
+                  label: const Text('Zamknij'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    backgroundColor: colorScheme.onTertiaryContainer.withValues(
+                      alpha: 0.15,
+                    ),
+                    foregroundColor: colorScheme.onTertiaryContainer,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+        Expanded(child: SingleChildScrollView(child: child)),
       ],
-    );
-  }
-
-  Widget _buildAnswerImage({String? url, Uint8List? bytes}) {
-    if ((url == null || url.isEmpty) && (bytes == null || bytes.isEmpty)) {
-      return const SizedBox.shrink();
-    }
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: url != null && url.isNotEmpty
-          ? buildZoomableImage(context, url)
-          : Image.memory(bytes!, fit: BoxFit.contain),
     );
   }
 }

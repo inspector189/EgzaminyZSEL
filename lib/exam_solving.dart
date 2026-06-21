@@ -166,14 +166,8 @@ class _EgzaminViewState extends State<EgzaminView> {
   // ── Data fetching ─────────────────────────
 
   Future<void> fetchQuestions() async {
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final testData = args?['testData'] as Map<String, dynamic>?;
-
     try {
-      final selected = testData != null
-          ? await _fetchFromPublishedTest(testData)
-          : await _fetchFromApi();
+      final selected = await _fetchFromApi();
 
       _applyQuestionMetadata(selected);
 
@@ -190,21 +184,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     } catch (e) {
       if (kDebugMode) debugPrint('Pobranie pytań nie powiodło się: $e');
     }
-  }
-
-  Future<List<dynamic>> _fetchFromPublishedTest(
-    Map<String, dynamic> testData,
-  ) async {
-    final result = await ApiService.instance.fetchPublishedTests();
-    if (!result.isSuccess || result.data == null) return [];
-    final matching = (result.data as List<dynamic>).firstWhere(
-      (t) =>
-          t['name'] == testData['name'] &&
-          t['author'] == testData['author'] &&
-          t['qualification'] == testData['qualification'],
-      orElse: () => null,
-    );
-    return List.from(matching?['test_json'] ?? []);
   }
 
   Future<List<dynamic>> _fetchFromApi() async {
