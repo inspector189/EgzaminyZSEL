@@ -612,7 +612,21 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     return false;
   }
 
-  Future<void> _printTest(Map<String, dynamic> test) async {
+  Future<void> _printTest(int index) async {
+    final id = savedTests[index]['id'] as int;
+    final test = await _fetchFullTest(id);
+    if (test == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Nie udało się wczytać testu'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
     if (_testContainsVideo(test)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -986,26 +1000,11 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
                 ),
               );
             },
-            onPrint: () async {
-              final id = t['id'] as int;
-              final full = await _fetchFullTest(id);
-              if (full == null) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Nie udało się wczytać testu'),
-                      backgroundColor: cs.error,
-                    ),
-                  );
-                }
-                return;
-              }
-              await _printTest(full);
-            },
+            onPrint: () => _printTest(realIndex),
             onDelete: canEdit ? () => _deleteTest(realIndex) : null,
             onTogglePublish: canEdit ? () => _togglePublish(realIndex) : null,
-            onReport: () => _generateReportPdf(t),
-            onAnswerKey: () => _generateAnswerKeyPdf(t),
+            onReport: () => _generateReportPdf(realIndex),
+            onAnswerKey: () => _generateAnswerKeyPdf(realIndex),
             onExamPreview: (examId) async {
               final data = await _fetchExamDetailsFull(examId);
               if (!context.mounted) return;
@@ -1174,16 +1173,32 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
 
   // ── PDF generation ────────────────────────────────────────────
 
-  Future<void> _generateAnswerKeyPdf(Map<String, dynamic> test) async {
-    final String qual = test['qualification'] as String;
+  Future<void> _generateAnswerKeyPdf(int index) async {
+    final id = savedTests[index]['id'] as int;
+
+    // Ensure full test with questions is loaded
+    final fullTest = await _fetchFullTest(id);
+    if (fullTest == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Nie udało się wczytać testu do klucza'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Use the fresh full test data
+    final String qual = fullTest['qualification'] as String;
     final questions = List<Map<String, dynamic>>.from(
-      test['questions'] as List,
+      fullTest['questions'] as List,
     );
 
     List<dynamic> fullDb = [];
 
     if (kUseFakeData) {
-      // Fake answer key — A for all
       fullDb = questions.map((q) => {'id': q['id'], 'poprawna': 'A'}).toList();
     } else {
       try {
@@ -1232,7 +1247,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
         margin: const pw.EdgeInsets.all(32),
         build: (ctx) => [
           pw.Text(
-            'Klucz Odpowiedzi — ${test['name']}',
+            'Klucz Odpowiedzi — ${fullTest['name']}',
             style: pw.TextStyle(
               font: ttf,
               fontWeight: pw.FontWeight.bold,
@@ -1266,12 +1281,30 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     final bytes = await pdf.save();
     _openPdfBlob(
       bytes,
-      'klucz_${(test['name'] as String).replaceAll(' ', '_')}.pdf',
+      'klucz_${(fullTest['name'] as String).replaceAll(' ', '_')}.pdf',
     );
   }
 
-  Future<void> _generateReportPdf(Map<String, dynamic> test) async {
+  Future<void> _generateReportPdf(int index) async {
+    final id = savedTests[index]['id'] as int;
+
+    // Ensure results are loaded (same as expanding the tile)
+    if (!_loadedResultsForIds.contains(id) &&
+        !_loadingResultsForIds.contains(id)) {
+      await _loadResultsForTest(index);
+    }
+
+    // Wait for setState to update the list
+    if (mounted) {
+      await Future.delayed(const Duration(milliseconds: 150));
+    }
+
+    if (!mounted) return;
+
+    // Use fresh reference
+    final test = savedTests[index];
     final results = (test['results'] as List<dynamic>?) ?? [];
+
     if (results.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
