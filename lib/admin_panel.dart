@@ -1,13 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'question_panel.dart';
-import 'utils/helpers.dart';
-import 'widgets/admin_tiles.dart';
-import 'admin_stats.dart';
-import 'admin_management.dart';
-import 'test_and_report_creation.dart';
-import 'admin_qualifications.dart';
+import '/questions_difficulty.dart';
+import '/admin_stats.dart';
+import '/admin_management.dart';
+import '/test_and_report_creation.dart';
+import '/admin_qualifications.dart';
+
+import '/utils/helpers.dart';
+import '/widgets/admin_tiles.dart';
+
 
 class AdminPanelPage extends StatelessWidget {
   final bool isSuperAdmin;
@@ -57,7 +59,7 @@ class AdminPanelPage extends StatelessWidget {
         label: 'Dane trudności pytań',
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => QuestionStatsPage()),
+          MaterialPageRoute(builder: (_) => QuestionsDifficultyPage()),
         ),
       ),
       if (kDebugMode)

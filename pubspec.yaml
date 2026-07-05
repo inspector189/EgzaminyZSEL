@@ -1,5 +1,5 @@
-name: flutter_app
-description: "A new Flutter project."
+name: egzaminy_zsel
+description: "Nowoczesna aplikacja webowa wspierająca przygotowanie uczniów do egzaminów zawodowych oraz ułatwiająca nauczycielom monitorowanie postępów i analizę wyników."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.5.0
 
 environment:
   sdk: ^3.12.2
@@ -38,7 +38,8 @@ dependencies:
   
   universal_html: ^2.3.0
   html_unescape_xx: ^3.0.1
-  http: ^1.6.0
+  #http: ^1.6.0
+  dio: ^5.10.0
   web: ^1.1.1
   http_parser: ^4.1.2
   url_launcher: ^6.3.2
@@ -70,7 +71,9 @@ dev_dependencies:
   
 flutter_launcher_icons:
   android: "launcher_icon"
-  ios: true
+  ios: "launcher_icon"
+  remove_alpha_ios: true
+  background_color_ios: "#ffffff"
   image_path: "assets/icon/logo.png"
   min_sdk_android: 26 # android min sdk min:16, default 21
   web:

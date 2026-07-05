@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'exam_solving.dart';
-import 'question_editing.dart';
-import 'widgets/question_tile.dart';
-import 'published_test_view.dart';
-import "services/oauth2_service.dart";
 
-class QualificationPage extends StatelessWidget {
-  const QualificationPage({
+import '/published_tests_view.dart';
+import '/exam_solving.dart';
+import '/question_editing.dart';
+
+import "/services/oauth2_service.dart";
+import '/widgets/question_tile.dart';
+
+class QualificationExamSelectionPage extends StatelessWidget {
+  const QualificationExamSelectionPage({
     super.key,
     required this.qualification,
     required this.isAdmin,

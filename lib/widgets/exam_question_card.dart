@@ -1,8 +1,10 @@
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_app/utils/app_themes.dart';
-import 'package:flutter_app/widgets/inline_video_player.dart';
-import 'package:flutter_app/widgets/zoomable_image.dart';
+
+import '/utils/app_themes.dart';
+import '/widgets/inline_video_player.dart';
+import '/widgets/zoomable_image.dart';
 
 const double _kCardRadius = 12.0;
 const double _kAccentWidth = 4.0;

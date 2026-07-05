@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/utils/app_themes.dart';
+
 import 'exam_preview.dart';
 
-class EgzaminWynikView extends StatelessWidget {
+import '/utils/app_themes.dart';
+
+class ExamResultsPage extends StatelessWidget {
   final int correctAnswers;
   final int totalQuestions;
   final List<dynamic> questions;
   final List<String?> selectedAnswers;
   final bool returnToHome;
 
-  const EgzaminWynikView({
+  const ExamResultsPage({
     super.key,
     required this.correctAnswers,
     required this.totalQuestions,
@@ -142,7 +144,7 @@ class EgzaminWynikView extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => EgzaminPodgladView(
+                                builder: (_) => ExamPreviewPage(
                                   questions: questions,
                                   selectedAnswers: selectedAnswers,
                                 ),

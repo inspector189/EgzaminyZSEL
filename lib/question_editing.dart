@@ -1,22 +1,21 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/utils/async_state_view.dart';
 import 'package:html_unescape_xx/html_unescape.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:universal_html/html.dart' as html;
 
-import 'package:flutter_app/services/api_service.dart';
-import 'package:flutter_app/utils/app_themes.dart';
-import 'widgets/difficulty_badge.dart';
-import 'widgets/exam_question_card.dart';
-import 'widgets/shim_box.dart';
-import 'utils/helpers.dart';
+import '/services/api_service.dart';
+import '/utils/async_state_view.dart';
+import '/utils/app_themes.dart';
+import '/utils/helpers.dart';
+import '/widgets/difficulty_badge.dart';
+import '/widgets/exam_question_card.dart';
+import '/widgets/shim_box.dart';
 
 // ─────────────────────────────────────────────
 //                    Enums

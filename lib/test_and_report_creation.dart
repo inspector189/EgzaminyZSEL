@@ -1,13 +1,7 @@
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:math' show pi;
-import 'package:flutter_app/services/api_service.dart';
-import 'package:flutter_app/utils/app_themes.dart';
-import 'package:flutter_app/utils/async_state_view.dart';
-import 'package:flutter_app/utils/helpers.dart';
-import 'package:flutter_app/widgets/exam_question_card.dart';
 
-import 'exam_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,7 +11,15 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:web/web.dart' as web;
 import 'package:html_unescape_xx/html_unescape.dart';
+
 import 'test_creator.dart';
+import 'exam_preview.dart';
+
+import '/services/api_service.dart';
+import '/utils/app_themes.dart';
+import '/utils/async_state_view.dart';
+import '/utils/helpers.dart';
+import '/widgets/exam_question_card.dart';
 
 final _fakeTests = [
   {
@@ -1012,7 +1014,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => EgzaminPodgladView(
+                    builder: (_) => ExamPreviewPage(
                       questions: data['questions'],
                       selectedAnswers: data['selectedAnswers'],
                     ),

@@ -1,7 +1,5 @@
-// admin_qualifications.dart
-
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
-import 'package:flutter/foundation.dart' as foundation;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 // ─────────────────────────────────────────────
@@ -89,7 +87,7 @@ class QualificationsStore extends ChangeNotifier {
 }
 
 // ─────────────────────────────────────────────
-// Emoji picker — themed to match app
+//                  Emoji picker
 // ─────────────────────────────────────────────
 
 Future<String?> showEmojiPicker(BuildContext context) async {
@@ -129,7 +127,7 @@ Future<String?> showEmojiPicker(BuildContext context) async {
                   backgroundColor: cs.surface,
                   emojiSizeMax:
                       28 *
-                      (foundation.defaultTargetPlatform == TargetPlatform.iOS
+                      (defaultTargetPlatform == TargetPlatform.iOS
                           ? 1.20
                           : 1.0),
                 ),
@@ -163,7 +161,7 @@ Future<String?> showEmojiPicker(BuildContext context) async {
 }
 
 // ─────────────────────────────────────────────
-// Emoji selector button
+//             Emoji selector button
 // ─────────────────────────────────────────────
 
 class _EmojiButton extends StatelessWidget {
@@ -204,7 +202,7 @@ class _EmojiButton extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// Section header (matches app accent-bar style)
+//                Section header
 // ─────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
@@ -257,7 +255,7 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// Qualification form dialog
+//         Qualification form dialog
 // ─────────────────────────────────────────────
 
 class QualificationFormDialog extends StatefulWidget {
@@ -446,7 +444,7 @@ class _QualificationFormDialogState extends State<QualificationFormDialog> {
 }
 
 // ─────────────────────────────────────────────
-// Profession form dialog
+//           Profession form dialog
 // ─────────────────────────────────────────────
 
 class ProfessionFormDialog extends StatefulWidget {
@@ -743,7 +741,7 @@ class _ProfessionFormDialogState extends State<ProfessionFormDialog> {
 }
 
 // ─────────────────────────────────────────────
-// Management page
+//               Management page
 // ─────────────────────────────────────────────
 
 class ManageQualificationsPage extends StatefulWidget {
@@ -820,7 +818,7 @@ class _ManageQualificationsPageState extends State<ManageQualificationsPage> {
 }
 
 // ─────────────────────────────────────────────
-// Qualifications tab
+//             Qualifications tab
 // ─────────────────────────────────────────────
 
 class _QualificationsTab extends StatelessWidget {
@@ -1000,7 +998,7 @@ class _QualificationCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// Professions tab
+//               Professions tab
 // ─────────────────────────────────────────────
 
 class _ProfessionsTab extends StatelessWidget {

@@ -1,11 +1,13 @@
 import 'dart:convert';
+import 'dart:math' show Random;
+
 import 'package:web/web.dart' as web;
-import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/helpers.dart';
+
+import '/services/api_service.dart';
+import '/utils/helpers.dart';
 
 class OAuth2Service {
   static const List<String> _scopes = [
@@ -78,56 +80,49 @@ class OAuth2Service {
     web.window.localStorage.removeItem('code_verifier');
 
     try {
-      final response = await http.post(
-        Uri.parse(_tokenUrl),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'client_id': clientId,
-          'grant_type': 'authorization_code',
-          'code': code,
-          'redirect_uri': _redirectUri,
-          'code_verifier': codeVerifier,
-        },
+      final result = await ApiService.instance.exchangeOAuthCode(
+        clientId: clientId,
+        tokenUrl: _tokenUrl,
+        code: code,
+        redirectUri: _redirectUri,
+        codeVerifier: codeVerifier,
       );
 
-      if (response.statusCode == 200) {
-        final jsonMap = jsonDecode(response.body) as Map<String, dynamic>;
-        final idToken = jsonMap['id_token'] as String?;
-
-        await _saveUserFromIdToken(idToken);
-
-        bool isAdmin = false;
-
-        if (idToken != null) {
-          final msRes = await http.post(
-            Uri.parse('$apiBaseUrl/ms-login.php'),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: {'id_token': idToken},
-          );
-
-          if (msRes.statusCode == 200) {
-            final msJson = jsonDecode(msRes.body) as Map<String, dynamic>;
-            isAdmin = msJson['isAdmin'] == true;
-          } else {
-            if (kDebugMode) {
-              debugPrint(
-                'Wystąpił błąd podczas logowania: ${msRes.statusCode} ${msRes.body}',
-              );
-            }
-          }
-        }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isAdmin', isAdmin);
-
-        return true;
-      } else {
+      if (!result.isSuccess) {
         if (kDebugMode) {
           debugPrint(
-            'Wystąpił błąd podczas pobierania tokena: ${response.statusCode} - ${response.body}',
+            'Wystąpił błąd podczas pobierania tokena: ${result.statusCode} - ${result.errorMessage}',
           );
         }
+        return false;
       }
+
+      final tokenData = result.data!;
+      final idToken = tokenData['id_token'] as String?;
+
+      await _saveUserFromIdToken(idToken);
+
+      bool isAdmin = false;
+
+      if (idToken != null) {
+        final loginResult = await ApiService.instance.logIntoMicrosoft(idToken);
+
+        if (loginResult.isSuccess) {
+          final loginData = loginResult.data!;
+          isAdmin = loginData['isAdmin'] == true;
+        } else {
+          if (kDebugMode) {
+            debugPrint(
+              'Wystąpił błąd podczas logowania: ${loginResult.statusCode} ${loginResult.errorMessage}',
+            );
+          }
+        }
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isAdmin', isAdmin);
+
+      return true;
     } catch (e) {
       if (kDebugMode) debugPrint('Wystąpił wewnętrzny błąd: $e');
     }

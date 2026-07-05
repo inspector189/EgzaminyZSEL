@@ -1,9 +1,6 @@
-import 'package:flutter_app/services/api_service.dart';
-import 'package:flutter_app/utils/helpers.dart';
-
-import 'widgets/question_tile.dart';
 import 'dart:async';
 import 'dart:math';
+
 import 'package:web/web.dart' as web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,17 +8,21 @@ import 'package:provider/provider.dart';
 import 'widgets/home_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'admin_panel.dart';
-import 'utils/qualifications_class.dart';
-import 'utils/app_themes.dart';
-import 'widgets/profile_popup.dart';
-import 'services/oauth2_service.dart';
-import 'theme_personalisation.dart';
-import 'qualification_test_selection.dart';
-import 'user_stats.dart';
-import 'utils/theme_manager.dart';
-import 'utils/quotes_array.dart';
-import 'about_us.dart';
+import '/admin_panel.dart';
+import '/theme_personalisation.dart';
+import '/qualification_exam_selection.dart';
+import '/user_stats.dart';
+import '/about_us.dart';
+
+import '/services/oauth2_service.dart';
+import '/services/api_service.dart';
+import '/utils/helpers.dart';
+import '/utils/qualifications_class.dart';
+import '/utils/app_themes.dart';
+import '/utils/theme_manager.dart';
+import '/utils/quotes_array.dart';
+import '/widgets/profile_popup.dart';
+import '/widgets/question_tile.dart';
 
 //Debug data here (use your data to login in debug)
 const String userName = "";
@@ -233,7 +234,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       if (context.mounted) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const StatisticsPage()),
+          MaterialPageRoute(builder: (context) => const UserStatisticsPage()),
         );
       }
     });
@@ -445,7 +446,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         onSelected: (qualification) {
           _navigatorKey.currentState?.pushAndRemoveUntil(
             MaterialPageRoute(
-              builder: (_) => QualificationPage(
+              builder: (_) => QualificationExamSelectionPage(
                 qualification: qualification.code,
                 isAdmin: _isAdmin,
                 isLoggedIn: _isLoggedIn,
@@ -510,7 +511,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         } else {
           _navigatorKey.currentState?.push(
             MaterialPageRoute(
-              builder: (context) => QualificationPage(
+              builder: (context) => QualificationExamSelectionPage(
                 qualification: title,
                 isAdmin: _isAdmin,
                 isLoggedIn: _isLoggedIn,
@@ -527,9 +528,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      drawer: MediaQuery.of(context).size.width <= 900
+      drawer: width <= 900
           ? Drawer(
               child: ListView(
                 padding: EdgeInsets.zero,
@@ -557,7 +559,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                             Navigator.pop(context);
                             _navigatorKey.currentState?.push(
                               MaterialPageRoute(
-                                builder: (_) => QualificationPage(
+                                builder: (_) => QualificationExamSelectionPage(
                                   qualification: q.code,
                                   isAdmin: _isAdmin,
                                   isLoggedIn: _isLoggedIn,
@@ -618,7 +620,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       appBar: AppBar(
         title: Text(widget.title),
         backgroundColor: colorScheme.primary,
-        actions: MediaQuery.of(context).size.width > 900
+        actions: width > 900
             ? [
                 const Spacer(),
                 buildPopupMenu('Strona Główna'),
@@ -631,7 +633,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const AboutPage()),
+                      MaterialPageRoute(builder: (_) => const AboutUsPage()),
                     );
                   },
                 ),
@@ -662,6 +664,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 ),
 
                 IconButton(
+                  color: colorScheme.onPrimary,
                   icon: Icon(switch (themeProvider.themeMode) {
                     ThemeMode.light => Icons.wb_sunny_rounded,
                     ThemeMode.dark => Icons.nightlight_rounded,
@@ -691,7 +694,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
               onQualificationTap: (qualification) {
                 _navigatorKey.currentState?.push(
                   MaterialPageRoute(
-                    builder: (context) => QualificationPage(
+                    builder: (context) => QualificationExamSelectionPage(
                       qualification: qualification,
                       isAdmin: _isAdmin,
                       isLoggedIn: _isLoggedIn,

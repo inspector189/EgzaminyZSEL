@@ -2,12 +2,14 @@ import 'dart:async' show Timer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/exam_preview.dart';
-import 'package:flutter_app/services/api_service.dart';
-import 'package:flutter_app/utils/app_themes.dart';
-import 'report_selection.dart';
-import 'widgets/search_bar.dart' as search_bar;
-import 'utils/async_state_view.dart';
+
+import '/report_selection.dart';
+import '/exam_preview.dart';
+
+import '/services/api_service.dart';
+import '/utils/async_state_view.dart';
+import '/utils/app_themes.dart';
+import '/widgets/search_bar.dart' as search_bar;
 
 class AdminStatsPage extends StatefulWidget {
   const AdminStatsPage({super.key});
@@ -1314,7 +1316,7 @@ class _QualificationTile extends StatelessWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => EgzaminPodgladView(
+                                    builder: (_) => ExamPreviewPage(
                                       questions: details['questions'],
                                       selectedAnswers:
                                           details['selectedAnswers'],

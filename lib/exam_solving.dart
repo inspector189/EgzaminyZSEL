@@ -1,17 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/services/api_service.dart';
-import 'package:flutter_app/utils/async_state_view.dart';
-import 'package:flutter_app/widgets/difficulty_badge.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'exam_results.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:html_unescape_xx/html_unescape.dart';
-import 'dart:async';
-import 'utils/app_themes.dart';
-import 'widgets/exam_question_card.dart';
-import 'widgets/exam_timer.dart';
-import 'widgets/shim_box.dart';
+
+import '/exam_results.dart';
+import '/services/api_service.dart';
+import '/utils/async_state_view.dart';
+import '/utils/app_themes.dart';
+import '/widgets/difficulty_badge.dart';
+import '/widgets/exam_question_card.dart';
+import '/widgets/exam_timer.dart';
+import '/widgets/shim_box.dart';
 
 // ──────────────
 // Design tokens
@@ -364,7 +366,7 @@ class _EgzaminViewState extends State<EgzaminView> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => EgzaminWynikView(
+        builder: (_) => ExamResultsPage(
           correctAnswers: correct,
           totalQuestions: questions.length,
           questions: questions,

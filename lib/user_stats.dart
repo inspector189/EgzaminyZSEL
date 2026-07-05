@@ -1,17 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/services/api_service.dart';
-import 'exam_preview.dart';
+
+import '/exam_preview.dart';
+import '/services/api_service.dart';
 import 'utils/async_state_view.dart';
 
-class StatisticsPage extends StatefulWidget {
-  const StatisticsPage({super.key});
+class UserStatisticsPage extends StatefulWidget {
+  const UserStatisticsPage({super.key});
 
   @override
-  State<StatisticsPage> createState() => _StatisticsPageState();
+  State<UserStatisticsPage> createState() => _UserStatisticsPageState();
 }
 
-class _StatisticsPageState extends State<StatisticsPage> {
+class _UserStatisticsPageState extends State<UserStatisticsPage> {
   late final Future<Map<String, dynamic>> _statsFuture = ApiService.instance
       .fetchUserStats()
       .then((result) {
@@ -443,7 +444,7 @@ class LastExamRow extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => EgzaminPodgladView(
+                          builder: (_) => ExamPreviewPage(
                             questions: data['questions'],
                             selectedAnswers: (data['selectedAnswers'])
                                 .cast<String?>(),

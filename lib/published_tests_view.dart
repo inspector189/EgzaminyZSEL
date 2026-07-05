@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/services/api_service.dart';
-import 'package:flutter_app/utils/async_state_view.dart';
-import 'package:flutter_app/utils/helpers.dart';
-import 'exam_solving.dart';
+
+import '/exam_solving.dart';
+import '/services/api_service.dart';
+import '/utils/async_state_view.dart';
+import '/utils/helpers.dart';
 
 final _fakeTests = [
   {

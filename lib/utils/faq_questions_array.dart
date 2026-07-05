@@ -1,4 +1,4 @@
-final List<Map<String, String>> faqs = const [
+final faqs = const [
   {
     "question":
         "1. Skąd wziął się pomysł na stworzenie aplikacji EgzaminyZawodoweZSEL i dlaczego taki system był potrzebny?",

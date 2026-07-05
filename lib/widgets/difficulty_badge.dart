@@ -1,6 +1,5 @@
-// lib/widgets/difficulty_badge.dart
 import 'package:flutter/material.dart';
-import '../utils/app_themes.dart';
+import '/utils/app_themes.dart';
 
 class DifficultyBadge extends StatelessWidget {
   const DifficultyBadge({
@@ -10,12 +9,13 @@ class DifficultyBadge extends StatelessWidget {
   });
   final double trudnosc;
   final int ilosc;
+  static const _kHardThreshold = 50.0;
 
   @override
   Widget build(BuildContext context) {
     if (ilosc < 5) return const SizedBox.shrink();
     final extras = Theme.of(context).extension<ExtraColors>()!;
-    final isHard = trudnosc > 50.0;
+    final isHard = trudnosc > _kHardThreshold;
     final color = isHard ? extras.incorrect : extras.correct;
 
     return Container(

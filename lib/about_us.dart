@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+
 import 'utils/faq_questions_array.dart';
 import 'utils/authors_array.dart';
 
-class AboutPage extends StatelessWidget {
-  const AboutPage({super.key, this.returnToHome = false});
+class AboutUsPage extends StatelessWidget {
+  const AboutUsPage({super.key, this.returnToHome = false});
 
   final bool returnToHome;
 

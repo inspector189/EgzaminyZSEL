@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'utils/theme_manager.dart';
 
 const _kSwatches = [

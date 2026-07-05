@@ -1,4 +1,4 @@
-final authors = [
+final authors = const [
   {
     "name": "Marta Błaszczyk",
     "class": "Klasa 5TG (2021-2026)",

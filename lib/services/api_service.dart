@@ -1,8 +1,10 @@
-import 'dart:convert';
 import 'dart:typed_data';
-import 'package:http/http.dart' as http;
+
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:http_parser/http_parser.dart' as http_parser;
-import '../utils/helpers.dart';
+
+import '/utils/helpers.dart';
 
 /// A typed response wrapper. [statusCode] of -1 means a network/exception failure.
 class ApiResult<T> {
@@ -23,27 +25,86 @@ class ApiResult<T> {
 }
 
 class ApiService {
-  ApiService._();
+  ApiService._() {
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: apiBaseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 20),
+        sendTimeout: const Duration(seconds: 30),
+        validateStatus: (_) => true,
+      ),
+    );
+
+    // Every request gets the bearer token unless explicitly opted out
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.extra['skipAuth'] != true) {
+            options.headers['Authorization'] = 'Bearer $apiToken';
+          }
+          handler.next(options);
+        },
+      ),
+    );
+
+    if (kDebugMode) {
+      _dio.interceptors.add(
+        InterceptorsWrapper(
+          onError: (e, handler) {
+            debugPrint(
+              'Błąd api_service.dart: ${e.requestOptions.method} ${e.requestOptions.path} → ${e.message}',
+            );
+            handler.next(e);
+          },
+        ),
+      );
+    }
+  }
+
   static final ApiService instance = ApiService._();
+  late final Dio _dio;
 
-  // ─── Headers ──────────────────────────────────────────────────────────────
+  // ─── Shared response/error handling ────────────────────────────────────────
 
-  Map<String, String> get _authHeaders => {'Authorization': 'Bearer $apiToken'};
+  ApiResult<T> _ok<T>(Response res, T Function(dynamic) parse) {
+    if (res.statusCode == 200) {
+      try {
+        return ApiResult(statusCode: 200, data: parse(res.data));
+      } catch (e) {
+        return ApiResult(
+          statusCode: res.statusCode ?? -1,
+          errorMessage: 'Błąd przetwarzania odpowiedzi: $e',
+        );
+      }
+    }
+    return ApiResult(
+      statusCode: res.statusCode ?? -1,
+      errorMessage: res.data?.toString(),
+    );
+  }
 
-  Map<String, String> get _authJsonHeaders => {
-    'Authorization': 'Bearer $apiToken',
-    'Content-Type': 'application/json',
-  };
+  ApiResult<T> _fail<T>(Object e) {
+    if (e is DioException) {
+      final msg = switch (e.type) {
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.sendTimeout ||
+        DioExceptionType.receiveTimeout =>
+          'Przekroczono czas oczekiwania na odpowiedź serwera',
+        DioExceptionType.connectionError => 'Błąd połączenia z serwerem',
+        DioExceptionType.cancel => 'Żądanie zostało anulowane',
+        DioExceptionType.badCertificate => 'Nieprawidłowy certyfikat serwera',
+        _ => e.message ?? 'Nieznany błąd sieci',
+      };
+      return ApiResult(statusCode: -1, errorMessage: msg);
+    }
+    return ApiResult(statusCode: -1, errorMessage: e.toString());
+  }
 
-  Map<String, String> get _apiKeyFormHeaders => {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'Authorization': 'Bearer $apiToken',
-  };
-
-  Map<String, String> get _apiKeyJsonHeaders => {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer $apiToken',
-  };
+  Options _form({bool skipAuth = false}) => Options(
+    contentType: Headers.formUrlEncodedContentType,
+    extra: {'skipAuth': skipAuth},
+  );
 
   // ─── Questions ────────────────────────────────────────────────────────────
 
@@ -53,41 +114,37 @@ class ApiService {
     int? limit,
   }) async {
     try {
-      final uri = Uri.parse('$apiBaseUrl/getQuestions.php').replace(
-        queryParameters: {
-          'egzamin': qualification,
-          if (limit != null) 'limit': limit.toString(),
-        },
+      final res = await _dio.get(
+        '/getQuestions.php',
+        queryParameters: {'egzamin': qualification, 'limit': ?limit},
       );
-      final res = await http.get(uri);
-      if (res.statusCode == 200 && res.body.isNotEmpty) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as List<dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      return _ok(res, (d) => d as List<dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
+    }
+  }
+
+  Future<ApiResult<List<dynamic>>> fetchQualificationDifficulty(
+    String kwal,
+  ) async {
+    try {
+      final res = await _dio.post(
+        '/getQualificationDifficulty.php',
+        data: {'kwalifikacja': kwal},
+      );
+      return _ok(res, (d) => d as List<dynamic>);
+    } catch (e) {
+      return _fail(e);
     }
   }
 
   /// Fetches difficulty stats for all questions.
   Future<ApiResult<List<dynamic>>> fetchDifficultyStats() async {
     try {
-      final res = await http.get(
-        Uri.parse('$apiBaseUrl/wyswietl_trudnosci.php'),
-        headers: _apiKeyJsonHeaders,
-      );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as List<dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.get('/getDifficultyStats.php');
+      return _ok(res, (d) => d as List<dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
@@ -96,43 +153,23 @@ class ApiService {
     Map<String, dynamic> payload,
   ) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/add_question.php'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $apiToken',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(payload),
-      );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      final res = await _dio.post('/add_question.php', data: payload);
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
   /// Deletes a question by [id] in [qualification].
   Future<ApiResult<void>> deleteQuestion(String qualification, int id) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/delete_question.php'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $apiToken',
-          'X-API-Key': apiToken,
-        },
-        body: jsonEncode({'egzamin': qualification, 'id': id}),
+      final res = await _dio.post(
+        '/delete_question.php',
+        data: {'egzamin': qualification, 'id': id},
       );
-      return ApiResult(statusCode: res.statusCode);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
@@ -143,20 +180,14 @@ class ApiService {
     int? questionId,
   }) async {
     try {
-      final body = <String, String>{'kwalifikacja': qualification};
-      if (questionId != null) body['pytanie_id'] = '$questionId';
-
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/reset_trudnosc.php'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-          'Authorization': 'Bearer $apiToken',
-        },
-        body: body,
+      final res = await _dio.post(
+        '/reset_trudnosc.php',
+        data: {'kwalifikacja': qualification, 'pytanie_id': ?questionId},
+        options: _form(),
       );
-      return ApiResult(statusCode: res.statusCode);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
@@ -167,22 +198,67 @@ class ApiService {
     bool correct,
   ) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/zapis_trudnosci.php'),
-        headers: _apiKeyFormHeaders,
-        body: {
-          'pytanie_id': questionId.toString(),
+      final res = await _dio.post(
+        '/zapis_trudnosci.php',
+        data: {
+          'pytanie_id': questionId,
           'kwalifikacja': qualification.replaceAll(' ', ''),
           'poprawna': correct ? '1' : '0',
         },
+        options: _form(),
       );
-      return ApiResult(statusCode: res.statusCode);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
   // ─── Media Uploads ────────────────────────────────────────────────────────
+
+  Future<ApiResult<Map<String, String>>> _upload(
+    String path,
+    Uint8List bytes,
+    String filename,
+    http_parser.MediaType contentType,
+    String qualification,
+  ) async {
+    try {
+      final formData = FormData.fromMap({
+        'kwalifikacja': qualification,
+        'egzamin': qualification,
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: filename,
+          contentType: contentType,
+        ),
+      });
+
+      final res = await _dio.post(path, data: formData);
+
+      if (res.statusCode != 200) {
+        return ApiResult(
+          statusCode: res.statusCode ?? -1,
+          errorMessage: res.data?.toString(),
+        );
+      }
+      final data = res.data as Map<String, dynamic>;
+      if (data['ok'] != true || data['url'] == null) {
+        return ApiResult(
+          statusCode: res.statusCode ?? -1,
+          errorMessage: data['error']?.toString() ?? 'Upload failed',
+        );
+      }
+      return ApiResult(
+        statusCode: res.statusCode ?? -1,
+        data: {
+          'url': data['url'] as String,
+          'filename': (data['filename'] as String?) ?? filename,
+        },
+      );
+    } catch (e) {
+      return _fail(e);
+    }
+  }
 
   /// Uploads an image for a question or answer.
   /// Returns the uploaded [url] and [filename] on success.
@@ -190,52 +266,15 @@ class ApiService {
     String qualification,
     Uint8List bytes,
     String filename,
-  ) async {
-    try {
-      final ext = filename.split('.').last.toLowerCase();
-      final req =
-          http.MultipartRequest(
-              'POST',
-              Uri.parse('$apiBaseUrl/upload_image_next.php'),
-            )
-            ..headers['Authorization'] = 'Bearer $apiToken'
-            ..headers['X-API-Key'] = apiToken
-            ..headers['Accept'] = 'application/json'
-            ..fields['kwalifikacja'] = qualification
-            ..fields['egzamin'] = qualification
-            ..files.add(
-              http.MultipartFile.fromBytes(
-                'file',
-                bytes,
-                filename: filename,
-                contentType: http_parser.MediaType(
-                  'image',
-                  ext == 'jpg' ? 'jpeg' : ext,
-                ),
-              ),
-            );
-
-      final res = await http.Response.fromStream(await req.send());
-      if (res.statusCode != 200) {
-        return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
-      }
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (data['ok'] != true || data['url'] == null) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          errorMessage: data['error']?.toString() ?? 'Upload failed',
-        );
-      }
-      return ApiResult(
-        statusCode: res.statusCode,
-        data: {
-          'url': data['url'] as String,
-          'filename': (data['filename'] as String?) ?? filename,
-        },
-      );
-    } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
-    }
+  ) {
+    final ext = filename.split('.').last.toLowerCase();
+    return _upload(
+      '/upload_image_next.php',
+      bytes,
+      filename,
+      http_parser.MediaType('image', ext == 'jpg' ? 'jpeg' : ext),
+      qualification,
+    );
   }
 
   /// Uploads a video for a question.
@@ -243,66 +282,35 @@ class ApiService {
     String qualification,
     Uint8List bytes,
     String filename,
-  ) async {
-    try {
-      final ext = filename.split('.').last.toLowerCase();
-      final mt = switch (ext) {
-        'webm' => http_parser.MediaType('video', 'webm'),
-        'ogg' => http_parser.MediaType('video', 'ogg'),
-        _ => http_parser.MediaType('video', 'mp4'),
-      };
-      final req =
-          http.MultipartRequest(
-              'POST',
-              Uri.parse('$apiBaseUrl/upload_video.php'),
-            )
-            ..headers['Authorization'] = 'Bearer $apiToken'
-            ..headers['X-API-Key'] = apiToken
-            ..headers['Accept'] = 'application/json'
-            ..fields['kwalifikacja'] = qualification
-            ..fields['egzamin'] = qualification
-            ..files.add(
-              http.MultipartFile.fromBytes(
-                'file',
-                bytes,
-                filename: filename,
-                contentType: mt,
-              ),
-            );
-
-      final res = await http.Response.fromStream(await req.send());
-      if (res.statusCode != 200) {
-        return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
-      }
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (data['ok'] != true || data['url'] == null) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          errorMessage: data['error']?.toString() ?? 'Upload failed',
-        );
-      }
-      return ApiResult(
-        statusCode: res.statusCode,
-        data: {
-          'url': data['url'] as String,
-          'filename': (data['filename'] as String?) ?? filename,
-        },
-      );
-    } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
-    }
+  ) {
+    final ext = filename.split('.').last.toLowerCase();
+    final mt = switch (ext) {
+      'webm' => http_parser.MediaType('video', 'webm'),
+      'ogg' => http_parser.MediaType('video', 'ogg'),
+      _ => http_parser.MediaType('video', 'mp4'),
+    };
+    return _upload('/upload_video.php', bytes, filename, mt, qualification);
   }
 
   /// Downloads raw image bytes from [url] — used when building PDFs.
   Future<ApiResult<Uint8List>> downloadImage(String url) async {
     try {
-      final res = await http.get(Uri.parse(url));
-      if (res.statusCode == 200) {
-        return ApiResult(statusCode: res.statusCode, data: res.bodyBytes);
+      final res = await _dio.get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          extra: {'skipAuth': true},
+        ),
+      );
+      if (res.statusCode == 200 && res.data != null) {
+        return ApiResult(
+          statusCode: res.statusCode!,
+          data: Uint8List.fromList(res.data!),
+        );
       }
-      return ApiResult(statusCode: res.statusCode);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
@@ -311,14 +319,10 @@ class ApiService {
   /// Saves a standard 40-question exam result with full payload.
   Future<ApiResult<void>> saveExam(Map<String, dynamic> payload) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/save_exam.php'),
-        headers: _apiKeyJsonHeaders,
-        body: jsonEncode(payload),
-      );
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.post('/save_exam.php', data: payload);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
@@ -327,125 +331,62 @@ class ApiService {
     Map<String, dynamic> payload,
   ) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/savePublishedResult.php'),
-        headers: _apiKeyJsonHeaders,
-        body: jsonEncode(payload),
-      );
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.post('/savePublishedResult.php', data: payload);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
-
-  /// Saves a quick exam score (used in single/40-question modes via zapisz_wynik.php).
-  /*Future<ApiResult<void>> saveExamScore({
-    required String qualification,
-    required double score,
-    required String dateTime,
-    required int durationSeconds,
-    required String userName,
-  }) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/zapisz_wynik.php'),
-        headers: _apiKeyFormHeaders,
-        body: {
-          'kwalifikacja': qualification.replaceAll(' ', ''),
-          'wynik': score.toStringAsFixed(2),
-          'data_czas': dateTime,
-          'czas_trwania': durationSeconds.toString(),
-          'userName': userName,
-        },
-      );
-      return ApiResult(statusCode: res.statusCode);
-    } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
-    }
-  }*/
 
   // ─── Published Tests ──────────────────────────────────────────────────────
 
-  /// Fetches all tests metadata for the admin "Created Tests" view (no questions).
   Future<ApiResult<List<Map<String, dynamic>>>>
   fetchAdminTestsMetadata() async {
     try {
-      final res = await http.get(
-        Uri.parse('$apiBaseUrl/publishedTests_adminMetadata.php'),
-        headers: _authHeaders,
-      );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: (json.decode(res.body) as List).cast<Map<String, dynamic>>(),
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.get('/publishedTests_adminMetadata.php');
+      return _ok(res, (d) => (d as List).cast<Map<String, dynamic>>());
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches published tests metadata for a given qualification (student-facing).
   Future<ApiResult<List<Map<String, dynamic>>>> fetchUserTestsMetadata(
     String qualification,
   ) async {
     try {
-      final res = await http.get(
-        Uri.parse(
-          '$apiBaseUrl/publishedTests_userMetadata.php?qualification=$qualification',
-        ),
-        headers: _authHeaders,
+      final res = await _dio.get(
+        '/publishedTests_userMetadata.php',
+        queryParameters: {'qualification': qualification},
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: (json.decode(res.body) as List).cast<Map<String, dynamic>>(),
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      return _ok(res, (d) => (d as List).cast<Map<String, dynamic>>());
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches a test's full content by id, regardless of published status (admin only).
   Future<ApiResult<Map<String, dynamic>>> fetchAdminTestQuestions(
     int id,
   ) async {
     try {
-      final res = await http.get(
-        Uri.parse('$apiBaseUrl/publishedTests_adminQuestions.php?id=$id'),
-        headers: _authHeaders,
+      final res = await _dio.get(
+        '/publishedTests_adminQuestions.php',
+        queryParameters: {'id': id},
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches a test's full content by id, only if published (student-facing).
   Future<ApiResult<Map<String, dynamic>>> fetchUserTestQuestions(int id) async {
     try {
-      final res = await http.get(
-        Uri.parse('$apiBaseUrl/publishedTests_userQuestions.php?id=$id'),
-        headers: _authHeaders,
+      final res = await _dio.get(
+        '/publishedTests_userQuestions.php',
+        queryParameters: {'id': id},
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
@@ -454,100 +395,69 @@ class ApiService {
     Map<String, dynamic> test,
   ) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/publishedTests_adminManage.php'),
-        headers: _authJsonHeaders,
-        body: json.encode({'action': 'create', 'test': test}),
+      final res = await _dio.post(
+        '/publishedTests_adminManage.php',
+        data: {'action': 'create', 'test': test},
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Publishes or unpublishes a test.
   Future<ApiResult<void>> setTestPublished(int id, bool publish) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/publishedTests_adminManage.php'),
-        headers: _authJsonHeaders,
-        body: json.encode({
+      final res = await _dio.post(
+        '/publishedTests_adminManage.php',
+        data: {
           'action': publish ? 'publish' : 'unpublish',
           'test': {'id': id},
-        }),
+        },
       );
-      return ApiResult(statusCode: res.statusCode);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Deletes a test from the server.
   Future<ApiResult<void>> deleteTest(int id) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/publishedTests_adminManage.php'),
-        headers: _authJsonHeaders,
-        body: json.encode({
+      final res = await _dio.post(
+        '/publishedTests_adminManage.php',
+        data: {
           'action': 'delete',
           'test': {'id': id},
-        }),
+        },
       );
-      return ApiResult(statusCode: res.statusCode);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches all submitted results for a specific test by [testKey].
   Future<ApiResult<List<dynamic>>> fetchTestResults(String testKey) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/getPublishedResults.php'),
-        headers: _authJsonHeaders,
-        body: json.encode({'test_key': testKey}),
+      final res = await _dio.post(
+        '/getPublishedResults.php',
+        data: {'test_key': testKey},
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as List<dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      return _ok(res, (d) => d as List<dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches available qualifications from the exam results endpoint.
   Future<ApiResult<List<dynamic>>> fetchQualifications() async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/egzaminy_wyniki_post.php'),
-        headers: _authJsonHeaders,
-        body: json.encode({}),
-      );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as List<dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.post('/egzaminy_wyniki_post.php', data: {});
+      return _ok(res, (d) => d as List<dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
   // ─── Statistics ───────────────────────────────────────────────────────────
 
-  // Static cache — survives widget rebuilds, respects server's 15min TTL
   static final Map<String, _CountCacheEntry> _countCache = {};
 
   Future<ApiResult<int>> fetchQuestionCount(String cacheKey) async {
@@ -557,14 +467,13 @@ class ApiService {
     }
 
     try {
-      final res = await http
-          .get(
-            Uri.parse('$apiBaseUrl/count/countQuestions.php?egzamin=$cacheKey'),
-          )
-          .timeout(const Duration(seconds: 10));
-
+      final res = await _dio.get(
+        '/count/countQuestions.php',
+        queryParameters: {'egzamin': cacheKey},
+        options: Options(sendTimeout: const Duration(seconds: 10)),
+      );
       if (res.statusCode == 200) {
-        final data = json.decode(res.body) as Map<String, dynamic>;
+        final data = res.data as Map<String, dynamic>;
         final count = data['count'];
         final parsed = count is int ? count : int.tryParse('$count');
         if (parsed != null) {
@@ -575,52 +484,30 @@ class ApiService {
           return ApiResult(statusCode: 200, data: parsed);
         }
       }
-      return ApiResult(statusCode: res.statusCode);
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches per-user statistics.
   Future<ApiResult<Map<String, dynamic>>> fetchUserStats() async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/stats.php'),
-        headers: _apiKeyFormHeaders,
-      );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.post('/stats.php', options: _form());
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches all exam results (admin view).
   Future<ApiResult<List<dynamic>>> fetchAllStats() async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/stats_all.php'),
-        headers: _apiKeyFormHeaders,
-        body: {'api_token': apiToken},
-      );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as List<dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.post('/stats_all.php', options: _form());
+      return _ok(res, (d) => d as List<dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches the full question/answer detail for an exam (admin view).
   Future<ApiResult<Map<String, dynamic>>> fetchExamPreviewAdmin({
     required int examId,
     required String userName,
@@ -628,229 +515,206 @@ class ApiService {
     required int durationSec,
   }) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/podgladEgzaminu.php'),
-        body: {
-          'api_token': apiToken,
-          'exam_id': examId.toString(),
+      final res = await _dio.post(
+        '/podgladEgzaminu.php',
+        data: {
+          'exam_id': examId,
           'userName': userName,
           'exam_date': examDateTime,
-          'duration_sec': durationSec.toString(),
+          'duration_sec': durationSec,
         },
+        options: _form(),
       );
       if (res.statusCode == 200) {
-        final data = json.decode(res.body) as Map<String, dynamic>;
+        final data = res.data as Map<String, dynamic>;
         if (data['success'] == true) {
-          return ApiResult(statusCode: res.statusCode, data: data);
+          return ApiResult(statusCode: res.statusCode!, data: data);
         }
       }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return ApiResult(
+        statusCode: res.statusCode ?? -1,
+        errorMessage: res.data?.toString(),
+      );
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches exam detail for a user's own history preview.
   Future<ApiResult<Map<String, dynamic>>> fetchExamPreviewUser({
     required int examId,
     required String examDateTime,
     required int durationSec,
   }) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/podgladEgzaminu_user.php'),
-        body: {
-          'api_token': apiToken,
-          'exam_id': examId.toString(),
+      final res = await _dio.post(
+        '/podgladEgzaminu_user.php',
+        data: {
+          'exam_id': examId,
           'exam_date': examDateTime,
-          'duration_sec': durationSec.toString(),
+          'duration_sec': durationSec,
         },
+        options: _form(),
       );
       if (res.statusCode == 200) {
-        final data = json.decode(res.body) as Map<String, dynamic>;
+        final data = res.data as Map<String, dynamic>;
         if (data['success'] == true) {
-          return ApiResult(statusCode: res.statusCode, data: data);
+          return ApiResult(statusCode: res.statusCode!, data: data);
         }
       }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return ApiResult(
+        statusCode: res.statusCode ?? -1,
+        errorMessage: res.data?.toString(),
+      );
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Fetches exam detail for teacher test result preview.
   Future<ApiResult<Map<String, dynamic>>> fetchExamPreviewForTest(
     int examId,
   ) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/podgladEgzaminuDlaTestow.php'),
-        body: {'api_token': apiToken, 'exam_id': examId.toString()},
+      final res = await _dio.post(
+        '/podgladEgzaminuDlaTestow.php',
+        data: {'exam_id': examId},
+        options: _form(),
       );
       if (res.statusCode == 200) {
-        final data = json.decode(res.body) as Map<String, dynamic>;
+        final data = res.data as Map<String, dynamic>;
         if (data['success'] == true) {
-          return ApiResult(statusCode: res.statusCode, data: data);
+          return ApiResult(statusCode: res.statusCode!, data: data);
         }
       }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return ApiResult(
+        statusCode: res.statusCode ?? -1,
+        errorMessage: res.data?.toString(),
+      );
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
   // ─── Admin Management ─────────────────────────────────────────────────────
 
-  /// Checks whether [email] has super admin privileges.
-  /*Future<ApiResult<bool>> checkSuperAdmin(String email) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/is_super_admin.php'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'email': email}),
-      );
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body) as Map<String, dynamic>;
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: data['isSuperAdmin'] == true,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, data: false);
-    } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString(), data: false);
-    }
-  }*/
-
-  /// Fetches the list of all admin accounts.
   Future<ApiResult<List<dynamic>>> fetchAdmins() async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/showAdmins.php'),
-        headers: _apiKeyFormHeaders,
-      );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as List<dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.post('/showAdmins.php', options: _form());
+      return _ok(res, (d) => d as List<dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Adds a new admin by [email].
   Future<ApiResult<Map<String, dynamic>>> addAdmin(String email) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/add_admin.php'),
-        headers: _apiKeyFormHeaders,
-        body: {'email': email},
+      final res = await _dio.post(
+        '/add_admin.php',
+        data: {'email': email},
+        options: _form(),
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Promotes admin [id] to super admin.
   Future<ApiResult<Map<String, dynamic>>> promoteToSuperAdmin(int id) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/promote_super_admin.php'),
-        headers: _apiKeyFormHeaders,
-        body: {'id': id.toString()},
+      final res = await _dio.post(
+        '/promote_super_admin.php',
+        data: {'id': id},
+        options: _form(),
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Demotes super admin [id] back to regular admin.
   Future<ApiResult<Map<String, dynamic>>> demoteSuperAdmin(int id) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/demote_super_admin.php'),
-        headers: _apiKeyFormHeaders,
-        body: {'id': id.toString()},
+      final res = await _dio.post(
+        '/demote_super_admin.php',
+        data: {'id': id},
+        options: _form(),
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
-  /// Deletes admin [id].
   Future<ApiResult<Map<String, dynamic>>> deleteAdmin(int id) async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/delete_admin.php'),
-        headers: _apiKeyFormHeaders,
-        body: {'id': id.toString()},
+      final res = await _dio.post(
+        '/delete_admin.php',
+        data: {'id': id},
+        options: _form(),
       );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode, errorMessage: res.body);
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
   Future<ApiResult<Map<String, dynamic>>> checkSession() async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/session-status.php'),
-        headers: _authJsonHeaders,
-        body: json.encode({}),
-      );
-      if (res.statusCode == 200) {
-        return ApiResult(
-          statusCode: res.statusCode,
-          data: json.decode(res.body) as Map<String, dynamic>,
-        );
-      }
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.post('/session-status.php', data: {});
+      return _ok(res, (d) => d as Map<String, dynamic>);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
     }
   }
 
   /// Logs the user out on the server.
   Future<ApiResult<void>> logout() async {
     try {
-      final res = await http.post(
-        Uri.parse('$apiBaseUrl/logout.php'),
-        headers: _authJsonHeaders,
-        body: json.encode({}),
-      );
-      return ApiResult(statusCode: res.statusCode);
+      final res = await _dio.post('/logout.php', data: {});
+      return ApiResult(statusCode: res.statusCode ?? -1);
     } catch (e) {
-      return ApiResult(statusCode: -1, errorMessage: e.toString());
+      return _fail(e);
+    }
+  }
+
+  /// Handles the oauth2 token request — talks to Microsoft
+  Future<ApiResult<Map<String, dynamic>>> exchangeOAuthCode({
+    required String clientId,
+    required String tokenUrl,
+    required String code,
+    required String redirectUri,
+    required String codeVerifier,
+  }) async {
+    try {
+      final res = await _dio.post(
+        tokenUrl,
+        data: {
+          'client_id': clientId,
+          'grant_type': 'authorization_code',
+          'code': code,
+          'redirect_uri': redirectUri,
+          'code_verifier': codeVerifier,
+        },
+        options: _form(skipAuth: true),
+      );
+      return _ok(res, (d) => d as Map<String, dynamic>);
+    } catch (e) {
+      return _fail(e);
+    }
+  }
+
+  /// Handles the oauth2 login mechanism authenticated via the id_token payload
+  Future<ApiResult<Map<String, dynamic>>> logIntoMicrosoft(
+    String idToken,
+  ) async {
+    try {
+      final res = await _dio.post(
+        '/ms-login.php',
+        data: {'id_token': idToken},
+        options: _form(skipAuth: true),
+      );
+      return _ok(res, (d) => d as Map<String, dynamic>);
+    } catch (e) {
+      return _fail(e);
     }
   }
 }

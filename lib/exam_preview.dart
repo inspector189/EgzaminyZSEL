@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:html_unescape_xx/html_unescape.dart';
+
 import 'utils/app_themes.dart';
 import 'widgets/exam_question_card.dart';
 
@@ -8,11 +9,11 @@ String _stripAnswerPrefix(String text) =>
 
 // ─────────────────────────────────────────────
 
-class EgzaminPodgladView extends StatelessWidget {
+class ExamPreviewPage extends StatelessWidget {
   final List<dynamic> questions;
   final List<String?> selectedAnswers;
 
-  const EgzaminPodgladView({
+  const ExamPreviewPage({
     super.key,
     required this.questions,
     required this.selectedAnswers,
