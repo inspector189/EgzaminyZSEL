@@ -8,3 +8,12 @@ const String apiToken = 'zT93@rP!cV7YkXp#qLm&92oFvN*AhdM@#SSd&^';
 const String apiBaseUrl = '$baseUrl/egzaminy/';
 
 const bool kUseFakeData = kDebugMode;
+const bool kFakeSuperAdmin = true;
+const String kFakeEmail = "superadmin@zselektr.onmicrosoft.com";
+const String kFakeUserName = "Super Admin";
+
+bool isValidQualification(String? qual) {
+  if (qual == null) return false;
+  final trimmed = qual.trim().toLowerCase();
+  return RegExp(r'^[a-z]{3}\d{2}$').hasMatch(trimmed);
+}

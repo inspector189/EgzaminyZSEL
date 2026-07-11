@@ -29,16 +29,16 @@ String _stripAnswerPrefix(String text) =>
 // Mode helpers
 // ──────────────
 
-enum TrybEgzaminu { jednoPytanie, czterdziesciPytan, wszystkie, zTestu }
+enum TrybEgzaminu { singleQuestion, normalTest, allQuestions, publishedTest }
 
 extension _TrybX on TrybEgzaminu {
   bool get isTimed =>
-      this == TrybEgzaminu.czterdziesciPytan || this == TrybEgzaminu.zTestu;
+      this == TrybEgzaminu.normalTest || this == TrybEgzaminu.publishedTest;
   bool get hasFinishButton => isTimed;
-  bool get hasSearch => this == TrybEgzaminu.wszystkie;
-  bool get isSingleQuestion => this == TrybEgzaminu.jednoPytanie;
+  bool get isAllQuestions => this == TrybEgzaminu.allQuestions;
+  bool get isSingleQuestion => this == TrybEgzaminu.singleQuestion;
   bool get showResultImmediately =>
-      this == TrybEgzaminu.wszystkie || this == TrybEgzaminu.jednoPytanie;
+      this == TrybEgzaminu.allQuestions || this == TrybEgzaminu.singleQuestion;
 }
 
 // ──────────────
@@ -54,7 +54,7 @@ class EgzaminView extends StatefulWidget {
     this.userName,
     this.testData,
   }) : assert(
-         tryb != TrybEgzaminu.zTestu || testData != null,
+         tryb != TrybEgzaminu.publishedTest || testData != null,
          'testData musi być obecne dla testów nauczyciela!',
        );
 
@@ -118,7 +118,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   String searchText = '';
 
   List<dynamic> get _filteredQuestions {
-    if (!_tryb.hasSearch || searchText.trim().isEmpty) return questions;
+    if (!_tryb.isAllQuestions || searchText.trim().isEmpty) return questions;
     final q = searchText.trim().toLowerCase();
     return questions.where((e) {
       return (e['pytanie_text']?.toString() ?? '').toLowerCase().contains(q) ||
@@ -189,7 +189,7 @@ class _EgzaminViewState extends State<EgzaminView> {
   }
 
   Future<List<dynamic>> _fetchFromApi() async {
-    if (_tryb == TrybEgzaminu.zTestu) {
+    if (_tryb == TrybEgzaminu.publishedTest) {
       if (widget.testData == null) {
         throw Exception('Brak testData w trybie zTestu!');
       }
@@ -197,8 +197,8 @@ class _EgzaminViewState extends State<EgzaminView> {
     }
 
     final int? limit = switch (_tryb) {
-      TrybEgzaminu.jednoPytanie => 1,
-      TrybEgzaminu.czterdziesciPytan => 40,
+      TrybEgzaminu.singleQuestion => 1,
+      TrybEgzaminu.normalTest => 40,
       _ => null,
     };
 
@@ -465,7 +465,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       child: Scaffold(
         appBar: buildAppBar(),
         body: switch (_tryb) {
-          TrybEgzaminu.jednoPytanie => _buildSingleQuestion(),
+          TrybEgzaminu.singleQuestion => _buildSingleQuestion(),
           _ => _buildLazyList(),
         },
         bottomNavigationBar: _tryb.hasFinishButton
@@ -502,39 +502,109 @@ class _EgzaminViewState extends State<EgzaminView> {
     );
   }
 
-  // ── List layout (wszystkie / 40 / zTestu) ─
+  // ── List layout
 
   Widget _buildLazyList() {
     final items = _filteredQuestions.take(_visibleCount).toList();
     final showResult = _tryb.showResultImmediately;
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return CustomScrollView(
       controller: _scrollController,
       slivers: [
-        if (_tryb.hasSearch)
+        if (_tryb.isAllQuestions)
           SliverPersistentHeader(
             pinned: true,
             delegate: _SearchHeader(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Container(
+                color: cs.surface,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
                       controller: _textSearchCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Szukaj...',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        hintText: 'Szukaj pytania lub ID...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        suffixIcon: searchText.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 20),
+                                onPressed: () {
+                                  _textSearchCtrl.clear();
+                                  setState(() {
+                                    searchText = '';
+                                    _visibleCount = 30.clamp(
+                                      0,
+                                      _filteredQuestions.length,
+                                    );
+                                  });
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: cs.outlineVariant),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: cs.primary, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: cs.surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
                       ),
                       onChanged: (v) => setState(() {
                         searchText = v;
                         _visibleCount = 30.clamp(0, _filteredQuestions.length);
                       }),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Znalezione: ${_filteredQuestions.length} / ${questions.length}',
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 9,
+                        horizontal: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.saved_search_rounded,
+                            size: 17,
+                            color: cs.onPrimaryContainer,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Znalezione: ${_filteredQuestions.length} / ${questions.length}',
+                              style: tt.bodyMedium?.copyWith(
+                                color: cs.onPrimaryContainer,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          if (_filteredQuestions.length != questions.length)
+                            Text(
+                              '(${questions.length - _filteredQuestions.length} ukrytych)',
+                              style: tt.labelSmall?.copyWith(
+                                color: cs.onPrimaryContainer.withValues(
+                                  alpha: 0.75,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -572,9 +642,11 @@ class _EgzaminViewState extends State<EgzaminView> {
   // ── Question card ─────────────────────────
 
   String _questionLabel(int index, dynamic q) {
-    if (_tryb.isSingleQuestion) return 'Pytanie';
-    final id = q['id'] != null ? ' (ID ${q['id']})' : '';
-    return 'Pytanie ${index + 1}$id';
+    if (_tryb.isAllQuestions) {
+      final id = q['id'] != null ? 'ID #${q['id']}' : '';
+      return id;
+    }
+    return 'Pytanie';
   }
 
   List<ExamAnswerState> _buildAnswers(dynamic q, int index) =>
@@ -773,9 +845,9 @@ class _SearchHeader extends SliverPersistentHeaderDelegate {
   final Widget child;
 
   @override
-  double get minExtent => 98;
+  double get minExtent => 120;
   @override
-  double get maxExtent => 98;
+  double get maxExtent => 120;
 
   @override
   Widget build(

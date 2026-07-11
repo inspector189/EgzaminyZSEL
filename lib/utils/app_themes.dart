@@ -60,7 +60,7 @@ class AppThemes {
           ExtraColors(
             shimmerBase: Color(0xFF2A2A2A),
             shimmerHighlight: Color(0xFF3C3C3C),
-            correct: Colors.greenAccent,
+            correct: Colors.lightGreen,
             incorrect: Colors.redAccent,
             noAnswer: Colors.amberAccent,
           ),

@@ -7,8 +7,6 @@ import 'widgets/exam_question_card.dart';
 String _stripAnswerPrefix(String text) =>
     text.replaceFirst(RegExp(r'^\s*[A-Da-d][.)]\s*'), '').trimLeft();
 
-// ─────────────────────────────────────────────
-
 class ExamPreviewPage extends StatelessWidget {
   final List<dynamic> questions;
   final List<String?> selectedAnswers;
@@ -117,7 +115,6 @@ class ExamPreviewPage extends StatelessWidget {
         ? 'Wybrano poprawną odpowiedź: $selected.'
         : 'Niepoprawna: $selected.  Poprawna: $poprawna.';
 
-    // Optional explanation text
     final String? explanation = isCorrect
         ? (q['opisPoprawne']?.toString().trim().isNotEmpty == true
               ? unescape.convert(q['opisPoprawne'].toString())

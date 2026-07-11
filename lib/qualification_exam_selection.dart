@@ -58,7 +58,7 @@ class QualificationExamSelectionPage extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (_) => EgzaminView(
-                tryb: TrybEgzaminu.jednoPytanie,
+                tryb: TrybEgzaminu.singleQuestion,
                 kwalifikacja: _sanitized,
                 returnToHome: false,
               ),
@@ -77,7 +77,7 @@ class QualificationExamSelectionPage extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (_) => EgzaminView(
-                tryb: TrybEgzaminu.czterdziesciPytan,
+                tryb: TrybEgzaminu.normalTest,
                 kwalifikacja: _sanitized,
                 returnToHome: false,
               ),
@@ -96,7 +96,7 @@ class QualificationExamSelectionPage extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (_) => EgzaminView(
-                tryb: TrybEgzaminu.wszystkie,
+                tryb: TrybEgzaminu.allQuestions,
                 kwalifikacja: _sanitized,
                 returnToHome: false,
               ),

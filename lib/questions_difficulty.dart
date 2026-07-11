@@ -5,6 +5,7 @@ import '/services/api_service.dart';
 import '/utils/app_themes.dart';
 import '/utils/async_state_view.dart';
 import '/widgets/exam_question_card.dart';
+import '/widgets/difficulty_badge.dart';
 
 const double _kHardThreshold = 50.0;
 const int _kPageSize = 30;
@@ -100,6 +101,7 @@ class QuestionsDifficultyPageState extends State<QuestionsDifficultyPage> {
         });
       }
     } catch (e) {
+      errorMessage = '$e';
       if (kDebugMode) debugPrint('Błąd ładowania $kwal: $e');
       if (mounted) setState(() => s.isLoading = false);
     }
@@ -170,8 +172,11 @@ class QuestionsDifficultyPageState extends State<QuestionsDifficultyPage> {
 
                 return Row(
                   children: [
-                    SizedBox(width: 340, child: list),
-                    const VerticalDivider(width: 1),
+                    SizedBox(width: 400, child: list),
+                    VerticalDivider(
+                      width: 1,
+                      color: cs.outlineVariant.withValues(alpha: 0.4),
+                    ),
                     Expanded(
                       child: _selectedKwal == null
                           ? Center(
@@ -244,7 +249,7 @@ class _QualificationListTile extends StatelessWidget {
 
     return Material(
       color: isSelected
-          ? cs.primaryContainer.withValues(alpha: 0.3)
+          ? cs.primaryContainer.withValues(alpha: 0.2)
           : cs.surface,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
@@ -277,10 +282,10 @@ class _QualificationListTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(3),
                       child: LinearProgressIndicator(
                         value: easyPercent,
-                        minHeight: 6,
+                        minHeight: 10,
                         backgroundColor: extras.incorrect.withValues(
                           alpha: 0.4,
                         ),
@@ -289,13 +294,98 @@ class _QualificationListTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$hard trudnych • $easy łatwych • $total razem',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: cs.onSurfaceVariant,
-                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            margin: const EdgeInsets.only(right: 4),
+                            decoration: BoxDecoration(
+                              color: extras.correct.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.trending_down_rounded,
+                                  size: 11,
+                                  color: cs.onPrimaryContainer,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$easy łatwych',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onPrimaryContainer,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            decoration: BoxDecoration(
+                              color: extras.incorrect.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.trending_up_rounded,
+                                  size: 11,
+                                  color: cs.onPrimaryContainer,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$hard trudnych',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onPrimaryContainer,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            margin: const EdgeInsets.only(left: 4),
+                            decoration: BoxDecoration(
+                              color: cs.primaryContainer,
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.article_rounded,
+                                  size: 11,
+                                  color: cs.onPrimaryContainer,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$total razem',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onPrimaryContainer,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -527,7 +617,7 @@ class _QuestionDifficultyCard extends StatelessWidget {
         answers: answers,
         accentColor: accent,
         showResult: true,
-        headerTrailing: _DiffBadge(trud: trud, isHard: isHard, color: accent),
+        headerTrailing: DifficultyBadge(trudnosc: trud, ilosc: total),
         bottomRow: _RateBar(
           rate: rate,
           total: total,
@@ -539,47 +629,6 @@ class _QuestionDifficultyCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DiffBadge extends StatelessWidget {
-  const _DiffBadge({
-    required this.trud,
-    required this.isHard,
-    required this.color,
-  });
-  final double trud;
-  final bool isHard;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withValues(alpha: 0.5)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          isHard ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-          size: 12,
-          color: color,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          '${isHard ? "TRUDNE" : "ŁATWE"} ${trud.toStringAsFixed(0)}%',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-            color: color,
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _RateBar extends StatelessWidget {
@@ -658,6 +707,9 @@ class _FilterChip extends StatelessWidget {
       selected: selected,
       onSelected: (_) => onTap(),
       selectedColor: cs.primaryContainer,
+      side: BorderSide(
+        color: selected ? Colors.transparent : cs.onSurfaceVariant,
+      ),
       labelStyle: TextStyle(
         color: selected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
         fontWeight: selected ? FontWeight.w600 : FontWeight.normal,

@@ -10,7 +10,6 @@ import '/admin_qualifications.dart';
 import '/utils/helpers.dart';
 import '/widgets/admin_tiles.dart';
 
-
 class AdminPanelPage extends StatelessWidget {
   final bool isSuperAdmin;
   final String currentUserEmail;
@@ -78,11 +77,9 @@ class AdminPanelPage extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (_) => CreatingTestsAndReportsPage(
-              isSuperAdmin: kUseFakeData ? true : isSuperAdmin,
-              currentUserEmail: kUseFakeData
-                  ? 'superadmin@zselektr.onmicrosoft.com'
-                  : currentUserEmail,
-              currentUserName: kUseFakeData ? 'Super Admin' : currentUserName,
+              isSuperAdmin: kUseFakeData ? kFakeSuperAdmin : isSuperAdmin,
+              currentUserEmail: kUseFakeData ? kFakeEmail : currentUserEmail,
+              currentUserName: kUseFakeData ? kFakeUserName : currentUserName,
             ),
           ),
         ),

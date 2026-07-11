@@ -137,7 +137,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   bool isLoading = true;
   List<dynamic> questions = [];
   int _displayCount = 20;
-  //final bool _isLoadingMore = false;
   String searchText = '';
 
   int? editingId;
@@ -610,7 +609,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _imageName!,
       );
       if (!result.isSuccess) {
-        throw result.errorMessage ?? 'Upload HTTP ${result.statusCode}';
+        throw result.errorMessage ?? 'Błąd HTTP ${result.statusCode}';
       }
       setState(() {
         _uploadedImageUrl = result.data!['url'];
@@ -626,7 +625,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd podczas wysyłania obrazka: $e')),
+          SnackBar(
+            content: Text('Wystąpił błąd podczas wysyłania obrazka: $e'),
+          ),
         );
       }
     } finally {
@@ -670,7 +671,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         _videoName!,
       );
       if (!result.isSuccess) {
-        throw result.errorMessage ?? 'Upload HTTP ${result.statusCode}';
+        throw result.errorMessage ?? 'Błąd HTTP ${result.statusCode}';
       }
       setState(() {
         _uploadedVideoUrl = result.data!['url'];
@@ -681,7 +682,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Błąd podczas wysyłania filmu: $e')),
+          SnackBar(content: Text('Wystąpił błąd podczas wysyłania filmu: $e')),
         );
       }
     } finally {
@@ -754,7 +755,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         a.imageName!,
       );
       if (!result.isSuccess) {
-        throw result.errorMessage ?? 'Upload HTTP ${result.statusCode}';
+        throw result.errorMessage ?? 'Błąd HTTP ${result.statusCode}';
       }
       setState(() {
         a.uploadedImageUrl = result.data!['url']!;
@@ -765,7 +766,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Błąd uploadu obrazka odpowiedzi ${index + 1}: $e'),
+            content: Text(
+              'Wystąpił błąd podczas wysyłania obrazka odpowiedzi ${index + 1}: $e',
+            ),
           ),
         );
       }
@@ -859,7 +862,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Upload odpowiedzi ${letters[i]} nie powiódł się. Zapis anulowany.',
+                  'Wysyłanie odpowiedzi ${letters[i]} nie powiodło się. Zapis anulowany.',
                 ),
               ),
             );
@@ -1033,9 +1036,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       await _loadAll();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Błąd resetu pytania $id: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Wystąpił błąd podczas resetu trudności pytania $id: $e',
+            ),
+          ),
+        );
       }
     }
   }
@@ -1188,7 +1195,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.refresh),
+                  : const Icon(Icons.rotate_90_degrees_cw_outlined),
               label: const Text('Resetuj trudności'),
             );
 
@@ -1467,7 +1474,6 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       DropdownMenuItem(value: 'C', child: Text('C')),
                       DropdownMenuItem(value: 'D', child: Text('D')),
                     ],
-                    dropdownColor: colorScheme.surface,
                   ),
                 ],
               ),
@@ -1568,9 +1574,20 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     required VoidCallback onSelected,
   }) {
     final selected = _mediaKind == kind;
+    Icon selectedIcon;
+    switch (kind) {
+      case MediaKind.none:
+        selectedIcon = Icon(Icons.not_interested_rounded);
+      case MediaKind.image:
+        selectedIcon = Icon(Icons.image_rounded);
+      case MediaKind.video:
+        selectedIcon = Icon(Icons.video_file_rounded);
+    }
     return ChoiceChip(
       label: Text(label),
       selected: selected,
+      avatar: selected ? Icon(Icons.check_rounded) : selectedIcon,
+      showCheckmark: false,
       selectedColor: colorScheme.primaryContainer,
       labelStyle: TextStyle(
         color: selected
@@ -1779,6 +1796,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final a = _answers[index];
     final letter = 'ABCD'[index];
     final isCorrect = letter == _correct;
+    final cs = Theme.of(context).colorScheme;
+    bool textSelected = a.kind == AnswerKind.text;
+    bool imageSelected = a.kind == AnswerKind.image;
 
     return Container(
       decoration: BoxDecoration(
@@ -1832,21 +1852,33 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               const SizedBox(width: 8),
               ChoiceChip(
                 label: const Text('Tekst'),
-                selected: a.kind == AnswerKind.text,
+                avatar: Icon(
+                  textSelected
+                      ? Icons.check_rounded
+                      : Icons.text_fields_rounded,
+                ),
+                showCheckmark: false,
+                selectedColor: cs.primaryContainer,
+                selected: textSelected,
                 visualDensity: VisualDensity.compact,
                 onSelected: (_) => setState(() => a.kind = AnswerKind.text),
               ),
               const SizedBox(width: 4),
               ChoiceChip(
-                label: const Text('Obrazek'),
-                selected: a.kind == AnswerKind.image,
+                label: const Text('Obraz'),
+                avatar: Icon(
+                  imageSelected ? Icons.check_rounded : Icons.image_rounded,
+                ),
+                showCheckmark: false,
+                selectedColor: cs.primaryContainer,
+                selected: imageSelected,
                 visualDensity: VisualDensity.compact,
                 onSelected: (_) => setState(() => a.kind = AnswerKind.image),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          if (a.kind == AnswerKind.text)
+          if (textSelected)
             TextField(
               controller: a.ctrl,
               onChanged: (_) => _refreshTextPreview(),
@@ -2006,7 +2038,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         ],
       ),
       child: ExamQuestionCard(
-        label: id != null ? 'ID $id' : 'ID —',
+        label: id != null ? 'ID #$id' : 'ID —',
         questionText: _clean(q['pytanie']?.toString() ?? ''),
         questionImages: questionImages,
         questionVideos: questionVideos,
@@ -2304,8 +2336,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             child: Row(
               children: [
                 Icon(
-                  Icons.preview_outlined,
-                  size: 18,
+                  Icons.preview_rounded,
+                  size: 22,
                   color: colorScheme.onTertiaryContainer,
                 ),
                 const SizedBox(width: 8),
@@ -2313,25 +2345,25 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   child: Text(
                     'PODGLĄD — zmiany nie są jeszcze zapisane!',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: colorScheme.onTertiaryContainer,
                       letterSpacing: 0.3,
                     ),
                   ),
                 ),
-                FilledButton.tonalIcon(
+                TextButton.icon(
                   onPressed: () => setState(() => _showPreview = false),
                   icon: const Icon(Icons.close, size: 16),
                   label: const Text('Zamknij'),
-                  style: FilledButton.styleFrom(
+                  style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
                     ),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    backgroundColor: colorScheme.onTertiaryContainer.withValues(
-                      alpha: 0.15,
+                    backgroundColor: colorScheme.errorContainer.withValues(
+                      alpha: 0.85,
                     ),
                     foregroundColor: colorScheme.onTertiaryContainer,
                   ),

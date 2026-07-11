@@ -29,6 +29,7 @@ final _fakeTests = [
     'author': 'jan.kowalski@szkola.pl',
     'createdAt': '2025-03-01T10:00:00',
     'published': true,
+    'question_count': 40,
     'questions': List.generate(
       40,
       (i) => {
@@ -88,6 +89,7 @@ final _fakeTests = [
     'author': 'anna.nowak@szkola.pl',
     'createdAt': '2025-02-20T14:22:00',
     'published': false,
+    'question_count': 40,
     'questions': List.generate(
       20,
       (i) => {
@@ -108,12 +110,6 @@ final _fakeTests = [
     'results': [],
   },
 ];
-
-bool isValidQualification(String? qual) {
-  if (qual == null) return false;
-  final trimmed = qual.trim().toLowerCase();
-  return RegExp(r'^[a-z]{3}\d{2}$').hasMatch(trimmed);
-}
 
 // ─────────────────────────────────────────────
 //              RichQuestionWidget
@@ -224,7 +220,6 @@ class _CreatingTestsAndReportsPageState
       body: Column(
         children: [
           Material(
-            color: cs.surface,
             elevation: 2,
             child: TabBar(
               controller: _tabController,
@@ -232,9 +227,10 @@ class _CreatingTestsAndReportsPageState
               unselectedLabelColor: cs.onSurface.withValues(alpha: 0.5),
               indicatorColor: cs.primary,
               indicatorWeight: 3,
+              dividerColor: cs.outlineVariant.withValues(alpha: 0.4),
               labelStyle: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: 15,
               ),
               tabs: const [
                 Tab(
@@ -913,7 +909,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
         // Inner tab bar
         Container(
           color: cs.surface,
-          child: TabBar(
+          child: TabBar.secondary(
             controller: _innerTab,
             labelColor: cs.primary,
             unselectedLabelColor: cs.onSurface.withValues(alpha: 0.5),
@@ -1035,13 +1031,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     );
   }
 
-  /*String _fmtDuration(int? seconds) {
-    if (seconds == null || seconds <= 0) return '-';
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m}m ${s}s';
-  }*/
-
   String _formatDate(String isoDate) {
     try {
       final d = DateTime.parse(isoDate);
@@ -1054,124 +1043,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
       return isoDate;
     }
   }
-
-  /*List<Widget> buildGroupedResults(
-    BuildContext context,
-    List<dynamic> results,
-    ColorScheme cs,
-    ExtraColors extras,
-    TextTheme tt,
-  ) {
-    final Map<String, List<dynamic>> grouped = {};
-    for (final r in results) {
-      final user = (r['userName'] as String?) ?? 'Nieznany';
-      (grouped[user] ??= []).add(r);
-    }
-
-    return grouped.entries.map((entry) {
-      final userResults = List<dynamic>.from(entry.value)
-        ..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
-
-      final latest = userResults.first;
-      final latestScore = (latest['score'] as num?)?.toDouble() ?? 0.0;
-
-      return Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          leading: _ScoreBadge(score: latestScore, extras: extras),
-          title: Text(
-            entry.key,
-            style: tt.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: cs.onSurface,
-            ),
-          ),
-          subtitle: Text(
-            'Ostatni: ${latestScore.toStringAsFixed(0)}%  •  ${_formatDate(latest['date'] as String? ?? '')}',
-            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          children: userResults.map((r) {
-            final score = (r['score'] as num?)?.toDouble() ?? 0.0;
-            final date = _formatDate((r['date'] as String?) ?? '');
-            final czas = _fmtDuration(
-              r['duration_sec'] is int
-                  ? r['duration_sec'] as int
-                  : int.tryParse('${r['duration_sec'] ?? ''}'),
-            );
-            final examId =
-                int.tryParse((r['exam_id'] ?? r['id'] ?? '').toString()) ?? 0;
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Row(
-                children: [
-                  _ScoreBadge(score: score, extras: extras, small: true),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          date,
-                          style: tt.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface,
-                          ),
-                        ),
-                        Text(
-                          'Czas: $czas',
-                          style: tt.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (examId > 0)
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final data = await _fetchExamDetailsFull(examId);
-                        if (!context.mounted) return;
-                        if (data != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => EgzaminPodgladView(
-                                questions: data['questions'],
-                                selectedAnswers: data['selectedAnswers'],
-                              ),
-                            ),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text(
-                                'Nie udało się wczytać podglądu',
-                              ),
-                              backgroundColor: cs.error,
-                            ),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.visibility_rounded, size: 14),
-                      label: const Text('Podgląd'),
-                      style: OutlinedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
-      );
-    }).toList();
-  } */
 
   // ── PDF generation ────────────────────────────────────────────
 
@@ -1498,7 +1369,8 @@ class _TestCard extends StatelessWidget {
                   .map((r) => (r['score'] as num?)?.toDouble() ?? 0.0)
                   .reduce((a, b) => a + b) /
               results.length;
-
+    final questionCount = test["question_count"];
+    final isEmpty = questionCount == 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -1533,7 +1405,7 @@ class _TestCard extends StatelessWidget {
               height: 42,
               decoration: BoxDecoration(
                 color: isPublished
-                    ? Colors.green.withValues(alpha: 0.15)
+                    ? extras.correct.withValues(alpha: 0.15)
                     : cs.surfaceContainerHighest,
                 shape: BoxShape.circle,
               ),
@@ -1547,7 +1419,7 @@ class _TestCard extends StatelessWidget {
                       ? Icons.public_rounded
                       : Icons.lock_outline_rounded,
                   size: 20,
-                  color: isPublished ? Colors.green : cs.onSurfaceVariant,
+                  color: isPublished ? extras.correct : cs.onSurfaceVariant,
                 ),
               ),
             ),
@@ -1555,16 +1427,8 @@ class _TestCard extends StatelessWidget {
             // ── Title ─────────────────────────────────────────────
             title: Row(
               children: [
-                Expanded(
-                  child: Text(
-                    test['name'] as String,
-                    style: tt.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ),
                 Container(
+                  margin: EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 3,
@@ -1573,12 +1437,29 @@ class _TestCard extends StatelessWidget {
                     color: cs.primaryContainer,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    (test['qualification'] as String).toUpperCase(),
-                    style: tt.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: cs.onPrimaryContainer,
-                    ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.school_rounded,
+                        size: 14,
+                        color: cs.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        (test['qualification'] as String).toUpperCase(),
+                        style: tt.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: cs.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  test['name'] as String,
+                  style: tt.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
                   ),
                 ),
               ],
@@ -1599,7 +1480,7 @@ class _TestCard extends StatelessWidget {
                   ),
                   _SubtitleChip(
                     icon: Icons.quiz_rounded,
-                    label: '${test['question_count'] ?? 0} pytań',
+                    label: isEmpty ? 'Brak pytań' : '$questionCount pytań',
                     cs: cs,
                     tt: tt,
                   ),
@@ -1766,6 +1647,7 @@ class _TestCard extends StatelessWidget {
                               horizontal: 10,
                               vertical: 6,
                             ),
+                            side: BorderSide(color: cs.primary),
                             textStyle: const TextStyle(fontSize: 12),
                           ),
                         ),

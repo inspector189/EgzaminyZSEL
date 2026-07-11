@@ -10,6 +10,7 @@ final _fakeTests = [
     'name': 'Test próbny nr 1',
     'qualification': 'inf03',
     'author': 'jan.kowalski@szkola.pl',
+    'question_count': 40,
     'questions': List.generate(
       40,
       (i) => {
@@ -71,7 +72,6 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
   bool isLoading = true;
   String? errorMessage;
 
-  // Hoisted normalisation so it isn't called redundantly in the loop
   late final String _normalizedQual = _normalize(widget.qualification);
 
   static String _normalize(String q) =>
@@ -166,7 +166,7 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
       context,
       MaterialPageRoute(
         builder: (_) => EgzaminView(
-          tryb: TrybEgzaminu.zTestu,
+          tryb: TrybEgzaminu.publishedTest,
           kwalifikacja: widget.qualification,
           returnToHome: false,
           userName: null,
@@ -243,7 +243,7 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
 }
 
 // ─────────────────────────────────────────────
-//  Test card
+//                  Test card
 // ─────────────────────────────────────────────
 
 class _TestCard extends StatelessWidget {
@@ -301,7 +301,6 @@ class _TestCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Avatar
                 Container(
                   width: 44,
                   height: 44,
@@ -328,8 +327,6 @@ class _TestCard extends StatelessWidget {
                         ),
                 ),
                 const SizedBox(width: 14),
-
-                // Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,8 +374,6 @@ class _TestCard extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                // Chevron / disabled indicator
                 if (!isEmpty)
                   Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
               ],
