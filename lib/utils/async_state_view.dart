@@ -49,8 +49,8 @@ class AsyncStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final size = MediaQuery.sizeOf(context);
 
     final double scale = (size.width / 400).clamp(0.8, 1.4);
@@ -58,16 +58,16 @@ class AsyncStateView extends StatelessWidget {
     final double cardSize = 200 * scale;
 
     final Color borderColor = switch (_type) {
-      _AsyncStateType.loading => colorScheme.primary.withValues(alpha: 0.35),
-      _AsyncStateType.empty => colorScheme.outlineVariant,
-      _AsyncStateType.error => colorScheme.error.withValues(alpha: 0.45),
+      _AsyncStateType.loading => cs.primary.withValues(alpha: 0.35),
+      _AsyncStateType.empty => cs.outlineVariant,
+      _AsyncStateType.error => cs.error.withValues(alpha: 0.45),
     };
 
-    final Color iconBg = colorScheme.surfaceContainerHighest;
+    final Color iconBg = cs.surfaceContainerHighest;
     final Color iconFg = switch (_type) {
-      _AsyncStateType.loading => colorScheme.primary,
-      _AsyncStateType.empty => colorScheme.onSurfaceVariant,
-      _AsyncStateType.error => colorScheme.error,
+      _AsyncStateType.loading => cs.primary,
+      _AsyncStateType.empty => cs.onSurfaceVariant,
+      _AsyncStateType.error => cs.error,
     };
 
     final double iconCircle = 52 * scale;
@@ -82,7 +82,7 @@ class AsyncStateView extends StatelessWidget {
         height: cardSize,
         child: Container(
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
+            color: cs.surfaceContainerLow,
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: borderColor, width: 2),
           ),
@@ -111,10 +111,10 @@ class AsyncStateView extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 12 * scale),
                 child: Text(
                   message,
-                  style: (textTheme.titleSmall ?? const TextStyle()).copyWith(
+                  style: (tt.titleSmall ?? const TextStyle()).copyWith(
                     fontWeight: FontWeight.w600,
                     fontSize: 14 * scale,
-                    color: colorScheme.onSurface,
+                    color: cs.onSurface,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -125,8 +125,8 @@ class AsyncStateView extends StatelessWidget {
                   padding: EdgeInsets.symmetric(horizontal: 12 * scale),
                   child: Text(
                     subtitle!,
-                    style: (textTheme.bodySmall ?? const TextStyle()).copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                    style: (tt.bodySmall ?? const TextStyle()).copyWith(
+                      color: cs.onSurfaceVariant,
                       fontSize: 12 * scale,
                     ),
                     textAlign: TextAlign.center,

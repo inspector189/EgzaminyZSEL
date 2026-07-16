@@ -31,7 +31,7 @@ class AdminPanelPage extends StatelessWidget {
 
     final adminTiles = <AdminTileData>[
       AdminTileData(
-        icon: Icons.people,
+        icon: Icons.admin_panel_settings_rounded,
         label: 'Administratorzy',
         onTap: () => Navigator.push(
           context,
@@ -71,8 +71,8 @@ class AdminPanelPage extends StatelessWidget {
           ),
         ),
       AdminTileData(
-        icon: Icons.play_circle_fill,
-        label: 'Przeprowadź test',
+        icon: Icons.playlist_add_check_circle_rounded,
+        label: 'Testy nauczycieli',
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -117,7 +117,7 @@ class AdminPanelPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    Icons.admin_panel_settings_rounded,
+                    Icons.shield_rounded,
                     color: cs.onPrimary,
                     size: 48,
                   ),

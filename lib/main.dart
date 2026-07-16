@@ -24,17 +24,14 @@ import '/utils/quotes_array.dart';
 import '/widgets/profile_popup.dart';
 import '/widgets/question_tile.dart';
 
-//Debug data here (use your data to login in debug)
-const String userName = "";
-const String userEmail = "";
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kUseFakeData) {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userName', userName);
-    await prefs.setString('userEmail', userEmail);
-    await prefs.setBool('isAdmin', true);
+    await prefs.setString('userName', kFakeUserName);
+    await prefs.setString('userEmail', kFakeEmail);
+    await prefs.setBool('isAdmin', kFakeSuperAdmin);
+    await prefs.setBool('isSuperAdmin', kFakeSuperAdmin);
   }
 
   if (kIsWeb && !kDebugMode) {
@@ -125,16 +122,17 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   }
 
   Future<void> _syncWithServerSession() async {
-    if (kUseFakeData) return;
-    if (!_isLoggedIn || _userEmail == null) return;
     if (!kIsWeb) return;
+    if (!_isLoggedIn || _userEmail == null) return;
 
     try {
       final result = await ApiService.instance.checkSession();
 
       if (result.statusCode == 401 || result.isNetworkError) {
         await _signOut(showSnack: false);
-        if (kDebugMode) debugPrint('ℹ️ ${result.statusCode} - logout lokalny');
+        if (kDebugMode) {
+          debugPrint('${result.statusCode} - nastąpiło wylogowanie!');
+        }
         return;
       }
 
@@ -143,7 +141,9 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         if (!ok) {
           await _signOut(showSnack: false);
           if (kDebugMode) {
-            debugPrint('ℹ️ Brak sesji na serwerze - logout lokalny');
+            debugPrint(
+              'Brak aktualnej sesji na serwerze - nastąpiło wylogowanie!',
+            );
           }
         } else {
           if (mounted) {
@@ -156,7 +156,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('❌ Wystąpił błąd podczas sprawdzania sesji na serwerze: $e');
+        debugPrint('Wystąpił błąd podczas sprawdzania sesji na serwerze: $e');
       }
     }
   }
@@ -166,20 +166,18 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     final userName = prefs.getString('userName');
     final userEmail = prefs.getString('userEmail');
     final isAdmin = prefs.getBool('isAdmin') ?? false;
+    final isSuperAdmin = prefs.getBool('isSuperAdmin') ?? false;
 
     final bool isLoggedIn = userName != null && userEmail != null;
 
     if (kDebugMode) {
       if (isLoggedIn) {
         debugPrint(
-          'ℹ️ Dane logowania: '
-          'userName=$userName, userEmail=$userEmail, isAdmin=$isAdmin.',
+          'Dane logowania: '
+          'userName=$userName, userEmail=$userEmail, isAdmin=$isAdmin, isSuperAdmin=$isSuperAdmin.',
         );
       } else {
-        debugPrint(
-          'ℹ️ Użytkownik nie jest zalogowany.'
-          'isAdmin=$isAdmin',
-        );
+        debugPrint('Użytkownik nie jest zalogowany.');
       }
     }
 
@@ -188,9 +186,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       _userName = isLoggedIn ? userName : null;
       _userEmail = isLoggedIn ? userEmail : null;
       _isAdmin = isLoggedIn ? isAdmin : false;
+      _isSuperAdmin = isLoggedIn ? isSuperAdmin : false;
     });
 
-    await _syncWithServerSession();
+    if (!kUseFakeData) _syncWithServerSession();
   }
 
   Future<void> _showLoginInfoAndStart() async {
@@ -216,7 +215,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       ),
     );
 
-    if (shouldLogin != true) return;
+    if (!shouldLogin!) return;
 
     try {
       OAuth2Service.startLogin();
@@ -246,7 +245,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         await ApiService.instance.logout();
       } catch (e) {
         if (kDebugMode) {
-          debugPrint('❌ Wystąpił błąd przy wylogowaniu: $e');
+          debugPrint('Wystąpił błąd przy wylogowaniu: $e');
         }
       }
     }
@@ -255,6 +254,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
     await prefs.remove('userName');
     await prefs.remove('userEmail');
     await prefs.remove('isAdmin');
+    await prefs.remove('isSuperAdmin');
 
     setState(() {
       _isLoggedIn = false;
@@ -336,6 +336,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                       userName: _userName!,
                       userEmail: _userEmail!,
                       isAdmin: _isAdmin,
+                      isSuperAdmin: _isSuperAdmin,
                       onOpenAdminPanel: () {
                         _closeProfilePopup();
                         Navigator.push(
@@ -394,7 +395,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   }
 
   Widget buildPopupMenu(String title) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
 
     if (title == 'Strona Główna') {
       return Padding(
@@ -420,7 +421,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 child: Text(
                   title,
                   style: TextStyle(
-                    color: colorScheme.onSecondary,
+                    color: cs.onSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -441,7 +442,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       child: PopupMenuButton<Qualification>(
         tooltip: "technik $title",
         offset: const Offset(0, kToolbarHeight),
-        color: colorScheme.surfaceContainerHighest,
+        color: cs.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (qualification) {
           _navigatorKey.currentState?.pushAndRemoveUntil(
@@ -461,7 +462,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
               value: q,
               child: Row(
                 children: [
-                  Icon(q.icon, size: 20, color: colorScheme.onPrimary),
+                  Icon(q.icon, size: 20, color: cs.onPrimary),
                   const SizedBox(width: 8),
                   Text(q.code),
                 ],
@@ -480,7 +481,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 Text(
                   "technik",
                   style: TextStyle(
-                    color: colorScheme.onSecondary,
+                    color: cs.onSecondary,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -488,7 +489,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 Text(
                   title,
                   style: TextStyle(
-                    color: colorScheme.onSecondary,
+                    color: cs.onSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -526,8 +527,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
@@ -537,13 +537,10 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 padding: EdgeInsets.zero,
                 children: [
                   DrawerHeader(
-                    decoration: BoxDecoration(color: colorScheme.primary),
+                    decoration: BoxDecoration(color: cs.primary),
                     child: Text(
                       'Menu',
-                      style: TextStyle(
-                        color: colorScheme.onPrimary,
-                        fontSize: 24,
-                      ),
+                      style: TextStyle(color: cs.onPrimary, fontSize: 24),
                     ),
                   ),
                   _drawerItem(context, 'Strona Główna'),
@@ -619,7 +616,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
           : null,
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: colorScheme.primary,
+        backgroundColor: cs.primary,
         actions: width > 900
             ? [
                 const Spacer(),
@@ -627,9 +624,9 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 ...professions.map((p) => buildPopupMenu(p.name)),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.info_outline_rounded),
+                  icon: const Icon(Icons.info_rounded),
                   tooltip: 'O nas',
-                  color: colorScheme.onPrimary,
+                  color: cs.onPrimary,
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -642,7 +639,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                     _isLoggedIn ? Icons.person_rounded : Icons.login_rounded,
                   ),
                   tooltip: _isLoggedIn ? 'Profil' : 'Logowanie',
-                  color: colorScheme.onPrimary,
+                  color: cs.onPrimary,
                   onPressed: () async {
                     if (_isLoggedIn) {
                       _toggleProfilePopup();
@@ -664,7 +661,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                 ),
 
                 IconButton(
-                  color: colorScheme.onPrimary,
+                  color: cs.onPrimary,
                   icon: Icon(switch (themeProvider.themeMode) {
                     ThemeMode.light => Icons.wb_sunny_rounded,
                     ThemeMode.dark => Icons.nightlight_rounded,

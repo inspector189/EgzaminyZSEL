@@ -384,16 +384,18 @@ class _SectionHeader extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: cs.primaryContainer,
-            borderRadius: BorderRadius.circular(20),
+            color: cs.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: cs.primary.withValues(alpha: 0.24)),
           ),
           child: Text(
             '$count',
-            style: tt.labelSmall?.copyWith(
+            style: TextStyle(
+              fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: cs.onPrimaryContainer,
+              color: cs.primary,
             ),
           ),
         ),
@@ -590,16 +592,18 @@ class _UsersHeader extends StatelessWidget {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(20),
+                color: cs.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: cs.primary.withValues(alpha: 0.24)),
               ),
               child: Text(
                 '$userCount',
-                style: tt.labelSmall?.copyWith(
+                style: TextStyle(
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: cs.onPrimaryContainer,
+                  color: cs.primary,
                 ),
               ),
             ),
@@ -651,11 +655,15 @@ class _UsersListPageState extends State<_UsersListPage>
           .toList()
         ..sort();
 
-  late _StatsResult _stats = _recompute();
-  late final TabController _tabController = TabController(
-    length: 2,
-    vsync: this,
-  );
+  late _StatsResult _stats;
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _stats = _recompute();
+    _tabController = TabController(length: 2, vsync: this);
+  }
 
   _StatsResult _recompute() => _computeStats(
     widget.allResults,
@@ -1543,7 +1551,9 @@ class _QualificationTile extends StatelessWidget {
         };
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('fetchExamDetails error: $e');
+      if (kDebugMode) {
+        debugPrint('Wystąpił błąd podczas pobierania danych egzaminów: $e');
+      }
     }
     return null;
   }
@@ -1571,21 +1581,29 @@ class _QualificationTile extends StatelessWidget {
           collapsedShape: const Border(),
           tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          leading: Icon(Icons.book_rounded, color: cs.primary, size: 20),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                qualification.toUpperCase(),
-                style: tt.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurface,
-                  letterSpacing: 0.5,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Row(
+          title: LayoutBuilder(
+            builder: (context, constraints) {
+              final iconAndName = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.school_rounded, color: cs.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      qualification.toUpperCase(),
+                      style: tt.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                        letterSpacing: 0.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              );
+
+              final pills = Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _StatPill(
                     label: 'Egz.',
@@ -1602,8 +1620,23 @@ class _QualificationTile extends StatelessWidget {
                     tt: tt,
                   ),
                 ],
-              ),
-            ],
+              );
+
+              if (constraints.maxWidth < 260) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [iconAndName, const SizedBox(height: 6), pills],
+                );
+              }
+
+              return Row(
+                children: [
+                  Flexible(child: iconAndName),
+                  const SizedBox(width: 10),
+                  pills,
+                ],
+              );
+            },
           ),
           children: recentExams.isEmpty
               ? [
@@ -1711,16 +1744,17 @@ class _ExamRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
+              color: cs.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: cs.primary.withValues(alpha: 0.24)),
             ),
             child: Text(
               date,
               style: tt.labelMedium?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: cs.onPrimaryContainer,
+                color: cs.primary,
               ),
             ),
           ),

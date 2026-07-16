@@ -90,7 +90,6 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     setState(() => isLoading = true);
 
     if (kUseFakeData) {
-      await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
       setState(() {
         admins = List.from(_fakeAdmins);
@@ -107,7 +106,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
     try {
       final result = await ApiService.instance.fetchAdmins();
       if (!result.isSuccess) {
-        _showSnackBar('Błąd serwera (${result.statusCode})', isError: true);
+        _showSnackBar('Wystąpił błąd serwera (HTTP ${result.statusCode})', isError: true);
         return;
       }
       if (mounted) {
@@ -117,9 +116,9 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
       }
     } catch (e, st) {
       if (kDebugMode) {
-        debugPrint('Błąd podczas ładowania administratorów: $e\n$st');
+        debugPrint('Wystąpił błąd podczas ładowania administratorów: $e\n$st');
       }
-      if (mounted) _showSnackBar('Nie udało się pobrać listy', isError: true);
+      if (mounted) _showSnackBar('Pobieranie listy nie powiodło się', isError: true);
     }
   }
 
@@ -130,7 +129,6 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
 
     try {
       if (kUseFakeData) {
-        await Future.delayed(const Duration(milliseconds: 400));
         if (!mounted) return;
         setState(() {
           admins.add(
@@ -158,7 +156,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
       _emailController.clear();
       await _refresh();
     } catch (e) {
-      if (mounted) _showSnackBar('Błąd podczas dodawania', isError: true);
+      if (mounted) _showSnackBar('Wystąpił błąd podczas dodawania administratora', isError: true);
     } finally {
       if (mounted) setState(() => isPerformingAction = false);
     }
@@ -176,7 +174,6 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
 
     try {
       if (kUseFakeData) {
-        await Future.delayed(const Duration(milliseconds: 300));
         if (!mounted) return;
         setState(() {
           final idx = admins.indexWhere((a) => a.id == user.id);
@@ -225,7 +222,7 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
 
   Future<void> _deleteAdmin(AdminUser user) async {
     if (user.email == widget.currentUserEmail) {
-      _showSnackBar('Nie możesz usunąć swojego statusu!', isError: true);
+      _showSnackBar('Nie możesz usunąć swojego statusu administratora!', isError: true);
       return;
     }
 
@@ -252,13 +249,11 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    if (!mounted || confirmed != true) return;
     setState(() => isPerformingAction = true);
 
     try {
       if (kUseFakeData) {
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (!mounted) return;
         setState(() => admins.removeWhere((a) => a.id == user.id));
         _showSnackBar('Status administratora został pomyślnie usunięty');
         return;
@@ -282,17 +277,17 @@ class _ManageAdminsPageState extends State<ManageAdminsPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => isPerformingAction = false);
+      if (mounted) {
+        setState(() => isPerformingAction = false);
+      }
     }
   }
 
   Future<void> _refresh() async {
-    if (!mounted) return;
     await _fetchAdmins();
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    if (!mounted) return;
     final cs = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -711,7 +706,7 @@ class _AdminRow extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Tooltip(
                       message:
-                          'Nie możesz usunąć statusu administratora z własnego konta',
+                          'Nie możesz usunąć statusu administratora z własnego konta!',
                       child: Icon(
                         Icons.shield_rounded,
                         color: cs.primary.withValues(alpha: 0.4),

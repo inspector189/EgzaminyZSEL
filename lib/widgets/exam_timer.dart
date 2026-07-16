@@ -6,7 +6,7 @@ class ExamTimer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     return StreamBuilder(
       stream: Stream.periodic(const Duration(seconds: 1)),
       builder: (context, snapshot) {
@@ -21,9 +21,7 @@ class ExamTimer extends StatelessWidget {
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: total.inMinutes < 5
-                ? colorScheme.error
-                : colorScheme.onPrimary,
+            color: total.inMinutes < 5 ? cs.error : cs.onPrimary,
           ),
         );
       },

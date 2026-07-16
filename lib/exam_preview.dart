@@ -81,7 +81,6 @@ class ExamPreviewPage extends StatelessWidget {
     final unescape = HtmlUnescapeSmall();
 
     if (selected == null) {
-      // Unanswered
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(

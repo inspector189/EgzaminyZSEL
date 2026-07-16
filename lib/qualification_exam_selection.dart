@@ -50,8 +50,8 @@ class QualificationExamSelectionPage extends StatelessWidget {
       (w) => SizedBox(
         width: w,
         child: QuestionTile(
-          icon: Icons.casino_rounded,
-          code: 'Losuj 1 pytanie',
+          icon: Icons.filter_1_rounded,
+          code: 'Pojedyncze pytanie',
           label: 'Sprawdź swoją wiedzę',
           showCount: false,
           onTap: () => Navigator.push(
@@ -88,7 +88,7 @@ class QualificationExamSelectionPage extends StatelessWidget {
       (w) => SizedBox(
         width: w,
         child: QuestionTile(
-          icon: Icons.library_books_rounded,
+          icon: Icons.library_books_outlined,
           code: 'Baza pytań',
           label: 'Przeglądaj wszystkie pytania',
           showCount: false,
@@ -107,8 +107,8 @@ class QualificationExamSelectionPage extends StatelessWidget {
       (w) => SizedBox(
         width: w,
         child: QuestionTile(
-          icon: Icons.assignment_turned_in_rounded,
-          code: 'Testy nauczyciela',
+          icon: Icons.assignment_ind_rounded,
+          code: 'Testy nauczycieli',
           label: 'Opublikowane zestawy pytań',
           showCount: false,
           isLocked: !isLoggedIn,
@@ -149,7 +149,7 @@ class QualificationExamSelectionPage extends StatelessWidget {
 
     final adminSection = isAdmin
         ? _Section(
-            label: 'Zarządzanie',
+            label: 'Zarządzaj',
             cs: cs,
             tt: tt,
             accent: cs.tertiary,

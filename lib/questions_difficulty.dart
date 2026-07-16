@@ -102,7 +102,9 @@ class QuestionsDifficultyPageState extends State<QuestionsDifficultyPage> {
       }
     } catch (e) {
       errorMessage = '$e';
-      if (kDebugMode) debugPrint('Błąd ładowania $kwal: $e');
+      if (kDebugMode) {
+        debugPrint('Wystąpił błąd podczas ładowania kwalifikacji $kwal: $e');
+      }
       if (mounted) setState(() => s.isLoading = false);
     }
   }
@@ -581,7 +583,7 @@ class _QuestionDifficultyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final extra = Theme.of(context).extension<ExtraColors>()!;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
 
     final id = q['pytanie_id'] ?? '-';
     final total = int.tryParse(q['ilosc_odpowiedzi'].toString()) ?? 0;
@@ -593,7 +595,7 @@ class _QuestionDifficultyCard extends StatelessWidget {
     final poprawna = q['poprawna']?.toString() ?? '';
     final trud = _trud(q);
     final isHard = trud > _kHardThreshold;
-    final accent = isHard ? extra.incorrect : extra.correct;
+    final accent = isHard ? extras.incorrect : extras.correct;
 
     final answers = List.generate(4, (i) {
       final letter = 'ABCD'[i];
@@ -624,7 +626,7 @@ class _QuestionDifficultyCard extends StatelessWidget {
           correct: correct,
           pct: ratePct,
           cs: cs,
-          extra: extra,
+          extra: extras,
         ),
       ),
     );

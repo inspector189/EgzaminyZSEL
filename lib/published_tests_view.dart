@@ -9,7 +9,7 @@ final _fakeTests = [
   {
     'name': 'Test próbny nr 1',
     'qualification': 'inf03',
-    'author': 'jan.kowalski@szkola.pl',
+    'author': 'Jan Kowalski',
     'question_count': 40,
     'questions': List.generate(
       40,
@@ -32,7 +32,8 @@ final _fakeTests = [
   {
     'name': 'Sprawdzian końcowy',
     'qualification': 'inf04',
-    'author': 'anna.nowak@szkola.pl',
+    'author': 'Anna Nowak',
+    'question_count': 40,
     'questions': List.generate(
       20,
       (i) => {
@@ -53,7 +54,7 @@ final _fakeTests = [
   },
   {
     'name': 'Pusty test (błąd serwera)',
-    'qualification': 'ee08',
+    'qualification': 'ele02',
     'author': 'system',
     'questions': <dynamic>[],
   },
@@ -91,7 +92,6 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
     });
 
     if (kUseFakeData) {
-      await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
       setState(() {
         publishedTests = _fakeTests
@@ -175,8 +175,6 @@ class _PublishedTestsPageState extends State<PublishedTestsPage> {
       ),
     );
   }
-
-  // ── Build ─────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {

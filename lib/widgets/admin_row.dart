@@ -12,18 +12,18 @@ class ModernAdminRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Container(
         decoration: BoxDecoration(
-          color: colorScheme.surface,
+          color: cs.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.onSurface.withValues(alpha: 0.05),
+              color: cs.onSurface.withValues(alpha: 0.05),
               blurRadius: 6,
               offset: const Offset(0, 3),
             ),
@@ -33,12 +33,9 @@ class ModernAdminRow extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: colorScheme.primaryContainer,
+              backgroundColor: cs.primaryContainer,
               radius: 18,
-              child: Icon(
-                Icons.person_outline,
-                color: colorScheme.onPrimaryContainer,
-              ),
+              child: Icon(Icons.person_outline, color: cs.onPrimaryContainer),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -47,15 +44,15 @@ class ModernAdminRow extends StatelessWidget {
                 children: [
                   Text(
                     email,
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    style: tt.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface,
+                      color: cs.onSurface,
                     ),
                   ),
                   Text(
                     'Administrator systemu',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                    style: tt.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -65,8 +62,8 @@ class ModernAdminRow extends StatelessWidget {
               tooltip: 'Usuń status administratora',
               onPressed: onDelete,
               style: IconButton.styleFrom(
-                backgroundColor: colorScheme.errorContainer,
-                foregroundColor: colorScheme.onErrorContainer,
+                backgroundColor: cs.errorContainer,
+                foregroundColor: cs.onErrorContainer,
               ),
               icon: const Icon(Icons.delete_outline),
             ),

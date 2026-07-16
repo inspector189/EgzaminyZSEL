@@ -53,7 +53,7 @@ class ApiService {
         InterceptorsWrapper(
           onError: (e, handler) {
             debugPrint(
-              'Błąd api_service.dart: ${e.requestOptions.method} ${e.requestOptions.path} → ${e.message}',
+              '[API] Wystąpił błąd podczas pobierania danych: ${e.requestOptions.method} ${e.requestOptions.path} → ${e.message}',
             );
             handler.next(e);
           },

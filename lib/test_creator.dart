@@ -83,7 +83,6 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
     });
 
     if (kUseFakeData) {
-      await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
       final fake = _buildFakeQuestions(120);
       setState(() {
@@ -184,6 +183,7 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
   }
 
   Future<void> _saveTest() async {
+    final cs = Theme.of(context).colorScheme;
     final name = _nameController.text.trim();
     if (name.isEmpty || selectedCount != 40 || isSaving) return;
 
@@ -207,9 +207,6 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
     try {
       final result = await ApiService.instance.createTest(newTest);
       if (!mounted) return;
-
-      final cs = Theme.of(context).colorScheme;
-
       if (result.isSuccess) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -244,7 +241,7 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Błąd połączenia z serwerem'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: cs.error,
         ),
       );
     } finally {
@@ -268,8 +265,8 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
       appBar: AppBar(
         title: Text(
           isRandom
-              ? 'Losowy test – ${widget.qualification.toUpperCase()}'
-              : 'Ręczny dobór pytań',
+              ? 'Losowy dobór pytań – ${widget.qualification.toUpperCase()}'
+              : 'Ręczny dobór pytań – ${widget.qualification.toUpperCase()}',
         ),
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
@@ -295,7 +292,6 @@ class _TestCreatorPageState extends State<TestCreatorPage> {
                 icon: Icons.cloud_off_rounded,
               ),
             )
-          // Warn user if bank has fewer than 40 questions
           : allQuestions.length < 40
           ? Center(
               child: AsyncStateView.empty(
@@ -383,24 +379,19 @@ class _HeaderPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Name field
           TextField(
             controller: nameController,
             decoration: InputDecoration(
               labelText: 'Nazwa testu',
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.title_rounded),
-              // Show hint when name is empty so user knows why save is disabled
               helperText: nameEmpty ? 'Wymagane do zapisania testu' : null,
               helperStyle: TextStyle(color: cs.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: 12),
-
-          // Progress row
           Row(
             children: [
-              // Count badge
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -408,7 +399,7 @@ class _HeaderPanel extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: countColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: countColor.withValues(alpha: 0.4)),
                 ),
                 child: Text(
@@ -420,7 +411,6 @@ class _HeaderPanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Progress bar
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
@@ -433,7 +423,6 @@ class _HeaderPanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Save button
               FilledButton.icon(
                 onPressed: canSave && !isSaving ? onSave : null,
                 icon: isSaving
@@ -652,14 +641,17 @@ class _ManualListState extends State<_ManualList> {
                     final isDisabled =
                         !isSelected && widget.selectedCount >= 40;
 
-                    return _SelectableQuestionCard(
-                      question: q,
-                      number: widget.questions.indexOf(q) + 1,
-                      qualification: widget.qualification,
-                      isSelected: isSelected,
-                      isDisabled: isDisabled,
-                      cs: cs,
-                      onTap: isDisabled ? null : () => widget.onToggle(q),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _SelectableQuestionCard(
+                        question: q,
+                        number: widget.questions.indexOf(q) + 1,
+                        qualification: widget.qualification,
+                        isSelected: isSelected,
+                        isDisabled: isDisabled,
+                        cs: cs,
+                        onTap: isDisabled ? null : () => widget.onToggle(q),
+                      ),
                     );
                   },
                 ),
@@ -696,47 +688,57 @@ class _SelectableQuestionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: isDisabled ? 0.45 : 1.0,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Stack(
-          children: [
-            IgnorePointer(
-              child: RichQuestionWidget(
-                question: question,
-                number: number,
-                qualification: qualification,
-                accentColorOverride: isSelected ? cs.primary : null,
-              ),
-            ),
-            Positioned(
-              top: 16,
-              right: 16,
-              child: Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: isSelected ? cs.primary : cs.surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected
-                        ? cs.primary
-                        : cs.outlineVariant.withValues(alpha: 0.6),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: cs.shadow.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
+      child: Material(
+        color: isSelected
+            ? cs.primaryContainer.withValues(alpha: 0.5)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          hoverColor: cs.primary.withValues(alpha: 0.1),
+          child: Stack(
+            children: [
+              IgnorePointer(
+                child: RichQuestionWidget(
+                  question: question,
+                  number: number,
+                  qualification: qualification,
+                  accentColorOverride: isSelected ? cs.primary : null,
                 ),
-                child: isSelected
-                    ? Icon(Icons.check_rounded, size: 16, color: cs.onPrimary)
-                    : null,
               ),
-            ),
-          ],
+              Positioned(
+                top: 16,
+                right: 16,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeInOut,
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isSelected ? cs.primary : cs.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected
+                          ? cs.primary
+                          : cs.outlineVariant.withValues(alpha: 0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: cs.shadow.withValues(alpha: 0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: isSelected
+                      ? Icon(Icons.check_rounded, size: 16, color: cs.onPrimary)
+                      : null,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

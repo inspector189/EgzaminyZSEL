@@ -16,7 +16,6 @@ class InlineVideoPlayer extends StatefulWidget {
          'Podaj url, filePath albo blobUrl (co najmniej jedno)',
        );
 
-  /// Named constructors so call-sites stay clean and obvious
   const InlineVideoPlayer.network(String this.url, {super.key, this.height})
     : filePath = null,
       blobUrl = null;
@@ -78,12 +77,12 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
 
     if (_initError) {
       return Text(
         'Nie udało się wczytać wideo',
-        style: TextStyle(color: colorScheme.error),
+        style: TextStyle(color: cs.error),
       );
     }
     if (_chewie == null) {

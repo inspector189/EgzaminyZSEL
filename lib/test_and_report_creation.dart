@@ -26,7 +26,7 @@ final _fakeTests = [
     'id': 1,
     'name': 'Test próbny EE.08',
     'qualification': 'ee08',
-    'author': 'jan.kowalski@szkola.pl',
+    'author': 'Jan Kowalski',
     'createdAt': '2025-03-01T10:00:00',
     'published': true,
     'question_count': 40,
@@ -86,7 +86,7 @@ final _fakeTests = [
     'id': 2,
     'name': 'Sprawdzian EE.09 – moduł 2',
     'qualification': 'ee09',
-    'author': 'anna.nowak@szkola.pl',
+    'author': 'Anna Nowak',
     'createdAt': '2025-02-20T14:22:00',
     'published': false,
     'question_count': 40,
@@ -169,7 +169,7 @@ class RichQuestionWidget extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Page root
+//                  Page root
 // ─────────────────────────────────────────────
 
 class CreatingTestsAndReportsPage extends StatefulWidget {
@@ -209,7 +209,6 @@ class _CreatingTestsAndReportsPageState
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    Theme.of(context).extension<ExtraColors>()!;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Testy i raporty'),
@@ -234,13 +233,13 @@ class _CreatingTestsAndReportsPageState
               ),
               tabs: const [
                 Tab(
-                  icon: Icon(Icons.list_alt_rounded),
-                  text: 'Utworzone testy',
+                  icon: Icon(Icons.view_list_rounded),
+                  text: 'Istniejące testy',
                   iconMargin: EdgeInsets.only(bottom: 4),
                 ),
                 Tab(
-                  icon: Icon(Icons.add_circle_outline_rounded),
-                  text: 'Stwórz test',
+                  icon: Icon(Icons.add_box_rounded),
+                  text: 'Stwórz nowy test',
                   iconMargin: EdgeInsets.only(bottom: 4),
                 ),
               ],
@@ -281,7 +280,6 @@ class TestPreviewPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    Theme.of(context).extension<ExtraColors>()!;
 
     final questions = List<Map<String, dynamic>>.from(
       test['questions'] as List,
@@ -364,7 +362,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
 
   Future<void> _loadTests() async {
     if (kUseFakeData) {
-      await Future.delayed(const Duration(milliseconds: 400));
       if (mounted) {
         setState(() {
           savedTests = _fakeTests
@@ -451,7 +448,11 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
         });
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('Błąd pobierania wyników [$id]: $e');
+      if (kDebugMode) {
+        debugPrint(
+          'Wystąpił błąd podczas pobierania wyników testu o [$id]: $e',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loadingResultsForIds.remove(id));
     }
@@ -461,6 +462,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
 
   Future<void> _deleteTest(int index) async {
     final test = savedTests[index];
+    final cs = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -476,9 +478,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.error,
-            ),
+            style: TextButton.styleFrom(foregroundColor: cs.error),
             child: const Text('Usuń'),
           ),
         ],
@@ -491,8 +491,8 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('[FAKE] Test usunięty'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            content: const Text('[DEBUG] Test usunięty'),
+            backgroundColor: cs.error,
           ),
         );
       }
@@ -502,7 +502,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     try {
       await ApiService.instance.deleteTest(test['id'] as int);
     } catch (e) {
-      if (kDebugMode) debugPrint('Błąd usuwania z serwera: $e');
+      if (kDebugMode) debugPrint('Wystąpił błąd podczas usuwania testu: $e');
     }
 
     setState(() => savedTests.removeAt(index));
@@ -512,8 +512,8 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Test usunięty'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          content: const Text('Test został usunięty'),
+          backgroundColor: cs.error,
         ),
       );
     }
@@ -522,6 +522,10 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
   Future<void> _togglePublish(int index) async {
     final test = savedTests[index];
     final willPublish = !(test['published'] == true);
+    final cs = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
+
+    final publishBackground = willPublish ? extras.correct : cs.secondary;
 
     if (kUseFakeData) {
       setState(() => savedTests[index]['published'] = willPublish);
@@ -529,11 +533,9 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '[FAKE] ${willPublish ? 'Opublikowano' : 'Wycofano'}',
+              '[DEBUG] ${willPublish ? 'Opublikowano' : 'Wycofano'}',
             ),
-            backgroundColor: willPublish
-                ? Colors.green
-                : Theme.of(context).colorScheme.secondary,
+            backgroundColor: publishBackground,
           ),
         );
       }
@@ -557,14 +559,11 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
                   ? 'Test opublikowany dla wszystkich!'
                   : 'Test wycofany z publikacji',
             ),
-            backgroundColor: willPublish
-                ? Colors.green
-                : Theme.of(context).colorScheme.secondary,
+            backgroundColor: publishBackground,
           ),
         );
       }
     } catch (_) {
-      // Roll back on failure
       setState(() => savedTests[index]['published'] = !willPublish);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -629,7 +628,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Ten test zawiera filmy — nie można wygenerować PDF'),
+            content: Text('Ten test zawiera filmy — nie można wygenerować testu w pliku PDF'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 4),
           ),
@@ -860,10 +859,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
   }
 
   Future<Map<String, dynamic>?> _fetchExamDetailsFull(int examId) async {
-    if (kUseFakeData) {
-      await Future.delayed(const Duration(milliseconds: 300));
-      return null;
-    }
     try {
       final result = await ApiService.instance.fetchExamPreviewForTest(examId);
       if (result.isSuccess && result.data?['success'] == true) {
@@ -874,7 +869,7 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
         };
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('Błąd podczas pobierania listy: $e');
+      if (kDebugMode) debugPrint('Wystąpił błąd podczas pobierania szczegółów testu: $e');
     }
     return null;
   }
@@ -916,8 +911,26 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
             indicatorColor: cs.primary,
             dividerColor: cs.outlineVariant.withValues(alpha: 0.4),
             tabs: [
-              Tab(text: 'Moje testy (${myTests.length})'),
-              Tab(text: 'Wszystkie (${savedTests.length})'),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Moje testy'),
+                    const SizedBox(width: 6),
+                    _CountBadge(count: myTests.length),
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Wszystkie testy'),
+                    const SizedBox(width: 6),
+                    _CountBadge(count: savedTests.length),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -1004,7 +1017,9 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
             onReport: () => _generateReportPdf(realIndex),
             onAnswerKey: () => _generateAnswerKeyPdf(realIndex),
             onExamPreview: (examId) async {
-              final data = await _fetchExamDetailsFull(examId);
+              final data = kUseFakeData
+                  ? null
+                  : await _fetchExamDetailsFull(examId);
               if (!context.mounted) return;
               if (data != null) {
                 Navigator.push(
@@ -1048,8 +1063,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
 
   Future<void> _generateAnswerKeyPdf(int index) async {
     final id = savedTests[index]['id'] as int;
-
-    // Ensure full test with questions is loaded
     final fullTest = await _fetchFullTest(id);
     if (fullTest == null) {
       if (mounted) {
@@ -1063,7 +1076,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
       return;
     }
 
-    // Use the fresh full test data
     final String qual = fullTest['qualification'] as String;
     final questions = List<Map<String, dynamic>>.from(
       fullTest['questions'] as List,
@@ -1159,22 +1171,21 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
   }
 
   Future<void> _generateReportPdf(int index) async {
+    if (kUseFakeData) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generowanie raportu niedostępne.')),
+      );
+      return;
+    }
     final id = savedTests[index]['id'] as int;
 
-    // Ensure results are loaded (same as expanding the tile)
     if (!_loadedResultsForIds.contains(id) &&
         !_loadingResultsForIds.contains(id)) {
       await _loadResultsForTest(index);
     }
 
-    // Wait for setState to update the list
-    if (mounted) {
-      await Future.delayed(const Duration(milliseconds: 150));
-    }
-
     if (!mounted) return;
 
-    // Use fresh reference
     final test = savedTests[index];
     final results = (test['results'] as List<dynamic>?) ?? [];
 
@@ -1187,7 +1198,6 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
       return;
     }
 
-    // Keep only the most recent attempt per user
     final Map<String, Map<String, dynamic>> lastResults = {};
     for (final r in results) {
       final uid = (r['uid'] ?? r['UID'] ?? '').toString();
@@ -1320,8 +1330,34 @@ class _CreatedTestsTabState extends State<CreatedTestsTab>
       );
 }
 
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.24)),
+      ),
+      child: Text(
+        '$count',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: cs.primary,
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────
-//  Test card widget
+//               Test card widget
 // ─────────────────────────────────────────────
 
 class _TestCard extends StatelessWidget {
@@ -1390,158 +1426,175 @@ class _TestCard extends StatelessWidget {
         color: cs.surface,
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            onExpansionChanged: (expanded) {
-              if (expanded) onExpand();
-            },
-            tilePadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-
-            leading: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: isPublished
-                    ? extras.correct.withValues(alpha: 0.15)
-                    : cs.surfaceContainerHighest,
-                shape: BoxShape.circle,
-              ),
-              child: Tooltip(
-                padding: EdgeInsets.all(8),
-                message: isPublished
-                    ? "Ten test jest dostępny do rozwiązywania przez uczniów."
-                    : "Test został zamknięty i nie można go już rozwiązywać.",
-                child: Icon(
-                  isPublished
-                      ? Icons.public_rounded
-                      : Icons.lock_outline_rounded,
-                  size: 20,
-                  color: isPublished ? extras.correct : cs.onSurfaceVariant,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final trailingMaxWidth = (constraints.maxWidth * 0.365).clamp(
+                80.0,
+                260.0,
+              );
+              return ExpansionTile(
+                onExpansionChanged: (expanded) {
+                  if (expanded) onExpand();
+                },
+                tilePadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
                 ),
-              ),
-            ),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
 
-            // ── Title ─────────────────────────────────────────────
-            title: Row(
-              children: [
-                Container(
-                  margin: EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
+                leading: Container(
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
+                    color: isPublished
+                        ? extras.correct.withValues(alpha: 0.15)
+                        : cs.surfaceContainerHighest,
+                    shape: BoxShape.circle,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.school_rounded,
-                        size: 14,
-                        color: cs.onPrimaryContainer,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        (test['qualification'] as String).toUpperCase(),
-                        style: tt.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: cs.onPrimaryContainer,
-                        ),
-                      ),
-                    ],
+                  child: Tooltip(
+                    padding: EdgeInsets.all(8),
+                    message: isPublished
+                        ? "Ten test jest dostępny do rozwiązywania przez uczniów."
+                        : "Test został zamknięty i nie można go już rozwiązywać.",
+                    child: Icon(
+                      isPublished
+                          ? Icons.public_outlined
+                          : Icons.lock_outline_rounded,
+                      size: 20,
+                      color: isPublished ? extras.correct : cs.onSurfaceVariant,
+                    ),
                   ),
                 ),
-                Text(
-                  test['name'] as String,
-                  style: tt.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface,
-                  ),
-                ),
-              ],
-            ),
 
-            // ── Subtitle ──────────────────────────────────────────
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  _SubtitleChip(
-                    icon: Icons.person_outline_rounded,
-                    label: test['author'] as String,
-                    cs: cs,
-                    tt: tt,
-                  ),
-                  _SubtitleChip(
-                    icon: Icons.quiz_rounded,
-                    label: isEmpty ? 'Brak pytań' : '$questionCount pytań',
-                    cs: cs,
-                    tt: tt,
-                  ),
-                  if (avg != null)
-                    _SubtitleChip(
-                      icon: Icons.bar_chart_rounded,
-                      label:
-                          'Śr. ${avg.toStringAsFixed(1)}% (${results.length})',
-                      cs: cs,
-                      tt: tt,
-                      highlight: true,
-                    ),
-                ],
-              ),
-            ),
-
-            // ── Action buttons
-            trailing: _ActionMenu(
-              canEdit: canEdit,
-              isPublished: isPublished,
-              cs: cs,
-              onPreview: onPreview,
-              onPrint: onPrint,
-              onDelete: onDelete,
-              onTogglePublish: onTogglePublish,
-              onReport: onReport,
-              onAnswerKey: onAnswerKey,
-            ),
-
-            children: isLoadingResults
-                ? [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                  ]
-                : results.isEmpty
-                ? [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                // ── Title ─────────────────────────────────────────────
+                title: Row(
+                  children: [
+                    Container(
+                      margin: EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.inbox_rounded,
-                            size: 20,
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                            Icons.school_rounded,
+                            size: 14,
+                            color: cs.onPrimaryContainer,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 4),
                           Text(
-                            'Brak wyników',
-                            style: tt.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              fontStyle: FontStyle.italic,
+                            (test['qualification'] as String).toUpperCase(),
+                            style: tt.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: cs.onPrimaryContainer,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ]
-                : _buildGroupedResultsInline(context, results),
+                    Expanded(
+                      child: Text(
+                        test['name'] as String,
+                        style: tt.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // ── Subtitle ──────────────────────────────────────────
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _SubtitleChip(
+                        icon: Icons.person_rounded,
+                        label: test['author'] as String,
+                        cs: cs,
+                        tt: tt,
+                      ),
+                      _SubtitleChip(
+                        icon: Icons.library_books_rounded,
+                        label: isEmpty ? 'Brak pytań' : '$questionCount pytań',
+                        cs: cs,
+                        tt: tt,
+                      ),
+                      if (avg != null)
+                        _SubtitleChip(
+                          icon: Icons.bar_chart_rounded,
+                          label:
+                              'Śr. ${avg.toStringAsFixed(1)}% (${results.length})',
+                          cs: cs,
+                          tt: tt,
+                          highlight: true,
+                        ),
+                    ],
+                  ),
+                ),
+
+                trailing: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: trailingMaxWidth),
+                  child: _ActionMenu(
+                    canEdit: canEdit,
+                    isPublished: isPublished,
+                    cs: cs,
+                    extras: extras,
+                    onPreview: onPreview,
+                    onPrint: onPrint,
+                    onDelete: onDelete,
+                    onTogglePublish: onTogglePublish,
+                    onReport: onReport,
+                    onAnswerKey: onAnswerKey,
+                  ),
+                ),
+
+                children: isLoadingResults
+                    ? [
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      ]
+                    : results.isEmpty
+                    ? [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.inbox_rounded,
+                                size: 20,
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Brak wyników',
+                                style: tt.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ]
+                    : _buildGroupedResultsInline(context, results),
+              );
+            },
           ),
         ),
       ),
@@ -1687,6 +1740,7 @@ class _ActionMenu extends StatelessWidget {
     required this.canEdit,
     required this.isPublished,
     required this.cs,
+    required this.extras,
     required this.onPreview,
     required this.onPrint,
     required this.onDelete,
@@ -1698,6 +1752,7 @@ class _ActionMenu extends StatelessWidget {
   final bool canEdit;
   final bool isPublished;
   final ColorScheme cs;
+  final ExtraColors extras;
   final VoidCallback onPreview;
   final VoidCallback onPrint;
   final VoidCallback? onDelete;
@@ -1705,103 +1760,136 @@ class _ActionMenu extends StatelessWidget {
   final VoidCallback onReport;
   final VoidCallback onAnswerKey;
 
+  static const double _kButtonWidth = 40;
+
+  List<_ActionItem> get _overflowItems => [
+    _ActionItem(
+      value: 'print',
+      icon: Icons.local_print_shop_rounded,
+      label: 'Drukuj PDF',
+      onTap: onPrint,
+    ),
+    _ActionItem(
+      value: 'report',
+      icon: Icons.analytics_rounded,
+      label: 'Raport wyników',
+      color: Colors.deepPurple,
+      onTap: onReport,
+    ),
+    _ActionItem(
+      value: 'key',
+      icon: Icons.key_rounded,
+      label: 'Klucz odpowiedzi',
+      color: Colors.teal,
+      onTap: onAnswerKey,
+    ),
+    if (canEdit) ...[
+      _ActionItem(
+        value: 'publish',
+        icon: isPublished ? Icons.public_off_rounded : Icons.public_rounded,
+        label: isPublished ? 'Wycofaj' : 'Opublikuj',
+        color: isPublished ? Colors.orange : extras.correct,
+        onTap: onTogglePublish,
+      ),
+      _ActionItem(
+        value: 'delete',
+        icon: Icons.delete_forever_rounded,
+        label: 'Usuń',
+        color: extras.incorrect,
+        onTap: onDelete,
+      ),
+    ],
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // quick actions
-        IconButton(
-          icon: Icon(Icons.visibility_rounded, color: cs.primary),
-          tooltip: 'Podgląd testu',
-          visualDensity: VisualDensity.compact,
-          onPressed: onPreview,
-        ),
-        // Overflow menu
-        PopupMenuButton<String>(
-          icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
-          tooltip: 'Więcej opcji',
-          onSelected: (value) {
-            switch (value) {
-              case 'print':
-                onPrint();
-              case 'report':
-                onReport();
-              case 'key':
-                onAnswerKey();
-              case 'publish':
-                onTogglePublish?.call();
-              case 'delete':
-                onDelete?.call();
-            }
-          },
-          itemBuilder: (ctx) => [
-            const PopupMenuItem(
-              value: 'print',
-              child: ListTile(
-                leading: Icon(Icons.print_rounded),
-                title: Text('Drukuj PDF'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
+    final items = _overflowItems;
+    final totalButtons = items.length + 1;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final everythingFits =
+            constraints.maxWidth >= totalButtons * _kButtonWidth;
+
+        if (everythingFits) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.visibility_rounded, color: cs.primary),
+                tooltip: 'Podgląd testu',
+                visualDensity: VisualDensity.compact,
+                onPressed: onPreview,
               ),
-            ),
-            const PopupMenuItem(
-              value: 'report',
-              child: ListTile(
-                leading: Icon(
-                  Icons.file_download_rounded,
-                  color: Colors.deepPurple,
-                ),
-                title: Text('Raport wyników'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'key',
-              child: ListTile(
-                leading: Icon(Icons.key_rounded, color: Colors.teal),
-                title: Text('Klucz odpowiedzi'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              ),
-            ),
-            if (canEdit) ...[
-              PopupMenuItem(
-                value: 'publish',
-                child: ListTile(
-                  leading: Icon(
-                    isPublished
-                        ? Icons.public_off_rounded
-                        : Icons.public_rounded,
-                    color: isPublished ? Colors.orange : Colors.green,
+              for (final item in items)
+                IconButton(
+                  icon: Icon(
+                    item.icon,
+                    color: item.color ?? cs.onSurfaceVariant,
                   ),
-                  title: Text(isPublished ? 'Wycofaj' : 'Opublikuj'),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
+                  tooltip: item.label,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: item.onTap,
                 ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  leading: Icon(
-                    Icons.delete_rounded,
-                    color: Theme.of(ctx).colorScheme.error,
-                  ),
-                  title: Text(
-                    'Usuń',
-                    style: TextStyle(color: Theme.of(ctx).colorScheme.error),
-                  ),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ),
             ],
+          );
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(Icons.visibility_rounded, color: cs.primary),
+              tooltip: 'Podgląd testu',
+              visualDensity: VisualDensity.compact,
+              onPressed: onPreview,
+            ),
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
+              tooltip: 'Więcej opcji',
+              onSelected: (value) {
+                final item = items.firstWhere((e) => e.value == value);
+                item.onTap?.call();
+              },
+              itemBuilder: (ctx) => [
+                for (final item in items)
+                  PopupMenuItem(
+                    value: item.value,
+                    child: ListTile(
+                      leading: Icon(item.icon, color: item.color),
+                      title: Text(
+                        item.label,
+                        style: item.color == cs.error
+                            ? TextStyle(color: cs.error)
+                            : null,
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ),
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
+}
+
+class _ActionItem {
+  const _ActionItem({
+    required this.value,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
+
+  final String value;
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final Color? color;
 }
 
 // ─────────────────────────────────────────────
@@ -1882,9 +1970,7 @@ class _ArcPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    // Full background track
     canvas.drawArc(rect, -pi / 2, 2 * pi, false, trackPaint);
-    // Progress arc, clockwise from 12 o'clock
     canvas.drawArc(rect, -pi / 2, 2 * pi * progress, false, arcPaint);
   }
 
@@ -1911,6 +1997,8 @@ class _SubtitleChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Icon(
           icon,
@@ -1923,6 +2011,7 @@ class _SubtitleChip extends StatelessWidget {
           style: tt.bodySmall?.copyWith(
             color: highlight ? cs.primary : cs.onSurfaceVariant,
             fontWeight: highlight ? FontWeight.w600 : FontWeight.w400,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -1953,7 +2042,6 @@ class _CreateNewTestTabState extends State<CreateNewTestTab> {
 
   Future<void> _loadQualifications() async {
     if (kUseFakeData) {
-      await Future.delayed(const Duration(milliseconds: 300));
       if (mounted) {
         setState(() {
           qualifications = ['ee08', 'ee09', 'ee10', 'inf02', 'inf03'];
@@ -1992,7 +2080,6 @@ class _CreateNewTestTabState extends State<CreateNewTestTab> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    Theme.of(context).extension<ExtraColors>()!;
     final tt = Theme.of(context).textTheme;
 
     if (isLoading) return const Center(child: CircularProgressIndicator());
@@ -2030,12 +2117,13 @@ class _CreateNewTestTabState extends State<CreateNewTestTab> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DropdownButtonFormField<String>(
             initialValue: selectedQualification,
             isExpanded: true,
-            dropdownColor: cs.surface,
+            dropdownColor: cs.surfaceContainerLowest,
             menuMaxHeight: 400,
             decoration: InputDecoration(
               labelText: 'Wybierz kwalifikację',

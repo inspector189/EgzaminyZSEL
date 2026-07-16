@@ -91,7 +91,7 @@ class OAuth2Service {
       if (!result.isSuccess) {
         if (kDebugMode) {
           debugPrint(
-            'Wystąpił błąd podczas pobierania tokena: ${result.statusCode} - ${result.errorMessage}',
+            'Wystąpił błąd podczas pobierania token\'a: ${result.statusCode} - ${result.errorMessage}',
           );
         }
         return false;

@@ -9,10 +9,9 @@ class SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = theme.colorScheme;
     final fill =
-        theme.inputDecorationTheme.fillColor ??
-        colorScheme.surfaceContainerHighest;
+        theme.inputDecorationTheme.fillColor ?? cs.surfaceContainerHighest;
 
     return TextField(
       onChanged: onChanged,

@@ -333,7 +333,7 @@ class _ModeOption extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-//  Preview card
+//                 Preview card
 // ─────────────────────────────────────────────
 
 class _PreviewCard extends StatelessWidget {

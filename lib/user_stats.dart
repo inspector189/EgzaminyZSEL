@@ -26,8 +26,8 @@ class _UserStatisticsPageState extends State<UserStatisticsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('📊 Statystyki'), elevation: 2),
@@ -100,8 +100,8 @@ class _UserStatisticsPageState extends State<UserStatisticsPage> {
                               Expanded(
                                 child: StatCard(
                                   entry: rowEntries[i],
-                                  colorScheme: colorScheme,
-                                  theme: theme,
+                                  colorScheme: cs,
+                                  textTheme: tt,
                                 ),
                               ),
                               if (i != rowEntries.length - 1)
@@ -150,12 +150,12 @@ class _UserStatisticsPageState extends State<UserStatisticsPage> {
 class StatCard extends StatelessWidget {
   final MapEntry<String, dynamic> entry;
   final ColorScheme colorScheme;
-  final ThemeData theme;
+  final TextTheme textTheme;
 
   const StatCard({
     required this.entry,
     required this.colorScheme,
-    required this.theme,
+    required this.textTheme,
     super.key,
   });
 
@@ -197,7 +197,7 @@ class StatCard extends StatelessWidget {
                 Flexible(
                   child: Text(
                     entry.key,
-                    style: theme.textTheme.titleLarge?.copyWith(
+                    style: textTheme.titleLarge?.copyWith(
                       color: colorScheme.onPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -240,8 +240,8 @@ class _StatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
@@ -249,20 +249,16 @@ class _StatRow extends StatelessWidget {
         border: isLast
             ? null
             : Border(
-                bottom: BorderSide(
-                  color: colorScheme.onSurface.withValues(alpha: 0.08),
-                ),
+                bottom: BorderSide(color: cs.onSurface.withValues(alpha: 0.08)),
               ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+          Expanded(child: Text(label, style: tt.bodyMedium)),
           Text(
             value,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -279,7 +275,8 @@ class LastExamCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -291,8 +288,8 @@ class LastExamCard extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                colorScheme.primary.withValues(alpha: 0.85),
-                colorScheme.primary.withValues(alpha: 0.5),
+                cs.primary.withValues(alpha: 0.85),
+                cs.primary.withValues(alpha: 0.5),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -311,15 +308,15 @@ class LastExamCard extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.school_rounded,
-                      color: colorScheme.onPrimary,
+                      color: cs.onPrimary,
                       size: 28,
                     ),
                     const SizedBox(width: 10),
                     Flexible(
                       child: Text(
                         title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: colorScheme.onPrimary,
+                        style: tt.titleMedium?.copyWith(
+                          color: cs.onPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -331,7 +328,7 @@ class LastExamCard extends StatelessWidget {
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    color: colorScheme.surface,
+                    color: cs.surface,
                     borderRadius: const BorderRadius.vertical(
                       bottom: Radius.circular(16),
                     ),
@@ -371,7 +368,8 @@ class LastExamRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     // (np. "2025-12-04 08:15:45")
     final fullDateTime = (exam['data_czas'] ?? '') as String;
@@ -403,9 +401,7 @@ class LastExamRow extends StatelessWidget {
       decoration: BoxDecoration(
         border: showBorder
             ? Border(
-                bottom: BorderSide(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
-                ),
+                bottom: BorderSide(color: cs.onSurface.withValues(alpha: 0.08)),
               )
             : null,
       ),
@@ -417,9 +413,7 @@ class LastExamRow extends StatelessWidget {
               children: [
                 Text(
                   "$date — wynik: $wynik%",
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 Text(
                   'Czas trwania: $czas',

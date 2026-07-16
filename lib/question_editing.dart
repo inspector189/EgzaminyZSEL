@@ -956,7 +956,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   bool _busyResetAll = false;
 
   Future<void> _resetTrudnoscAll() async {
-    final ok =
+    final request =
         await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -977,7 +977,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           ),
         ) ??
         false;
-    if (!ok) return;
+    if (!request) return;
     setState(() => _busyResetAll = true);
     try {
       final result = await ApiService.instance.resetDifficulty(_kval);
@@ -1002,11 +1002,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   Future<void> _resetTrudnoscOne(int id) async {
-    final ok =
+    final request =
         await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: Text('Resetować trudność pytania ID $id?'),
+            title: Text('Resetować trudność pytania o ID #$id?'),
             content: const Text('Wyzeruje trudność dla tego pytania.'),
             actions: [
               TextButton(
@@ -1021,7 +1021,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           ),
         ) ??
         false;
-    if (!ok) return;
+    if (!request) return;
     try {
       final result = await ApiService.instance.resetDifficulty(
         _kval,
@@ -1049,8 +1049,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final isEditing = editingId != null;
 
     return DefaultTabController(
@@ -1064,25 +1063,25 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               Text('Edytor pytań — ${widget.qualification.toUpperCase()}'),
               if (isEditing)
                 Text(
-                  'Edytujesz ID $editingId',
+                  'Edytujesz pytanie o ID #$editingId',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
-                    color: colorScheme.onPrimary.withValues(alpha: 0.75),
+                    color: cs.onPrimary.withValues(alpha: 0.75),
                   ),
                 ),
             ],
           ),
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
+          backgroundColor: cs.primary,
+          foregroundColor: cs.onPrimary,
           actions: [
             if (isEditing)
               TextButton.icon(
                 onPressed: _startNewQuestion,
-                icon: Icon(Icons.close, color: colorScheme.onPrimary, size: 18),
+                icon: Icon(Icons.close, color: cs.onPrimary, size: 18),
                 label: Text(
                   'Anuluj edycję',
-                  style: TextStyle(color: colorScheme.onPrimary),
+                  style: TextStyle(color: cs.onPrimary),
                 ),
               ),
             IconButton(
@@ -1113,7 +1112,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   Widget _buildMobileLayout(BuildContext context) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: [
         TabBar(
@@ -1121,7 +1120,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             Tab(text: 'Edytor'),
             Tab(text: 'Lista'),
           ],
-          labelColor: theme.colorScheme.primary,
+          labelColor: cs.primary,
         ),
         Expanded(
           child: TabBarView(
@@ -1149,12 +1148,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   // ─────────────────────────────────────────
 
   Widget _buildRightToolbar(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final found = _filteredQuestions.length;
     final total = questions.length;
 
     return Material(
-      color: colorScheme.surface,
+      color: cs.surface,
       elevation: 1,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -1164,13 +1164,34 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             final countWidget = Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.filter_alt, size: 20, color: colorScheme.primary),
+                Icon(Icons.filter_alt_rounded, size: 20, color: cs.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'Wyniki: $found / $total',
+                  'Wyniki',
                   style: TextStyle(
-                    color: colorScheme.onSurface,
+                    color: cs.onSurface,
                     fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: cs.primary.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  child: Text(
+                    "$found / $total",
+                    style: tt.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.primary,
+                    ),
                   ),
                 ),
                 if (!narrow && searchText.isNotEmpty) ...[
@@ -1268,15 +1289,15 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   // ─────────────────────────────────────────
 
   Widget _buildLeftPanel(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     final isEditing = editingId != null;
 
     OutlineInputBorder enabledBorder() => OutlineInputBorder(
-      borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5)),
+      borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.5)),
     );
     OutlineInputBorder focusedBorder() => OutlineInputBorder(
-      borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
+      borderSide: BorderSide(color: cs.primary, width: 2.0),
     );
 
     return Scrollbar(
@@ -1289,25 +1310,23 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionCard(
-              icon: Icons.search,
+              icon: Icons.manage_search_rounded,
               title: 'Szukaj',
-              colorScheme: colorScheme,
+              colorScheme: cs,
               child: TextField(
                 controller: _textSearchCtrl,
                 decoration: InputDecoration(
                   hintText: 'Treść, odpowiedzi lub ID…',
                   prefixIcon: Icon(
-                    Icons.search,
-                    color: colorScheme.onSurfaceVariant,
+                    Icons.search_rounded,
+                    color: cs.onSurfaceVariant,
                   ),
                   border: const OutlineInputBorder(),
                   enabledBorder: enabledBorder(),
                   focusedBorder: focusedBorder(),
                   isDense: true,
                   filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.4,
-                  ),
+                  fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.4),
                 ),
                 onChanged: (v) => setState(() => searchText = v.trim()),
               ),
@@ -1318,14 +1337,12 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
               duration: const Duration(milliseconds: 200),
               decoration: BoxDecoration(
                 color: isEditing
-                    ? colorScheme.primaryContainer.withValues(alpha: 0.35)
-                    : colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.25,
-                      ),
+                    ? cs.primaryContainer.withValues(alpha: 0.15)
+                    : cs.surfaceContainerHighest.withValues(alpha: 0.25),
                 border: Border.all(
                   color: isEditing
-                      ? colorScheme.primary.withValues(alpha: 0.5)
-                      : colorScheme.outline.withValues(alpha: 0.2),
+                      ? cs.primary.withValues(alpha: 0.5)
+                      : cs.outline.withValues(alpha: 0.2),
                 ),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1335,22 +1352,18 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   Icon(
                     isEditing ? Icons.edit_note : Icons.add_circle_outline,
                     size: 20,
-                    color: isEditing
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
+                    color: isEditing ? cs.primary : cs.onSurfaceVariant,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       isEditing
-                          ? 'Edytujesz pytanie ID $editingId'
+                          ? 'Edytujesz pytanie o ID #$editingId'
                           : 'Nowe pytanie${_nextId != null ? ' (szac. ID ~$_nextId)' : ''}',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: isEditing
-                            ? colorScheme.primary
-                            : colorScheme.onSurface,
+                        color: isEditing ? cs.primary : cs.onSurface,
                       ),
                     ),
                   ),
@@ -1359,9 +1372,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                     icon: Icon(isEditing ? Icons.close : Icons.add, size: 16),
                     label: Text(isEditing ? 'Anuluj' : 'Nowe'),
                     style: TextButton.styleFrom(
-                      foregroundColor: isEditing
-                          ? colorScheme.error
-                          : colorScheme.primary,
+                      foregroundColor: isEditing ? cs.error : cs.primary,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 6,
@@ -1377,7 +1388,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             _SectionCard(
               icon: Icons.perm_media_outlined,
               title: 'Multimedia',
-              colorScheme: colorScheme,
+              colorScheme: cs,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1387,13 +1398,13 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       _mediaChip(
                         'Brak',
                         MediaKind.none,
-                        colorScheme,
+                        cs,
                         onSelected: _removeMedia,
                       ),
                       _mediaChip(
                         'Obrazek',
                         MediaKind.image,
-                        colorScheme,
+                        cs,
                         onSelected: () => setState(() {
                           _mediaKind = MediaKind.image;
                           _videoBytes = null;
@@ -1406,7 +1417,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       _mediaChip(
                         'Film',
                         MediaKind.video,
-                        colorScheme,
+                        cs,
                         onSelected: () => setState(() {
                           _mediaKind = MediaKind.video;
                           _imageBytes = null;
@@ -1419,7 +1430,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   ),
                   if (_mediaKind != MediaKind.none) ...[
                     const SizedBox(height: 12),
-                    _buildMediaBody(colorScheme),
+                    _buildMediaBody(cs),
                   ],
                 ],
               ),
@@ -1429,7 +1440,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             _SectionCard(
               icon: Icons.help_outline,
               title: 'Treść pytania',
-              colorScheme: colorScheme,
+              colorScheme: cs,
               child: TextField(
                 controller: _contentCtrl,
                 onChanged: (_) => _refreshTextPreview(),
@@ -1439,9 +1450,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   enabledBorder: enabledBorder(),
                   focusedBorder: focusedBorder(),
                   filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.3,
-                  ),
+                  fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.3),
                 ),
                 maxLines: 7,
                 minLines: 5,
@@ -1452,35 +1461,45 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             _SectionCard(
               icon: Icons.checklist_rtl,
               title: 'Odpowiedzi',
-              colorScheme: colorScheme,
+              colorScheme: cs,
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Poprawna: ',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  DropdownButton<String>(
-                    value: _correct,
-                    isDense: true,
-                    underline: const SizedBox.shrink(),
-                    onChanged: (v) => setState(() => _correct = v ?? 'A'),
-                    items: const [
-                      DropdownMenuItem(value: 'A', child: Text('A')),
-                      DropdownMenuItem(value: 'B', child: Text('B')),
-                      DropdownMenuItem(value: 'C', child: Text('C')),
-                      DropdownMenuItem(value: 'D', child: Text('D')),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'A', label: Text('A')),
+                      ButtonSegment(value: 'B', label: Text('B')),
+                      ButtonSegment(value: 'C', label: Text('C')),
+                      ButtonSegment(value: 'D', label: Text('D')),
                     ],
+                    selected: {_correct},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (s) =>
+                        setState(() => _correct = s.first),
+                    style: SegmentedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      side: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.45),
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      selectedBackgroundColor: extras.correct,
+                      selectedForegroundColor: cs.onPrimary,
+                    ),
                   ),
                 ],
               ),
               child: Column(
                 children: [
                   for (int i = 0; i < 4; i++) ...[
-                    _buildAnswerEditor(i, colorScheme),
+                    _buildAnswerEditor(i, cs),
                     if (i < 3) const SizedBox(height: 10),
                   ],
                 ],
@@ -1491,7 +1510,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             _SectionCard(
               icon: Icons.info_outline,
               title: 'Wyjaśnienia (opcjonalne)',
-              colorScheme: colorScheme,
+              colorScheme: cs,
               child: Column(
                 children: [
                   TextField(
@@ -1503,7 +1522,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       enabledBorder: enabledBorder(),
                       focusedBorder: focusedBorder(),
                       filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest.withValues(
+                      fillColor: cs.surfaceContainerHighest.withValues(
                         alpha: 0.3,
                       ),
                     ),
@@ -1520,7 +1539,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       enabledBorder: enabledBorder(),
                       focusedBorder: focusedBorder(),
                       filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest.withValues(
+                      fillColor: cs.surfaceContainerHighest.withValues(
                         alpha: 0.3,
                       ),
                     ),
@@ -1542,7 +1561,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       side: BorderSide(
-                        color: colorScheme.outline.withValues(alpha: 0.6),
+                        color: cs.outline.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -1552,7 +1571,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   flex: 2,
                   child: FilledButton.icon(
                     onPressed: _saveQuestion,
-                    icon: const Icon(Icons.save_outlined),
+                    icon: const Icon(Icons.save_rounded),
                     label: Text(isEditing ? 'Zaktualizuj' : 'Zapisz pytanie'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1797,15 +1816,17 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
     final letter = 'ABCD'[index];
     final isCorrect = letter == _correct;
     final cs = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     bool textSelected = a.kind == AnswerKind.text;
     bool imageSelected = a.kind == AnswerKind.image;
 
     return Container(
+      key: ValueKey('answer_editor_$letter'),
       decoration: BoxDecoration(
         border: Border(
           left: BorderSide(
             color: isCorrect
-                ? colorScheme.primary
+                ? extras.correct
                 : colorScheme.outline.withValues(alpha: 0.25),
             width: 3,
           ),
@@ -1825,26 +1846,44 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: () => setState(() => _correct = letter),
-                    child: Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: isCorrect
-                            ? colorScheme.primary
-                            : colorScheme.surfaceContainerHighest,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        letter,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isCorrect
-                              ? colorScheme.onPrimary
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey('circle_anim_$letter'),
+                      tween: Tween(begin: 0.0, end: isCorrect ? 1.0 : 0.0),
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeInOutCubic,
+                      builder: (context, t, child) {
+                        final bgColor = Color.lerp(
+                          colorScheme.surfaceContainerHighest,
+                          extras.correct,
+                          t,
+                        )!;
+                        final fgColor = Color.lerp(
+                          colorScheme.onSurfaceVariant,
+                          colorScheme.onPrimary,
+                          t,
+                        )!;
+                        final scale = 0.95 + (0.25 * t);
+                        return Transform.scale(
+                          scale: scale,
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              letter,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: fgColor,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -2048,7 +2087,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
         backgroundColor: isActiveEdit
             ? cs.primaryContainer.withValues(alpha: 0.10)
             : cs.surface,
-        shadowAlpha: 0, // shadow handled by AnimatedContainer above
+        shadowAlpha: 0,
         headerTrailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2076,14 +2115,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
             ),
             _cardAction(
               context,
-              icon: Icons.restart_alt,
+              icon: Icons.restart_alt_rounded,
               label: 'Zresetuj trudność',
               onTap: id == null ? null : () => _resetTrudnoscOne(id),
               color: cs.secondary,
             ),
             _cardAction(
               context,
-              icon: Icons.delete_outline,
+              icon: Icons.delete_outline_rounded,
               label: 'Usuń',
               onTap: id == null
                   ? null
@@ -2203,7 +2242,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   // ─────────────────────────────────────────
 
   Widget _buildLivePreview(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final url = '$apiBaseUrl/$_kval/obrazy/';
 
     final questionImageUrls = _mediaKind == MediaKind.image
@@ -2236,10 +2275,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
       );
     });
 
-    final label = editingId != null ? 'Pytanie ID $editingId' : 'Nowe pytanie';
+    final label = editingId != null ? 'ID #$editingId' : 'Nowe pytanie';
     final questionText = _clean(_contentCtrl.text.trim());
 
-    // Local video not yet uploaded needs async temp-file resolution first.
     if (_mediaKind == MediaKind.video &&
         _uploadedVideoUrl == null &&
         (_videoBytes?.isNotEmpty ?? false)) {
@@ -2264,9 +2302,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 questionImages: questionImageUrls,
                 questionVideos: [snapshot.data!],
                 answers: answers,
-                accentColor: colorScheme.primary,
+                accentColor: cs.primary,
                 showResult: true,
-                resultBanner: _buildExplanationBanner(colorScheme),
+                resultBanner: _buildExplanationBanner(cs),
               ),
             );
           },
@@ -2284,9 +2322,9 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
           questionImages: questionImageUrls,
           questionVideos: questionVideoUrls,
           answers: answers,
-          accentColor: colorScheme.primary,
+          accentColor: cs.primary,
           showResult: true,
-          resultBanner: _buildExplanationBanner(colorScheme),
+          resultBanner: _buildExplanationBanner(cs),
         ),
       ),
     );
@@ -2325,11 +2363,11 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
   }
 
   Widget _previewShell(BuildContext context, {required Widget child}) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: [
         Material(
-          color: colorScheme.tertiaryContainer,
+          color: cs.tertiaryContainer,
           elevation: 0,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -2338,7 +2376,7 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                 Icon(
                   Icons.preview_rounded,
                   size: 22,
-                  color: colorScheme.onTertiaryContainer,
+                  color: cs.onTertiaryContainer,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -2347,14 +2385,14 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: colorScheme.onTertiaryContainer,
+                      color: cs.onTertiaryContainer,
                       letterSpacing: 0.3,
                     ),
                   ),
                 ),
                 TextButton.icon(
                   onPressed: () => setState(() => _showPreview = false),
-                  icon: const Icon(Icons.close, size: 16),
+                  icon: const Icon(Icons.close_rounded, size: 16),
                   label: const Text('Zamknij'),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
@@ -2362,10 +2400,8 @@ class _EditQuestionsPageState extends State<EditQuestionsPage> {
                       vertical: 8,
                     ),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    backgroundColor: colorScheme.errorContainer.withValues(
-                      alpha: 0.85,
-                    ),
-                    foregroundColor: colorScheme.onTertiaryContainer,
+                    backgroundColor: cs.errorContainer.withValues(alpha: 0.85),
+                    foregroundColor: cs.onTertiaryContainer,
                   ),
                 ),
               ],

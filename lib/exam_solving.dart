@@ -42,7 +42,7 @@ extension _TrybX on TrybEgzaminu {
 }
 
 // ──────────────
-// Widget
+//    Widget
 // ──────────────
 
 class EgzaminView extends StatefulWidget {
@@ -69,12 +69,10 @@ class EgzaminView extends StatefulWidget {
 }
 
 class _EgzaminViewState extends State<EgzaminView> {
-  // ── Helpers ──────
   final _unescape = HtmlUnescapeSmall();
   String _clean(String? s) => _unescape.convert(s?.toString() ?? '');
   TrybEgzaminu get _tryb => widget.tryb;
 
-  // ── Timer ────────
   Timer? _examTimer;
   final int minutesToEndExam = 60;
   DateTime _endTime = DateTime.now();
@@ -165,8 +163,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     super.dispose();
   }
 
-  // ── Data fetching ─────────────────────────
-
   Future<void> fetchQuestions() async {
     try {
       final selected = await _fetchFromApi();
@@ -184,7 +180,7 @@ class _EgzaminViewState extends State<EgzaminView> {
 
       if (_tryb.isTimed) _startTimer();
     } catch (e) {
-      if (kDebugMode) debugPrint('Pobranie pytań nie powiodło się: $e');
+      if (kDebugMode) debugPrint('Wystąpił błąd podczas pobierania pytań: $e');
     }
   }
 
@@ -229,8 +225,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     }
   }
 
-  // ── Difficulty ────────────────────────────
-
   Future<void> _recordDifficulty(int id, bool correct) async {
     if (id <= 0) return;
     final result = await ApiService.instance.recordDifficulty(
@@ -239,7 +233,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       correct,
     );
     if (!result.isSuccess && mounted && kDebugMode) {
-      debugPrint('Zapis trudności nie powiódł się: ${result.errorMessage}');
+      debugPrint('Wystąpił błąd podczas zapisu trudności: ${result.errorMessage}');
     }
   }
 
@@ -270,8 +264,6 @@ class _EgzaminViewState extends State<EgzaminView> {
       if (mounted) setState(() => _isLoadingNext = false);
     }
   }
-
-  // ── Exam finish ───────────────────────────
 
   Future<void> _confirmFinishExam() async {
     if (_isButtonDisabled) return;
@@ -502,8 +494,6 @@ class _EgzaminViewState extends State<EgzaminView> {
     );
   }
 
-  // ── List layout
-
   Widget _buildLazyList() {
     final items = _filteredQuestions.take(_visibleCount).toList();
     final showResult = _tryb.showResultImmediately;
@@ -642,9 +632,12 @@ class _EgzaminViewState extends State<EgzaminView> {
   // ── Question card ─────────────────────────
 
   String _questionLabel(int index, dynamic q) {
-    if (_tryb.isAllQuestions) {
-      final id = q['id'] != null ? 'ID #${q['id']}' : '';
-      return id;
+    if (!_tryb.isSingleQuestion) {
+      if (_tryb.isAllQuestions) {
+        final id = q['id'] != null ? 'ID #${q['id']}' : '';
+        return id;
+      }
+      return 'Pytanie ${index + 1}';
     }
     return 'Pytanie';
   }
@@ -744,9 +737,7 @@ class _EgzaminViewState extends State<EgzaminView> {
       resultBanner: resultBanner,
     );
   }
-
-  // ── Finish button ─────────────────────────
-
+  
   Widget _buildFinishButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
@@ -765,8 +756,6 @@ class _EgzaminViewState extends State<EgzaminView> {
       ),
     );
   }
-
-  // ── Shimmer ───────────────────────────────
 
   Widget _buildShimmer(BuildContext context) {
     final extras = Theme.of(context).extension<ExtraColors>()!;

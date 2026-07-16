@@ -39,9 +39,8 @@ class _AdminTileState extends State<AdminTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final scale = _pressed
         ? 0.97
         : _hovered
@@ -76,13 +75,11 @@ class _AdminTileState extends State<AdminTile> {
             height: 120,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: colorScheme.surface,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: colorScheme.onSurface.withValues(
-                    alpha: _hovered ? 0.2 : 0.15,
-                  ),
+                  color: cs.onSurface.withValues(alpha: _hovered ? 0.2 : 0.15),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -90,21 +87,21 @@ class _AdminTileState extends State<AdminTile> {
             ),
             child: Row(
               children: [
-                Icon(widget.data.icon, size: 36, color: colorScheme.primary),
+                Icon(widget.data.icon, size: 36, color: cs.primary),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
                     widget.data.label,
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    style: tt.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface,
+                      color: cs.onSurface,
                     ),
                   ),
                 ),
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: colorScheme.onSurfaceVariant,
+                  color: cs.onSurfaceVariant,
                 ),
               ],
             ),

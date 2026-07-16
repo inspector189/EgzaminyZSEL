@@ -4,6 +4,7 @@ class ProfilePopup extends StatelessWidget {
   final String userName;
   final String userEmail;
   final bool isAdmin;
+  final bool isSuperAdmin;
   final VoidCallback onOpenAdminPanel;
   final VoidCallback onOpenPersonalisation;
   final VoidCallback onOpenStatistics;
@@ -14,6 +15,7 @@ class ProfilePopup extends StatelessWidget {
     required this.userName,
     required this.userEmail,
     required this.isAdmin,
+    required this.isSuperAdmin,
     required this.onOpenAdminPanel,
     required this.onOpenPersonalisation,
     required this.onOpenStatistics,
@@ -43,12 +45,10 @@ class ProfilePopup extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── User identity header ─────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
               child: Row(
                 children: [
-                  // Avatar
                   Container(
                     width: 44,
                     height: 44,
@@ -98,16 +98,25 @@ class ProfilePopup extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: cs.secondaryContainer,
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(5),
                             ),
-                            child: Text(
-                              'Administrator',
-                              style: tt.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: cs.onSecondaryContainer,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
+                            child: isSuperAdmin
+                                ? Text(
+                                    'Admin Nadrzędny',
+                                    style: tt.labelSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSecondaryContainer,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  )
+                                : Text(
+                                    'Admin',
+                                    style: tt.labelSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSecondaryContainer,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
                           ),
                         ],
                       ],
@@ -119,7 +128,6 @@ class ProfilePopup extends StatelessWidget {
 
             Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.4)),
 
-            // ── Menu items ───────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
@@ -153,7 +161,6 @@ class ProfilePopup extends StatelessWidget {
 
             Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.4)),
 
-            // ── Sign out ─────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: _MenuItem(

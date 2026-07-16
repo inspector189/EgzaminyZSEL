@@ -22,18 +22,17 @@ class ExamResultsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final extras = theme.extension<ExtraColors>()!;
+    final cs = Theme.of(context).colorScheme;
+    final extras = Theme.of(context).extension<ExtraColors>()!;
     final percentage = (correctAnswers / totalQuestions) * 100;
-    final bool zdane = percentage >= 50;
+    final bool passingGrade = percentage >= 50;
 
     final resultText = "$correctAnswers / $totalQuestions";
-    final message = zdane
+    final message = passingGrade
         ? "Gratulacje! Zdałeś egzamin!"
         : "Niestety, nie udało się zdać egzaminu";
 
-    final color = zdane ? extras.correct : extras.incorrect;
+    final color = passingGrade ? extras.correct : extras.incorrect;
 
     return Scaffold(
       appBar: AppBar(
@@ -85,7 +84,7 @@ class ExamResultsPage extends StatelessWidget {
                             ),
                             Center(
                               child: Icon(
-                                zdane
+                                passingGrade
                                     ? Icons.check_circle_rounded
                                     : Icons.cancel_rounded,
                                 color: color,
@@ -113,7 +112,7 @@ class ExamResultsPage extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 48,
                               fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
+                              color: cs.onSurface,
                             ),
                           ),
                           Container(
@@ -154,8 +153,8 @@ class ExamResultsPage extends StatelessWidget {
                           icon: const Icon(Icons.visibility),
                           label: const Text("Podgląd egzaminu"),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
+                            backgroundColor: cs.primary,
+                            foregroundColor: cs.onPrimary,
                           ),
                         ),
                       const SizedBox(height: 8),

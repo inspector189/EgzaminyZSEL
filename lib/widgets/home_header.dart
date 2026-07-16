@@ -7,16 +7,16 @@ class HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       children: [
         Text(
-          'Witamy w aplikacji Egzaminy! 👋',
-          style: theme.textTheme.headlineMedium?.copyWith(
+          'Witamy w aplikacji Egzaminy!',
+          style: tt.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: colorScheme.onPrimary,
+            color: cs.onPrimary,
           ),
           textAlign: TextAlign.center,
         ),
@@ -24,21 +24,27 @@ class HomeHeader extends StatelessWidget {
         Text(
           'Przygotuj się do egzaminu zawodowego z najlepszą bazą pytań!'
           ' Poniżej znajdziesz kwalifikacje, które możesz przeglądać:',
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: colorScheme.onSurface,
-          ),
+          style: tt.bodyLarge?.copyWith(color: cs.onSurface),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
-        Text(
-          '💬 $selectedQuote',
-          style: theme.textTheme.bodyLarge?.copyWith(
-            fontStyle: FontStyle.italic,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(Icons.format_quote_rounded, color: cs.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(
+              selectedQuote,
+              style: tt.bodyLarge?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ],
     );

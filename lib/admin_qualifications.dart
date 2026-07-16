@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 // ─────────────────────────────────────────────
-// Data models
+//                 Data models
 // ─────────────────────────────────────────────
 
 class QualificationData {
@@ -51,7 +51,7 @@ class ProfessionData {
 }
 
 // ─────────────────────────────────────────────
-// In-memory store
+//             QualificationsStore
 // ─────────────────────────────────────────────
 
 class QualificationsStore extends ChangeNotifier {
@@ -104,7 +104,6 @@ Future<String?> showEmojiPicker(BuildContext context) async {
       height: 420,
       child: Column(
         children: [
-          // drag handle
           Container(
             margin: const EdgeInsets.only(top: 10, bottom: 4),
             width: 36,
@@ -361,7 +360,6 @@ class _QualificationFormDialogState extends State<QualificationFormDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Emoji + code row
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -494,12 +492,13 @@ class _ProfessionFormDialogState extends State<ProfessionFormDialog> {
   }
 
   void _submit() {
+    final cs = Theme.of(context).colorScheme;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCodes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Wybierz co najmniej jedną kwalifikację'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: cs.error,
         ),
       );
       return;
